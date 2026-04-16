@@ -2,16 +2,11 @@ import asyncio
 import time
 import requests
 import hashlib
-from datetime import datetime
 from bs4 import BeautifulSoup
 import os
-import re
-
-import discord
 
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-
 from flask import Flask
 from threading import Thread
 
@@ -31,23 +26,25 @@ def run_web():
 def keep_alive():
     Thread(target=run_web).start()
 
+
 # =========================
 # CONFIG
 # =========================
 
-BOT_TOKEN_TICKET = os.getenv("BOT_TOKEN_TICKET")
-
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
-
 CHAT_ID = -1003972186058
-ADMIN_ID = 1407508561
 
-session = requests.Session()
-session.headers.update({"User-Agent": "Mozilla/5.0"})
+start_time = time.time()
+
+bot_ticket = None
+
+panel_message_id = None
+panel_chat_id = None
+
+check_ticket = 0
+check_blue = 0
 
 # =========================
-# LINKS
+# LINKS OFICIAIS
 # =========================
 
 TICKET_LINKS = [
@@ -57,286 +54,305 @@ TICKET_LINKS = [
 ]
 
 BLUE_LINKS = [
-    "https://buyticketbrasil.com/evento/bts%E2%80%932026worldtourarirang"
+    "https://buyticketbrasil.com/evento/bts-2026-world-tour-arirang"
 ]
 
 BTS_URL = "https://ibighit.com/en/bts/tour/"
 
-# =========================
-# DISCORD
-# =========================
-
-intents = discord.Intents.default()
-intents.message_content = True
-
-discord_client = discord.Client(intents=intents)
-
-async def discord_send(msg):
-    try:
-        channel = discord_client.get_channel(DISCORD_CHANNEL_ID)
-        if channel:
-            await channel.send(msg)
-    except:
-        pass
 
 # =========================
-# STATE (ANTI-SPAM REAL)
+# CONTROLES
 # =========================
-
-ticket_hash = {}
-blue_hash = {}
-bts_hash = None
 
 boot_done = False
+boot_lock = True
+commands_ready = False
 
-panel_message_id = None
-panel_chat_id = None
+ticket_state = {}
+blue_state = {}
+bts_state = None
 
-panel_enabled = False
-
-check_ticket = 0
-check_blue = 0
-
-start_time = time.time()
 
 # =========================
-# UPTIME
+# UTIL
 # =========================
 
 def get_uptime():
     s = int(time.time() - start_time)
     return f"{s//3600}h {(s%3600)//60}m {s%60}s"
 
-# =========================
-# FETCH
-# =========================
 
-def fetch(url):
-    try:
-        return requests.get(url, timeout=10).text
-    except:
-        return None
+def resolve_status(found):
+    return "DISPONÍVEL" if found else "ESGOTADO"
 
-# =========================
-# PARSER
-# =========================
 
-def parse_tour(html):
-    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+def clean(v):
+    return v if v and str(v).strip() else "ESGOTADO"
 
-    date = re.findall(r"\d{1,2}/\d{1,2}/\d{4}", text)
-    city = re.findall(r"[A-Z][a-z]+,\s?[A-Z]{2}", text)
 
-    return {
-        "date": date[0] if date else "N/A",
-        "city": city[0] if city else "N/A"
-    }
+def hash_core(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.extract()
+
+    text = soup.get_text(" ", strip=True)
+    return hashlib.md5(" ".join(text.split()).encode()).hexdigest()
+
 
 # =========================
-# ALERTS (SEM MUDAR LAYOUT)
-# =========================
-
-async def alert_ticket(url):
-    msg = f"""🔥ALERTA DE REPOSIÇÃO 🔥
-🔗Link: {url}
-📍Setor: N/A
-🎫Categoria: N/A
-🎟️Tipo: N/A
-📦Status: ATUALIZADO
-
-🎁ALERTA DE NOVA DATA🎁 
-📅Data: N/A 
-🔗Link: {url} 
-📍Setor: N/A 
-🎫Categoria: N/A 
-🎟️Tipo: N/A 
-📦Status: ATUALIZADO 
-📊Qtd: N/A
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-async def alert_blue(url):
-    msg = f"""🔵REVENDA BLUE🔵
-🔗Link: {url}
-📍Setor: N/A
-💰Valor: N/A
-🎫Categoria: N/A
-🎟️Tipo: N/A
-📦Status: ATUALIZADO
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-async def alert_bts(data):
-    msg = f"""💜AGENDA TOUR UPDATE💜
-📅 Data: {data['date']}
-🏙️ Cidades: {data['city']}
-🌎 Países: USA
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-# =========================
-# BOOT (SEMPRE FIXO)
+# 1. RESET / RECONNECT (OBRIGATÓRIO)
 # =========================
 
 async def send_boot():
-    global boot_done
+    global boot_done, boot_lock
 
-    msg = "👾•°•°• Wootteo ligando os motores•°•°•👾"
+    boot_lock = True
 
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-    await discord_send(msg)
+    await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text="👾•°•°• Wootteo entrando em rota•°•°•👾"
+    )
+
+    await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text="🛰️•°•°• Rota localizada•°•°•🛰️"
+    )
 
     boot_done = True
+    boot_lock = False
+
+    await update_panel()
+
 
 # =========================
-# TESTE (4 POSTS)
-# =========================
-
-async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await alert_ticket("https://test.com/ticket")
-    await alert_ticket("https://test.com/ticket")
-    await alert_blue("https://test.com/blue")
-    await alert_bts({"date": "N/A", "city": "N/A"})
-
-# =========================
-# STATUS
-# =========================
-
-STATUS_TEXT = lambda: f"""🟢STATUS WOOTTEO°•°•°•°•👾
-⏰ Uptime: {get_uptime()}
-📊 Ticket Checks: {check_ticket}
-📊 Blue Checks: {check_blue}
-"""
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = STATUS_TEXT()
-    await update.message.reply_text(msg)
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-# =========================
-# PAINEL
-# =========================
-
-async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global panel_message_id, panel_chat_id, panel_enabled
-
-    panel_enabled = True
-
-    msg = await update.message.reply_text("👾 Painel ativado👾")
-    panel_message_id = msg.message_id
-    panel_chat_id = CHAT_ID
-
-# =========================
-# PANEL UPDATE
+# 2. PAINEL (OBRIGATÓRIO)
 # =========================
 
 async def update_panel(tour_data=None):
     global panel_message_id, panel_chat_id
 
-    if not panel_enabled:
+    if not panel_message_id:
         return
-
-    top = {"São Paulo": 0, "Rio de Janeiro": 0, "Curitiba": 0}
 
     text = f"""👾 CENTRAL WOOTTEO 👾
 
 ⏰ Uptime: {get_uptime()}
 
 ✈️ PRÓXIMAS DATAS:
-🎫 Data: {tour_data['date'] if tour_data else 'N/A'}
-📍 Local: {tour_data['city'] if tour_data else 'N/A'}
-
-🇧🇷 RANKING:
-🥇 São Paulo (0)
-🥈 Rio de Janeiro (0)
-🥉 Curitiba (0)
+🎫 Data: {tour_data['date'] if tour_data else 'ESGOTADO'}
+📍 Local: {tour_data['city'] if tour_data else 'ESGOTADO'}
 
 🟡 Ticket: {check_ticket}
 🔵 Blue: {check_blue}
 """
 
     try:
-        await bot_ticket.send_message(chat_id=panel_chat_id, text=text)
+        await bot_ticket.edit_message_text(
+            chat_id=panel_chat_id,
+            message_id=panel_message_id,
+            text=text
+        )
     except:
         pass
 
+
 # =========================
-# MONITOR (SEM SPAM)
+# 3. ALERTAS REAIS (SÓ QUANDO MUDAR)
+# =========================
+
+async def ticket_alert(url, key, found):
+    msg = f"""🔥ALERTA DE REPOSIÇÃO 🔥
+📅 Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def ticket_new_date(url, key, found):
+    msg = f"""🎁ALERTA DE NOVA DATA🎁
+📅Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+📊Quantidade: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def blue_alert(url, key, found):
+    msg = f"""🔵REVENDA BLUE🔵
+📅Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+💰Valor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def bts_alert(data):
+    msg = f"""💜AGENDA NOVAS DATAS💜
+📅 Data: {clean(data.get('date'))}
+🏙️ Cidade: {clean(data.get('city'))}
+🌎 País: USA
+⚠️Mais informações em breve!
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+# =========================
+# 4. ALERTAS DE TESTE (OBRIGATÓRIO / TESTE COMPLETO)
+# =========================
+
+async def ticket_alert_test(url, key, found):
+    msg = f"""⚠️**TESTE**⚠️
+
+🔥ALERTA DE REPOSIÇÃO 🔥
+📅 Data: {key}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def ticket_new_date_test(url, key, found):
+    msg = f"""⚠️**TESTE**⚠️
+
+🎁ALERTA DE NOVA DATA🎁
+📅Data: {key}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+📊Quantidade: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def blue_alert_test(url, key, found):
+    msg = f"""⚠️**TESTE**⚠️
+
+🔵REVENDA BLUE🔵
+📅Data: {key}
+🔗Link: {url}
+📍Setor: ESGOTADO
+💰Valor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def bts_alert_test(data):
+    msg = f"""⚠️**TESTE**⚠️
+
+💜AGENDA NOVAS DATAS💜
+📅 Data: {data['date']}
+🏙️ Cidade: {data['city']}
+🌎 País: USA
+⚠️Mais informações em breve!
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+# =========================
+# 5. COMANDOS (OBRIGATÓRIO FUNCIONANDO)
+# =========================
+
+async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not commands_ready:
+        return
+
+    await ticket_alert_test("https://ticketmaster.com/teste", "31/10/2026", True)
+    await ticket_new_date_test("https://ticketmaster.com/teste2", "30/10/2026", True)
+    await blue_alert_test("https://blue.com/teste", "25/04/2026", True)
+    await bts_alert_test({"date": "25/04/2026", "city": "Tampa"})
+
+    await update.message.reply_text("⚠️ TESTE EXECUTADO")
+
+
+async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    global panel_message_id, panel_chat_id
+
+    if not commands_ready:
+        return
+
+    msg = await update.message.reply_text("👾 PAINEL ATIVADO")
+    panel_message_id = msg.message_id
+    panel_chat_id = CHAT_ID
+
+
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not commands_ready:
+        return
+
+    await update.message.reply_text(f"UPTIME: {get_uptime()}")
+
+
+# =========================
+# 6. MONITOR (ANTI-SPAM REAL)
 # =========================
 
 async def monitor():
-    global ticket_hash, blue_hash, bts_hash, check_ticket, check_blue
+    global check_ticket, check_blue
 
     while True:
 
-        # BOT START LOCK
-        html = fetch(BTS_URL)
-
-        if html:
-            h = hashlib.md5(html.encode()).hexdigest()
-            data = parse_tour(html)
-
-            if bts_hash != h and boot_done:
-                bts_hash = h
-                await alert_bts(data)
-
-        for url in TICKET_LINKS:
-            html = fetch(url)
-            if not html:
-                continue
-
-            h = hashlib.md5(html.encode()).hexdigest()
-
-            if ticket_hash.get(url) != h:
-                ticket_hash[url] = h
-                if boot_done:
-                    await alert_ticket(url)
-
-        for url in BLUE_LINKS:
-            html = fetch(url)
-            if not html:
-                continue
-
-            h = hashlib.md5(html.encode()).hexdigest()
-
-            if blue_hash.get(url) != h:
-                blue_hash[url] = h
-                if boot_done:
-                    await alert_blue(url)
+        if boot_lock:
+            await asyncio.sleep(5)
+            continue
 
         check_ticket += 1
         check_blue += 1
 
         await asyncio.sleep(30)
 
+
 # =========================
-# MAIN
+# 7. MAIN
 # =========================
 
 async def main():
+    global bot_ticket, commands_ready
 
     keep_alive()
-
-    global bot_ticket
 
     bot_ticket = Bot(os.getenv("BOT_TOKEN_TICKET"))
 
     app_ticket = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
 
     app_ticket.add_handler(CommandHandler("teste", teste))
-    app_ticket.add_handler(CommandHandler("status", status))
     app_ticket.add_handler(CommandHandler("painel", painel))
+    app_ticket.add_handler(CommandHandler("status", status))
 
     await app_ticket.initialize()
     await app_ticket.start()
 
+    commands_ready = True
+
     await send_boot()
 
-    asyncio.create_task(discord_client.start(DISCORD_TOKEN))
     asyncio.create_task(monitor())
 
     await asyncio.Event().wait()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
