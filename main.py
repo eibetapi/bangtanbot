@@ -76,6 +76,8 @@ async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     panel_message_id = msg.message_id
 
 async def update_panel():
+    global panel_message_id
+
     if not panel_message_id:
         return
 
@@ -185,9 +187,6 @@ async def monitor():
 # MAIN
 # =========================
 
-async def start_bot(app):
-    await app.run_polling()
-
 async def main():
     keep_alive()
 
@@ -198,13 +197,16 @@ async def main():
         app.add_handler(CommandHandler("status", status))
         app.add_handler(CommandHandler("painel", painel))
 
+    # roda monitor
     asyncio.create_task(monitor())
 
     print("🔥 Bots iniciando...")
 
-    await asyncio.gather(
-        start_bot(app_ticket),
-        start_bot(app_blue)
-    )
+    # roda bots corretamente
+    asyncio.create_task(app_ticket.run_polling())
+    asyncio.create_task(app_blue.run_polling())
+
+    # mantém vivo
+    await asyncio.Event().wait()
 
 asyncio.run(main())
