@@ -150,6 +150,8 @@ async def alert_ticket(url):
 🎟️Tipo: N/A
 📦Status: ATUALIZADO
 
+bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 🎁ALERTA DE NOVA DATA🎁 
 📅Data: N/A 
 🔗Link: {url} 
