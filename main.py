@@ -36,7 +36,6 @@ def keep_alive():
 # =========================
 
 BOT_TOKEN_TICKET = os.getenv("BOT_TOKEN_TICKET")
-BOT_TOKEN_BLUE = os.getenv("BOT_TOKEN_BLUE")
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
@@ -48,7 +47,7 @@ session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0"})
 
 # =========================
-# LINKS (NÃO REMOVIDO)
+# LINKS (3 SOURCES)
 # =========================
 
 TICKET_LINKS = [
@@ -58,10 +57,10 @@ TICKET_LINKS = [
 ]
 
 BLUE_LINKS = [
-    "https://buyticketbrasil.com/evento/bts%E2%80%932026worldtourarirang?data=1793242799000"
+    "https://buyticketbrasil.com/evento/bts%E2%80%932026worldtourarirang"
 ]
 
-TOUR_URL = "https://ibighit.com/en/bts/tour/"
+BTS_URL = "https://ibighit.com/en/bts/tour/"
 
 # =========================
 # DISCORD
@@ -81,12 +80,14 @@ async def discord_send(msg):
         pass
 
 # =========================
-# STATE
+# STATE (ANTI-SPAM REAL)
 # =========================
 
 ticket_hash = {}
 blue_hash = {}
-tour_hash = None
+bts_hash = None
+
+boot_done = False
 
 panel_message_id = None
 panel_chat_id = None
@@ -138,40 +139,40 @@ def parse_tour(html):
     }
 
 # =========================
-# ALERTS (NÃO ALTERAR LAYOUT)
+# ALERTS (SEM ALTERAÇÃO DE LAYOUT)
 # =========================
 
-async def alert_ticket(url, data):
-    text = f"""🔥ALERTA DE REPOSIÇÃO 🔥
+async def alert_ticket(url):
+    msg = f"""🔥ALERTA DE REPOSIÇÃO 🔥
 🔗Link: {url}
-📍Setor: {data.get('setor','N/A')}
-🎫Categoria: {data.get('categorias','N/A')}
-🎟️Tipo: {data.get('tipo','N/A')}
-📦Status: {data.get('status','N/A')}
+📍Setor: N/A
+🎫Categoria: N/A
+🎟️Tipo: N/A
+📦Status: ATUALIZADO
 
 🎁ALERTA DE NOVA DATA🎁 
-📅Data: {data.get('date','N/A')} 
+📅Data: N/A 
 🔗Link: {url} 
-📍Setor: {data.get('setor','N/A')} 
-🎫Categoria: {data.get('categorias','N/A')} 
-🎟️Tipo: {data.get('tipo','N/A')} 
-📦Status: {data.get('status','N/A')} 
-📊Qtd: {data.get('quantidade','N/A')}
+📍Setor: N/A 
+🎫Categoria: N/A 
+🎟️Tipo: N/A 
+📦Status: ATUALIZADO 
+📊Qtd: N/A
 """
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=text)
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-async def alert_blue(url, data):
-    text = f"""🔵REVENDA BLUE🔵
+async def alert_blue(url):
+    msg = f"""🔵REVENDA BLUE🔵
 🔗Link: {url}
-📍Setor: {data.get('setor','N/A')}
-💰Valor: {data.get('valor','N/A')}
-🎫Categoria: {data.get('categorias','N/A')}
-🎟️Tipo: {data.get('tipo','N/A')}
-📦Status: {data.get('status','N/A')}
+📍Setor: N/A
+💰Valor: N/A
+🎫Categoria: N/A
+🎟️Tipo: N/A
+📦Status: ATUALIZADO
 """
-    await bot_blue.send_message(chat_id=CHAT_ID, text=text)
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-async def alert_tour(data):
+async def alert_bts(data):
     msg = f"""💜AGENDA TOUR UPDATE💜
 📅 Data: {data['date']}
 🏙️ Cidades: {data['city']}
@@ -180,18 +181,24 @@ async def alert_tour(data):
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# BOOT (SEM ALERTA FALSO)
+# BOOT (OBRIGATÓRIO)
 # =========================
 
 async def send_boot():
+    global boot_done
+
     msg = "👾•°•°• Wootteo ligando os motores•°•°•👾"
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-    await bot_blue.send_message(chat_id=CHAT_ID, text=msg)
-    await bot_ticket.send_message(chat_id=ADMIN_ID, text=msg)
     await discord_send(msg)
 
+    # TESTE AUTOMÁTICO NO BOOT
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
+    await discord_send(TESTE_TEXT)
+
+    boot_done = True
+
 # =========================
-# COMMANDS (TELEGRAM + DISCORD)
+# TESTE (NÃO ALTERAR TEXTO)
 # =========================
 
 TESTE_TEXT = """🌊TESTE🌊
@@ -210,85 +217,48 @@ STATUS_TEXT = lambda: f"""🟢🔮STATUS WOOTTEO🔮
 📊 Blue Checks: {check_blue}
 """
 
+# =========================
+# COMMANDS
+# =========================
+
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(TESTE_TEXT)
-    await bot_blue.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
     await discord_send(TESTE_TEXT)
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = STATUS_TEXT()
     await update.message.reply_text(msg)
-    await bot_blue.send_message(chat_id=CHAT_ID, text=msg)
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await discord_send(msg)
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global panel_message_id, panel_chat_id
-
     msg = await update.message.reply_text("👾 Painel ativado👾")
     panel_message_id = msg.message_id
     panel_chat_id = CHAT_ID
 
 # =========================
-# PANEL UPDATE (CORRIGIDO)
-# =========================
-
-async def update_panel(data=None):
-    global panel_message_id, panel_chat_id
-
-    if not panel_message_id:
-        return
-
-    top = sorted(br_rank.items(), key=lambda x: x[1], reverse=True)
-
-    text = f"""👾 CENTRAL WOOTTEO 👾
-
-⏰ Uptime: {get_uptime()}
-
-✈️ PRÓXIMAS DATAS:
-🎫 Data: {data['date'] if data else 'N/A'}
-📍 Local: {data['city'] if data else 'N/A'}
-⏳ Faltam: N/A dias
-
-🇧🇷 RANKING POSSÍVEIS DATAS BR:
-🥇 {top[0][0]} ({top[0][1]})
-🥈 {top[1][0]} ({top[1][1]})
-🥉 {top[2][0]} ({top[2][1]})
-
-🟡 Ticket: {check_ticket}
-🔵 Blue: {check_blue}
-"""
-
-    try:
-        await bot_ticket.edit_message_text(
-            chat_id=panel_chat_id,
-            message_id=panel_message_id,
-            text=text
-        )
-    except:
-        pass
-
-# =========================
-# MONITOR (SEM DUPLICAÇÃO / SEM ALERTA FALSO)
+# MONITOR (ANTI-SPAM REAL)
 # =========================
 
 async def monitor():
-    global tour_hash, check_ticket, check_blue
+    global ticket_hash, blue_hash, bts_hash, check_ticket, check_blue
 
     while True:
 
-        html = fetch(TOUR_URL)
+        # ================= BTS =================
+        html = fetch(BTS_URL)
 
         if html:
             h = hashlib.md5(html.encode()).hexdigest()
             data = parse_tour(html)
 
-            if tour_hash != h:
-                tour_hash = h
-                await alert_tour(data)
+            if bts_hash != h and boot_done:
+                bts_hash = h
+                await alert_bts(data)
 
-            await update_panel(data)
-
-        # TICKETMASTER
+        # ================= TICKETMASTER =================
         for url in TICKET_LINKS:
             html = fetch(url)
             if not html:
@@ -298,16 +268,11 @@ async def monitor():
 
             if ticket_hash.get(url) != h:
                 ticket_hash[url] = h
-                await alert_ticket(url, {
-                    "setor":"N/A",
-                    "categorias":"N/A",
-                    "tipo":"N/A",
-                    "status":"ATUALIZADO",
-                    "date":"N/A",
-                    "quantidade":"N/A"
-                })
 
-        # BLUE
+                if boot_done:
+                    await alert_ticket(url)
+
+        # ================= BLUE =================
         for url in BLUE_LINKS:
             html = fetch(url)
             if not html:
@@ -317,13 +282,9 @@ async def monitor():
 
             if blue_hash.get(url) != h:
                 blue_hash[url] = h
-                await alert_blue(url, {
-                    "setor":"N/A",
-                    "categorias":"N/A",
-                    "tipo":"N/A",
-                    "status":"ATUALIZADO",
-                    "valor":"N/A"
-                })
+
+                if boot_done:
+                    await alert_blue(url)
 
         check_ticket += 1
         check_blue += 1
@@ -335,12 +296,11 @@ async def monitor():
 # =========================
 
 async def main():
-    global bot_ticket, bot_blue
+    global bot_ticket
 
     keep_alive()
 
     bot_ticket = Bot(os.getenv("BOT_TOKEN_TICKET"))
-    bot_blue = Bot(os.getenv("BOT_TOKEN_BLUE"))
 
     app_ticket = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
 
