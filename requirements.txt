@@ -1,5 +1,5 @@
 python-telegram-bot==20.7
-discord.py==2.4.0
+discord.py
 requests
 beautifulsoup4
 flask
