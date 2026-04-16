@@ -29,7 +29,7 @@ def run_web():
     app.run(host="0.0.0.0", port=8080)
 
 def keep_alive():
-    Thread(target=run_web, daemon=True).start()
+    Thread(target=run_web).start()
 
 # =========================
 # CONFIG
@@ -44,24 +44,20 @@ DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
 CHAT_ID = -1003972186058
 ADMIN_ID = 1407508561
 
-session = requests.Session()
-session.headers.update({"User-Agent": "Mozilla/5.0"})
-
-# =========================
-# LINKS (RESTAURADOS)
-# =========================
-
-EVENTS_TICKET = [
+TICKETMASTER_LINKS = [
     "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-28-10",
     "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-30-10",
     "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-31-10"
 ]
 
-EVENTS_BLUE = [
+BLUE_LINKS = [
     "https://buyticketbrasil.com/evento/bts%E2%80%932026worldtourarirang?data=1793242799000"
 ]
 
 TOUR_URL = "https://ibighit.com/en/bts/tour/"
+
+session = requests.Session()
+session.headers.update({"User-Agent": "Mozilla/5.0"})
 
 # =========================
 # DISCORD
@@ -69,7 +65,6 @@ TOUR_URL = "https://ibighit.com/en/bts/tour/"
 
 intents = discord.Intents.default()
 intents.message_content = True
-
 discord_client = discord.Client(intents=intents)
 
 async def discord_send(msg):
@@ -80,39 +75,21 @@ async def discord_send(msg):
     except:
         pass
 
-@discord_client.event
-async def on_ready():
-    print("Discord conectado")
-    await discord_send("👾•°•°• Wootteo ligando os motores•°•°•👾")
-
-@discord_client.event
-async def on_message(message):
-    if message.author == discord_client.user:
-        return
-
-    if message.content.lower() == "/teste":
-        await message.channel.send(TESTE_TEXT)
-
-    if message.content.lower() == "/status":
-        await message.channel.send(STATUS_TEXT())
-
-    if message.content.lower() == "/painel":
-        await message.channel.send("👾 Painel ativado👾")
-
 # =========================
 # STATE
 # =========================
 
-start_time = time.time()
-
 tour_last_hash = None
-tour_last_event = None
+ticket_last_hash = {}
+blue_last_hash = {}
+
+panel_message_id = None
+panel_chat_id = None
 
 check_ticket = 0
 check_blue = 0
 
-panel_message_id = None
-panel_chat_id = None
+start_time = time.time()
 
 br_rank = {
     "São Paulo": 0,
@@ -141,7 +118,24 @@ def fetch(url):
         return None
 
 # =========================
-# ALERTS (SEM ALTERAR LAYOUT)
+# TOUR PARSER (BTS)
+# =========================
+
+def parse_tour(html):
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text(" ", strip=True)
+
+    date = re.findall(r"\d{1,2}/\d{1,2}/\d{4}", text)
+    city = re.findall(r"[A-Z][a-z]+,\s?[A-Z]{2}", text)
+
+    return {
+        "date": date[0] if date else "N/A",
+        "city": city[0] if city else "N/A",
+        "raw": text
+    }
+
+# =========================
+# ALERTS (NÃO MEXER LAYOUT)
 # =========================
 
 async def alert_tour(data):
@@ -150,6 +144,7 @@ async def alert_tour(data):
 🏙️ Cidades: {data['city']}
 🌎 Países: USA
 """
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await discord_send(msg)
 
 async def alert_ticket(url, data):
@@ -169,6 +164,7 @@ async def alert_ticket(url, data):
 📦Status: {data.get('status','N/A')} 
 📊Qtd: {data.get('quantidade','N/A')}
 """
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=text)
     await discord_send(text)
 
 async def alert_blue(url, data):
@@ -180,10 +176,22 @@ async def alert_blue(url, data):
 🎟️Tipo: {data.get('tipo','N/A')}
 📦Status: {data.get('status','N/A')}
 """
+    await bot_blue.send_message(chat_id=CHAT_ID, text=text)
     await discord_send(text)
 
 # =========================
-# COMMANDS (SEM ALTERAR TEXTO)
+# BOOT
+# =========================
+
+async def send_boot():
+    msg = "👾•°•°• Wootteo ligando os motores•°•°•👾"
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+    await bot_blue.send_message(chat_id=CHAT_ID, text=msg)
+    await bot_ticket.send_message(chat_id=ADMIN_ID, text=msg)
+    await discord_send(msg)
+
+# =========================
+# COMMANDS (TELEGRAM)
 # =========================
 
 TESTE_TEXT = """🌊TESTE🌊
@@ -204,11 +212,14 @@ STATUS_TEXT = lambda: f"""🟢🔮STATUS WOOTTEO🔮
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(TESTE_TEXT)
+    await bot_blue.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
     await discord_send(TESTE_TEXT)
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(STATUS_TEXT())
-    await discord_send(STATUS_TEXT())
+    msg = STATUS_TEXT()
+    await update.message.reply_text(msg)
+    await bot_blue.send_message(chat_id=CHAT_ID, text=msg)
+    await discord_send(msg)
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global panel_message_id, panel_chat_id
@@ -217,29 +228,13 @@ async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     panel_chat_id = CHAT_ID
 
 # =========================
-# TOUR PARSER
+# PANEL (COMPLETO)
 # =========================
 
-def parse_tour(html):
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(" ", strip=True)
-
-    date_match = re.search(r"\d{1,2}/\d{1,2}", text)
-    city_match = re.search(r"[A-Z][a-z]+,\s?[A-Z]{2}", text)
-
-    return {
-        "date": date_match.group() if date_match else "N/A",
-        "city": city_match.group() if city_match else "N/A"
-    }
-
-# =========================
-# PANEL UPDATE (RESTAURADO)
-# =========================
-
-async def update_panel(data):
+async def update_panel(tour_data=None):
     global panel_message_id, panel_chat_id
 
-    if not panel_message_id or not panel_chat_id:
+    if not panel_message_id:
         return
 
     top = sorted(br_rank.items(), key=lambda x: x[1], reverse=True)
@@ -249,8 +244,9 @@ async def update_panel(data):
 ⏰ Uptime: {get_uptime()}
 
 ✈️ PRÓXIMAS DATAS:
-🎫 Data: {data['date']}
-📍 Local: {data['city']}
+🎫 Data: {tour_data['date'] if tour_data else 'N/A'}
+📍 Local: {tour_data['city'] if tour_data else 'N/A'}
+⏳ Faltam: N/A dias
 
 🇧🇷 RANKING POSSÍVEIS DATAS BR:
 🥇 {top[0][0]} ({top[0][1]})
@@ -271,36 +267,67 @@ async def update_panel(data):
         pass
 
 # =========================
-# MONITOR (SEM SPAM + COM LINKS)
+# MONITOR (SEPARAÇÃO REAL DE ALERTAS)
 # =========================
 
 async def monitor():
-    global tour_last_hash, tour_last_event, check_ticket, check_blue
+    global tour_last_hash, check_ticket, check_blue
 
     while True:
 
+        # TOUR
         html = fetch(TOUR_URL)
-
         if html:
             h = hashlib.md5(html.encode()).hexdigest()
+            data = parse_tour(html)
 
-            if h != tour_last_hash:
+            if tour_last_hash != h:
                 tour_last_hash = h
+                await alert_tour(data)
 
-                data = parse_tour(html)
+            await update_panel(data)
 
-                if tour_last_event != data["date"]:
-                    tour_last_event = data["date"]
-                    await alert_tour(data)
+        # TICKETMASTER (SÓ SE MUDAR HASH POR LINK)
+        for url in TICKETMASTER_LINKS:
+            html = fetch(url)
+            if not html:
+                continue
 
-                await update_panel(data)
+            h = hashlib.md5(html.encode()).hexdigest()
 
-        # Ticket alerts (SÓ LINKS REAIS)
-        for url in EVENTS_TICKET:
-            check_ticket += 1
+            if ticket_last_hash.get(url) != h:
+                ticket_last_hash[url] = h
 
-        for url in EVENTS_BLUE:
-            check_blue += 1
+                await alert_ticket(url, {
+                    "setor":"N/A",
+                    "categorias":"N/A",
+                    "tipo":"N/A",
+                    "status":"N/A",
+                    "date":"N/A",
+                    "quantidade":"N/A"
+                })
+
+        # BLUE
+        for url in BLUE_LINKS:
+            html = fetch(url)
+            if not html:
+                continue
+
+            h = hashlib.md5(html.encode()).hexdigest()
+
+            if blue_last_hash.get(url) != h:
+                blue_last_hash[url] = h
+
+                await alert_blue(url, {
+                    "setor":"N/A",
+                    "categorias":"N/A",
+                    "tipo":"N/A",
+                    "status":"N/A",
+                    "valor":"N/A"
+                })
+
+        check_ticket += 1
+        check_blue += 1
 
         await asyncio.sleep(30)
 
@@ -324,15 +351,13 @@ async def main():
 
     await app_ticket.initialize()
     await app_ticket.start()
-    await app_ticket.updater.start_polling()
 
     await send_boot()
 
-    await discord_client.start(DISCORD_TOKEN)
-
+    asyncio.create_task(discord_client.start(DISCORD_TOKEN))
     asyncio.create_task(monitor())
 
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
