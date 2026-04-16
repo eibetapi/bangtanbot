@@ -1,6 +1,5 @@
 import asyncio
 import time
-import random
 import requests
 import hashlib
 from bs4 import BeautifulSoup
@@ -92,7 +91,7 @@ async def update_panel():
 📊 Checks: {check_ticket}
 🚫 Bloqueios: {blocked_ticket}
 
-🔵 Blue (Revenda)
+🔵 Blueticket (Revenda)
 📊 Checks: {check_blue}
 🚫 Bloqueios: {blocked_blue}
 """
@@ -234,7 +233,6 @@ async def monitor():
 
     while True:
         try:
-
             for url in EVENTS_TICKET:
                 check_ticket += 1
                 html = fetch(url, True)
@@ -268,7 +266,6 @@ async def monitor():
 
         except Exception as e:
             print("ERRO:", e)
-            last_reconnect = time.strftime("%H:%M:%S")
 
 # =========================
 # MAIN
@@ -285,23 +282,15 @@ async def main():
         app.add_handler(CommandHandler("status", status))
         app.add_handler(CommandHandler("painel", painel))
 
-    # inicia bots
-    await app_ticket.initialize()
-    await app_blue.initialize()
+    # roda bots em paralelo
+    asyncio.create_task(app_ticket.run_polling())
+    asyncio.create_task(app_blue.run_polling())
 
-    await app_ticket.start()
-    await app_blue.start()
-
-    # inicia polling (ESSENCIAL)
-    await app_ticket.updater.start_polling()
-    await app_blue.updater.start_polling()
-
-    # roda monitor em paralelo
+    # roda monitor junto
     asyncio.create_task(monitor())
 
     print("🔥 Bots online!")
 
-    # mantém rodando
     await asyncio.Event().wait()
 
 asyncio.run(main())
