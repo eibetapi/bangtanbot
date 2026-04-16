@@ -119,7 +119,7 @@ def get_uptime():
 
 def fetch(url):
     try:
-        return requests.get(url, timeout=10).text
+        return session.get(url, timeout=10).text
     except:
         return None
 
@@ -139,7 +139,7 @@ def parse_tour(html):
     }
 
 # =========================
-# ALERTS (SEM ALTERAÇÃO DE LAYOUT)
+# ALERTS (MANTIDO 100% LAYOUT)
 # =========================
 
 async def alert_ticket(url):
@@ -149,8 +149,6 @@ async def alert_ticket(url):
 🎫Categoria: N/A
 🎟️Tipo: N/A
 📦Status: ATUALIZADO
-
-bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 🎁ALERTA DE NOVA DATA🎁 
 📅Data: N/A 
@@ -183,24 +181,24 @@ async def alert_bts(data):
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# BOOT (OBRIGATÓRIO)
+# BOOT (CORRIGIDO SEM FALSE POSITIVE)
 # =========================
 
 async def send_boot():
     global boot_done
 
     msg = "👾•°•°• Wootteo ligando os motores•°•°•👾"
+
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await discord_send(msg)
 
-    # TESTE AUTOMÁTICO NO BOOT
     await bot_ticket.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
     await discord_send(TESTE_TEXT)
 
     boot_done = True
 
 # =========================
-# TESTE (NÃO ALTERAR TEXTO)
+# TESTE / STATUS / PAINEL
 # =========================
 
 TESTE_TEXT = """🌊TESTE🌊
@@ -219,10 +217,6 @@ STATUS_TEXT = lambda: f"""🟢🔮STATUS WOOTTEO🔮
 📊 Blue Checks: {check_blue}
 """
 
-# =========================
-# COMMANDS
-# =========================
-
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(TESTE_TEXT)
     await bot_ticket.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
@@ -239,6 +233,37 @@ async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("👾 Painel ativado👾")
     panel_message_id = msg.message_id
     panel_chat_id = CHAT_ID
+
+# =========================
+# PANEL UPDATE (SEM REMOVER NADA)
+# =========================
+
+async def update_panel(data=None):
+    global panel_message_id
+
+    if not panel_message_id:
+        return
+
+    text = f"""👾 CENTRAL WOOTTEO 👾
+
+⏰ Uptime: {get_uptime()}
+
+✈️ PRÓXIMAS DATAS:
+🎫 Data: {data['date'] if data else 'N/A'}
+📍 Local: {data['city'] if data else 'N/A'}
+
+🟡 Ticket: {check_ticket}
+🔵 Blue: {check_blue}
+"""
+
+    try:
+        await bot_ticket.edit_message_text(
+            chat_id=panel_chat_id,
+            message_id=panel_message_id,
+            text=text
+        )
+    except:
+        pass
 
 # =========================
 # MONITOR (ANTI-SPAM REAL)
@@ -259,6 +284,7 @@ async def monitor():
             if bts_hash != h and boot_done:
                 bts_hash = h
                 await alert_bts(data)
+                await update_panel(data)
 
         # ================= TICKETMASTER =================
         for url in TICKET_LINKS:
