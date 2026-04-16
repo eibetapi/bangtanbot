@@ -47,7 +47,7 @@ session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0"})
 
 # =========================
-# LINKS (3 SOURCES)
+# LINKS
 # =========================
 
 TICKET_LINKS = [
@@ -92,18 +92,12 @@ boot_done = False
 panel_message_id = None
 panel_chat_id = None
 
+panel_enabled = False
+
 check_ticket = 0
 check_blue = 0
 
 start_time = time.time()
-
-br_rank = {
-    "São Paulo": 0,
-    "Rio de Janeiro": 0,
-    "Curitiba": 0,
-    "Belo Horizonte": 0,
-    "Brasília": 0,
-}
 
 # =========================
 # UPTIME
@@ -119,12 +113,12 @@ def get_uptime():
 
 def fetch(url):
     try:
-        return session.get(url, timeout=10).text
+        return requests.get(url, timeout=10).text
     except:
         return None
 
 # =========================
-# TOUR PARSER
+# PARSER
 # =========================
 
 def parse_tour(html):
@@ -139,7 +133,7 @@ def parse_tour(html):
     }
 
 # =========================
-# ALERTS (MANTIDO 100% LAYOUT)
+# ALERTS (SEM MUDAR LAYOUT)
 # =========================
 
 async def alert_ticket(url):
@@ -181,7 +175,7 @@ async def alert_bts(data):
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# BOOT (CORRIGIDO SEM FALSE POSITIVE)
+# BOOT (SEMPRE FIXO)
 # =========================
 
 async def send_boot():
@@ -192,81 +186,83 @@ async def send_boot():
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await discord_send(msg)
 
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
-    await discord_send(TESTE_TEXT)
-
     boot_done = True
 
 # =========================
-# TESTE / STATUS / PAINEL
+# TESTE (4 POSTS)
 # =========================
 
-TESTE_TEXT = """🌊TESTE🌊
-📅Data: 13/06
-🔗Link: https://ibighit.com/en/bts/tour/
-📍Setor: Porão da Big Hit
-🎫Categoria: Army
-🎟️Tipo: OT7
-📦Status: disponível
-📊Qtd: 07
-"""
+async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-STATUS_TEXT = lambda: f"""🟢🔮STATUS WOOTTEO🔮
+    await alert_ticket("https://test.com/ticket")
+    await alert_ticket("https://test.com/ticket")
+    await alert_blue("https://test.com/blue")
+    await alert_bts({"date": "N/A", "city": "N/A"})
+
+# =========================
+# STATUS
+# =========================
+
+STATUS_TEXT = lambda: f"""🟢STATUS WOOTTEO°•°•°•°•👾
 ⏰ Uptime: {get_uptime()}
 📊 Ticket Checks: {check_ticket}
 📊 Blue Checks: {check_blue}
 """
 
-async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(TESTE_TEXT)
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=TESTE_TEXT)
-    await discord_send(TESTE_TEXT)
-
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = STATUS_TEXT()
     await update.message.reply_text(msg)
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-    await discord_send(msg)
+
+# =========================
+# PAINEL
+# =========================
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global panel_message_id, panel_chat_id
+    global panel_message_id, panel_chat_id, panel_enabled
+
+    panel_enabled = True
+
     msg = await update.message.reply_text("👾 Painel ativado👾")
     panel_message_id = msg.message_id
     panel_chat_id = CHAT_ID
 
 # =========================
-# PANEL UPDATE (SEM REMOVER NADA)
+# PANEL UPDATE
 # =========================
 
-async def update_panel(data=None):
-    global panel_message_id
+async def update_panel(tour_data=None):
+    global panel_message_id, panel_chat_id
 
-    if not panel_message_id:
+    if not panel_enabled:
         return
+
+    top = {"São Paulo": 0, "Rio de Janeiro": 0, "Curitiba": 0}
 
     text = f"""👾 CENTRAL WOOTTEO 👾
 
 ⏰ Uptime: {get_uptime()}
 
 ✈️ PRÓXIMAS DATAS:
-🎫 Data: {data['date'] if data else 'N/A'}
-📍 Local: {data['city'] if data else 'N/A'}
+🎫 Data: {tour_data['date'] if tour_data else 'N/A'}
+📍 Local: {tour_data['city'] if tour_data else 'N/A'}
+
+🇧🇷 RANKING:
+🥇 São Paulo (0)
+🥈 Rio de Janeiro (0)
+🥉 Curitiba (0)
 
 🟡 Ticket: {check_ticket}
 🔵 Blue: {check_blue}
 """
 
     try:
-        await bot_ticket.edit_message_text(
-            chat_id=panel_chat_id,
-            message_id=panel_message_id,
-            text=text
-        )
+        await bot_ticket.send_message(chat_id=panel_chat_id, text=text)
     except:
         pass
 
 # =========================
-# MONITOR (ANTI-SPAM REAL)
+# MONITOR (SEM SPAM)
 # =========================
 
 async def monitor():
@@ -274,7 +270,7 @@ async def monitor():
 
     while True:
 
-        # ================= BTS =================
+        # BOT START LOCK
         html = fetch(BTS_URL)
 
         if html:
@@ -284,9 +280,7 @@ async def monitor():
             if bts_hash != h and boot_done:
                 bts_hash = h
                 await alert_bts(data)
-                await update_panel(data)
 
-        # ================= TICKETMASTER =================
         for url in TICKET_LINKS:
             html = fetch(url)
             if not html:
@@ -296,11 +290,9 @@ async def monitor():
 
             if ticket_hash.get(url) != h:
                 ticket_hash[url] = h
-
                 if boot_done:
                     await alert_ticket(url)
 
-        # ================= BLUE =================
         for url in BLUE_LINKS:
             html = fetch(url)
             if not html:
@@ -310,7 +302,6 @@ async def monitor():
 
             if blue_hash.get(url) != h:
                 blue_hash[url] = h
-
                 if boot_done:
                     await alert_blue(url)
 
@@ -324,9 +315,10 @@ async def monitor():
 # =========================
 
 async def main():
-    global bot_ticket
 
     keep_alive()
+
+    global bot_ticket
 
     bot_ticket = Bot(os.getenv("BOT_TOKEN_TICKET"))
 
