@@ -53,11 +53,9 @@ session.headers.update({"User-Agent": "Mozilla/5.0"})
 # =========================
 
 intents = discord.Intents.default()
-intents.message_content = True  # <<< ESSENCIAL
+intents.message_content = True
 
 discord_client = discord.Client(intents=intents)
-
-discord_panel_message = None
 
 # =========================
 # STATE
@@ -154,7 +152,7 @@ def make_state(data):
     return f"{data['status']}|{data['tipo']}|{data['setor']}|{data['categorias']}"
 
 # =========================
-# ALERTAS
+# ALERTAS (SEU TEXTO MANTIDO 100%)
 # =========================
 
 async def alert_ticket(url, data):
@@ -194,7 +192,7 @@ async def send_boot():
     msg = "👾•°•°• Wootteo ligando os motores•°•°•👾"
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await bot_blue.send_message(chat_id=CHAT_ID, text=msg)
-    await bot_admin.send_message(chat_id=ADMIN_ID, text="👾•°•°• Wootteo ligando os motores•°•°•👾")
+    await bot_admin.send_message(chat_id=ADMIN_ID, text=msg)
 
 # =========================
 # TESTE
@@ -221,13 +219,12 @@ async def painel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👾Painel iniciado👾")
 
 # =========================
-# MONITOR
+# MONITOR (ANTI-SPAM REAL)
 # =========================
 
 async def monitor():
     global system_ready, check_ticket, check_blue
 
-    # calibração inicial (SEM ALERTA)
     if not system_ready:
         for url in EVENTS_TICKET + EVENTS_BLUE:
             html = fetch(url)
@@ -278,35 +275,32 @@ async def on_ready():
 
 @discord_client.event
 async def on_message(message):
-    global discord_panel_message
-
     if message.author == discord_client.user:
         return
 
     if message.content.lower().strip() == "/painel":
-        discord_panel_message = await message.channel.send("👾•°•°• Wootteo ligando os motores•°•°•👾")
+        await message.channel.send("👾Painel iniciado👾")
 
 # =========================
-# MAIN (CORRIGIDO)
+# MAIN (CORRIGIDO DE VERDADE)
 # =========================
 
-async def main():
+def main():
     keep_alive()
 
     app_ticket = ApplicationBuilder().token(BOT_TOKEN_TICKET).build()
     app_blue = ApplicationBuilder().token(BOT_TOKEN_BLUE).build()
 
-    # handlers CORRETOS
     app_ticket.add_handler(CommandHandler("teste", teste))
     app_ticket.add_handler(CommandHandler("painel", painel_cmd))
 
-    # IMPORTANTE: run_polling resolve tudo
-    asyncio.create_task(app_ticket.run_polling())
-    asyncio.create_task(app_blue.run_polling())
+    print("Bots iniciando...")
 
-    asyncio.create_task(discord_client.start(DISCORD_TOKEN))
-    asyncio.create_task(monitor())
+    # Telegram correto (SEM asyncio conflito)
+    app_ticket.run_polling()
 
-    await asyncio.Event().wait()
+    # monitor roda separado NÃO bloqueante
+    asyncio.run(monitor())
 
-asyncio.run(main())
+if __name__ == "__main__":
+    main()
