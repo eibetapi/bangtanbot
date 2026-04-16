@@ -63,6 +63,7 @@ EVENTS_BLUE = [
 # =========================
 
 last_state = {}
+initialized = False
 
 # =========================
 # FETCH
@@ -75,7 +76,7 @@ def fetch(url):
         return None
 
 # =========================
-# PARSER
+# PARSER (ESTADO REAL)
 # =========================
 
 def parse_event(html):
@@ -121,26 +122,24 @@ def parse_event(html):
     if time_tag:
         date = time_tag.get_text(strip=True)
 
-    quantidade = "DESCONHECIDO"
-
     return {
         "status": status,
         "tipo": tipo,
         "categorias": ", ".join(categorias),
         "setor": ", ".join(setores),
         "date": date,
-        "quantidade": quantidade
+        "quantidade": "DESCONHECIDO"
     }
 
 # =========================
-# STATE BUILDER (NÚCLEO DO ANTI-SPAM)
+# STATE BUILDER
 # =========================
 
 def make_state(data):
     return f"{data['status']}|{data['tipo']}|{data['setor']}|{data['categorias']}|{data['quantidade']}|{data['date']}"
 
 # =========================
-# ALERTAS (COM TEU FORMATO ORIGINAL)
+# ALERTAS (SEU FORMATO ORIGINAL)
 # =========================
 
 async def alert_ticket(url, data):
@@ -178,7 +177,20 @@ async def alert_blue(url, data):
     await bot_blue.send_message(chat_id=CHAT_ID, text=text)
 
 # =========================
-# TESTE (SEMPRE FIXO)
+# TESTE (OBRIGATÓRIO 1X)
+# =========================
+
+async def send_boot_messages():
+    await bot_ticket.send_message(chat_id=CHAT_ID, text="🧪 BOT TICKET ONLINE")
+    await bot_blue.send_message(chat_id=CHAT_ID, text="🧪 BOT BLUE ONLINE")
+
+    await bot_admin.send_message(
+        chat_id=ADMIN_ID,
+        text="👾•°•°•Painel iniciado•°•°•👾"
+    )
+
+# =========================
+# COMANDO TESTE
 # =========================
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -193,13 +205,15 @@ async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """)
 
 # =========================
-# MONITOR (SEM SPAM)
+# MONITOR (SEM SPAM REAL)
 # =========================
 
 async def monitor():
+    global initialized
+
     while True:
 
-        # TICKET
+        # TICKETMASTER
         for url in EVENTS_TICKET:
             html = fetch(url)
             if not html:
@@ -210,6 +224,12 @@ async def monitor():
 
             old = last_state.get(url)
 
+            # 🔥 PRIMEIRA EXECUÇÃO = só salva (NÃO ALERTA)
+            if old is None:
+                last_state[url] = state
+                continue
+
+            # 🔥 só alerta mudança real
             if old != state:
                 last_state[url] = state
                 await alert_ticket(url, data)
@@ -224,6 +244,10 @@ async def monitor():
             state = make_state(data)
 
             old = last_state.get(url)
+
+            if old is None:
+                last_state[url] = state
+                continue
 
             if old != state:
                 last_state[url] = state
@@ -244,10 +268,7 @@ async def main():
     for app in [app_ticket, app_blue]:
         app.add_handler(CommandHandler("teste", teste))
 
-    await bot_admin.send_message(
-        chat_id=ADMIN_ID,
-        text="👾•°•°• Painel iniciado •°•°•👾"
-    )
+    await send_boot_messages()
 
     await app_ticket.initialize()
     await app_blue.initialize()
