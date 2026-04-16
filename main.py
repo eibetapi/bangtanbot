@@ -125,6 +125,32 @@ def fetch(url):
         return None
 
 # =========================
+# SMART SIGNATURE (ANTI-SPAM REAL)
+# =========================
+
+def smart_signature(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
+    text = soup.get_text(" ", strip=True).lower()
+    text = re.sub(r"\s+", " ", text)
+
+    keywords = [
+        "sold out", "available", "esgotado", "disponível",
+        "tickets", "ingressos", "buy", "comprar",
+        "tour", "data", "date"
+    ]
+
+    filtered = " ".join([
+        w for w in text.split()
+        if any(k in w for k in keywords) or len(w) < 20
+    ])
+
+    return hashlib.md5(filtered.encode()).hexdigest()
+
+# =========================
 # TOUR PARSER
 # =========================
 
@@ -138,14 +164,12 @@ def parse_tour(html):
     cities = []
     countries = []
 
-    known = ["brazil", "japan", "korea", "usa", "france", "uk"]
-
-    for k in known:
+    known_countries = ["brazil", "japan", "korea", "usa", "france", "uk"]
+    for k in known_countries:
         if k in text:
             countries.append(k.upper())
 
     br_cities = ["são paulo", "rio de janeiro", "curitiba", "belo horizonte", "brasília"]
-
     for c in br_cities:
         if c in text:
             cities.append(c.title())
@@ -158,7 +182,7 @@ def parse_tour(html):
     }
 
 # =========================
-# ALERTA TOUR
+# ALERTAS
 # =========================
 
 async def alert_tour(data):
@@ -170,19 +194,15 @@ async def alert_tour(data):
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await send_discord(msg)
 
-# =========================
-# ALERTAS TICKETS
-# =========================
-
 async def alert_ticket(url):
-    msg = f"""🔥 ALERTA 🔥
+    msg = f"""🔥 ALERTA TICKETMASTER
 🔗 {url}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
     await send_discord(msg)
 
 async def alert_blue(url):
-    msg = f"""🔵 BLUE ALERTA
+    msg = f"""🔵 ALERTA BLUE
 🔗 {url}
 """
     await bot_blue.send_message(chat_id=CHAT_ID, text=msg)
@@ -196,7 +216,6 @@ panel_message_id = None
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global panel_message_id
-
     msg = await update.message.reply_text("👾 Painel ativado")
     panel_message_id = msg.message_id
 
@@ -212,7 +231,7 @@ async def update_panel(tour_data=None):
 
 ⏰ Uptime: {get_uptime()}
 
-🌍 PRÓXIMA TOUR DATA: {tour_data['date'] if tour_data else 'N/A'}
+🌍 PRÓXIMA DATA: {tour_data['date'] if tour_data else 'N/A'}
 🏙️ CIDADES: {", ".join(tour_data['cities']) if tour_data else 'N/A'}
 
 🇧🇷 RANKING BR:
@@ -225,7 +244,11 @@ async def update_panel(tour_data=None):
 """
 
     try:
-        await bot_ticket.edit_message_text(CHAT_ID, panel_message_id, text)
+        await bot_ticket.edit_message_text(
+            chat_id=CHAT_ID,
+            message_id=panel_message_id,
+            text=text
+        )
     except:
         pass
 
@@ -248,7 +271,7 @@ async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """)
 
 # =========================
-# MONITOR
+# MONITOR (ANTI-SPAM REAL)
 # =========================
 
 async def monitor():
@@ -262,22 +285,35 @@ async def monitor():
         html = fetch(TOUR_URL)
 
         if html:
-            h = hashlib.md5(html.encode()).hexdigest()
+            sig = smart_signature(html)
             data = parse_tour(html)
 
-            if tour_last_state != h:
-                tour_last_state = h
+            if tour_last_state != sig:
+                tour_last_state = sig
                 tour_cache = data
                 await alert_tour(data)
 
-        # TICKETS
+        # TICKETMASTER
         for url in EVENTS_TICKET:
             check_ticket += 1
-            await alert_ticket(url)
+            html = fetch(url)
+            if html:
+                sig = smart_signature(html)
 
+                if url not in last_state or last_state[url] != sig:
+                    last_state[url] = sig
+                    await alert_ticket(url)
+
+        # BLUE
         for url in EVENTS_BLUE:
             check_blue += 1
-            await alert_blue(url)
+            html = fetch(url)
+            if html:
+                sig = smart_signature(html)
+
+                if url not in last_state or last_state[url] != sig:
+                    last_state[url] = sig
+                    await alert_blue(url)
 
         await update_panel(tour_cache)
         await asyncio.sleep(30)
@@ -297,7 +333,7 @@ async def main():
         app.add_handler(CommandHandler("teste", teste))
         app.add_handler(CommandHandler("painel", painel))
 
-    print("🔥 iniciando bots...")
+    print("🔥 Bots iniciando...")
 
     await bot_admin.send_message(CHAT_ID, "👾 sistema iniciado")
 
