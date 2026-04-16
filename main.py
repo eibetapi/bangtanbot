@@ -194,16 +194,15 @@ async def main():
         app.add_handler(CommandHandler("status", status))
         app.add_handler(CommandHandler("painel", painel))
 
-    # roda monitor
+    # inicia monitor
     asyncio.create_task(monitor())
 
     print("🔥 Bots iniciando...")
 
-    # roda bots corretamente
-    asyncio.create_task(app_ticket.run_polling())
-    asyncio.create_task(app_blue.run_polling())
-
-    # mantém vivo
-    await asyncio.Event().wait()
+    # roda bots corretamente juntos
+    await asyncio.gather(
+        app_ticket.run_polling(),
+        app_blue.run_polling()
+    )
 
 asyncio.run(main())
