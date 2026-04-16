@@ -12,7 +12,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from flask import Flask
 from threading import Thread
 
-
 # =========================
 # KEEP ALIVE
 # =========================
@@ -29,12 +28,12 @@ def run_web():
 def keep_alive():
     Thread(target=run_web).start()
 
-
 # =========================
 # CONFIG
 # =========================
 
 CHAT_ID = -1003972186058
+
 start_time = time.time()
 
 bot_ticket = None
@@ -48,9 +47,8 @@ check_blue = 0
 last_ticket_check = time.time()
 last_blue_check = time.time()
 
-
 # =========================
-# LINKS (NÃO REMOVER)
+# LINKS (OBRIGATÓRIO)
 # =========================
 
 TICKET_LINKS = [
@@ -65,9 +63,8 @@ BLUE_LINKS = [
 
 BTS_URL = "https://ibighit.com/en/bts/tour/"
 
-
 # =========================
-# CONTROLE
+# CONTROLES
 # =========================
 
 boot_done = False
@@ -78,7 +75,6 @@ ticket_state = {}
 blue_state = {}
 bts_state = {}
 
-
 # =========================
 # UTIL
 # =========================
@@ -87,33 +83,52 @@ def get_uptime():
     s = int(time.time() - start_time)
     return f"{s//3600}h {(s%3600)//60}m {s%60}s"
 
-
 def resolve_status(found):
     return "DISPONÍVEL" if found else "ESGOTADO"
-
 
 def clean(v):
     return v if v and str(v).strip() else "ESGOTADO"
 
-
 def make_hash(html):
     return hashlib.md5(html.encode()).hexdigest()
-
 
 def days_left(date_obj):
     return max((date_obj - datetime.now()).days, 0)
 
-
 def minutes_since(ts):
     return int((time.time() - ts) / 60)
 
+def detect_country(city):
+
+    c = city.lower()
+
+    if any(x in c for x in [
+        "são paulo", "rio de janeiro", "curitiba",
+        "belo horizonte", "brasília", "porto alegre"
+    ]):
+        return "Brasil"
+
+    if "seoul" in c:
+        return "Coreia do Sul"
+
+    if "tokyo" in c:
+        return "Japão"
+
+    if "los angeles" in c or "new york" in c:
+        return "USA"
+
+    return "Internacional"
 
 def parse_bts_tour(html):
 
     soup = BeautifulSoup(html, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.extract()
+
     text = soup.get_text("\n", strip=True)
 
-    pattern = r"(\d{4}\.\d{2}\.\d{2}).*?([A-Za-z\s]+)"
+    pattern = r"(20\d{2}\.\d{2}\.\d{2})\s+([A-Za-zÀ-ÿ\s]+)"
     matches = re.findall(pattern, text)
 
     eventos = []
@@ -126,7 +141,7 @@ def parse_bts_tour(html):
                 "date": dt,
                 "date_str": dt.strftime("%d/%m/%Y"),
                 "city": city.strip(),
-                "country": "Brasil" if any(x in city.lower() for x in ["são paulo", "rio", "brasil"]) else "USA"
+                "country": detect_country(city)
             })
 
         except:
@@ -135,19 +150,15 @@ def parse_bts_tour(html):
     if not eventos:
         return None, None
 
+    eventos.sort(key=lambda x: x["date"])
+
     now = datetime.now()
     futuros = [e for e in eventos if e["date"] >= now]
 
-    proximo = min(futuros, key=lambda x: x["date"]) if futuros else None
-
-    brasil = None
-    for e in eventos:
-        if e["country"] == "Brasil":
-            brasil = e
-            break
+    proximo = futuros[0] if futuros else None
+    brasil = next((e for e in eventos if e["country"] == "Brasil"), None)
 
     return proximo, brasil
-
 
 # =========================
 # 1. RESET / RECONNECT
@@ -182,7 +193,6 @@ async def send_boot():
 
     await update_panel()
 
-
 # =========================
 # 2. PAINEL
 # =========================
@@ -212,13 +222,17 @@ async def update_panel():
     if brasil:
         dias_br = days_left(brasil["date"])
     else:
-        dias_br = "..."
+        dt_br = datetime(2026, 10, 28)
+        dias_br = days_left(dt_br)
 
-    text = f"""👾 CENTRAL WOOTTEO 👾
+    text = f"""🔴⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜🔴
+
+👾 CENTRAL WOOTTEO 👾
 
 ⏰ Uptime: {get_uptime()}
 
-✈️ PRÓXIMAS DATAS:
+✈️ *PRÓXIMAS DATAS*
+
 🎫 Data: {data}
 📍 Local: {city}
 🔔 Faltam {dias} dias.
@@ -233,11 +247,11 @@ async def update_panel():
         await bot_ticket.edit_message_text(
             chat_id=panel_chat_id,
             message_id=panel_message_id,
-            text=text
+            text=text,
+            parse_mode="Markdown"
         )
     except:
         pass
-
 
 # =========================
 # 3. ALERTAS OFICIAIS
@@ -254,7 +268,6 @@ async def ticket_reposicao(url, key, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 async def ticket_nova_data(url, key, found):
     msg = f"""🎁ALERTA DE NOVA DATA🎁
 📅Data: {clean(key)}
@@ -266,7 +279,6 @@ async def ticket_nova_data(url, key, found):
 ✅Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
 
 async def blue_revenda(url, key, found):
     msg = f"""🔵REVENDA BLUE🔵
@@ -280,7 +292,6 @@ async def blue_revenda(url, key, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 async def agenda_update(data):
     msg = f"""💜AGENDA NOVAS DATAS💜
 📅 Data: {clean(data.get('date'))}
@@ -289,7 +300,6 @@ async def agenda_update(data):
 ⚠️Mais informações em breve!
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
 
 # =========================
 # 4. ALERTAS DE TESTE
@@ -309,7 +319,6 @@ async def test_reposicao(url, key, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 async def test_nova_data(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
 
@@ -323,7 +332,6 @@ async def test_nova_data(url, key, found):
 ✅Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
 
 async def test_blue(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
@@ -340,7 +348,6 @@ async def test_blue(url, key, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 async def test_agenda(data):
     msg = f"""⚠️**TESTE**⚠️
 
@@ -351,7 +358,6 @@ async def test_agenda(data):
 ⚠️Mais informações em breve!
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
 
 # =========================
 # 5. COMANDOS
@@ -364,22 +370,20 @@ async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await test_reposicao(TICKET_LINKS[0], "31/10/2026", True)
     await test_nova_data(TICKET_LINKS[1], "30/10/2026", True)
     await test_blue(BLUE_LINKS[0], "25/04/2026", True)
-    await test_agenda({"date": "25/04/2026", "city": "Tampa", "country": "USA"})
-
+    await test_agenda({"date": "25/04/2026", "city": "Seoul", "country": "Coreia do Sul"})
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update_panel()
 
-
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"UPTIME: {get_uptime()}")
 
-
 # =========================
-# MONITOR
+# 6. MONITOR
 # =========================
 
 async def monitor():
+
     global check_ticket, check_blue, last_ticket_check, last_blue_check
 
     while True:
@@ -398,27 +402,27 @@ async def monitor():
 
         await asyncio.sleep(30)
 
-
 # =========================
-# MAIN
+# 7. MAIN
 # =========================
 
 async def main():
+
     global bot_ticket, app_ready
 
     keep_alive()
 
     bot_ticket = Bot(os.getenv("BOT_TOKEN_TICKET"))
 
-    application = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
+    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
 
-    application.add_handler(CommandHandler("teste", teste))
-    application.add_handler(CommandHandler("painel", painel))
-    application.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("teste", teste))
+    app.add_handler(CommandHandler("painel", painel))
+    app.add_handler(CommandHandler("status", status))
 
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
 
     app_ready = True
 
