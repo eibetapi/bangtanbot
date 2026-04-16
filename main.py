@@ -4,6 +4,8 @@ import requests
 import hashlib
 from bs4 import BeautifulSoup
 import os
+import re
+from datetime import datetime
 
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -43,9 +45,12 @@ panel_chat_id = None
 check_ticket = 0
 check_blue = 0
 
+last_ticket_check = time.time()
+last_blue_check = time.time()
+
 
 # =========================
-# LINKS
+# LINKS (NÃO REMOVER)
 # =========================
 
 TICKET_LINKS = [
@@ -62,7 +67,7 @@ BTS_URL = "https://ibighit.com/en/bts/tour/"
 
 
 # =========================
-# CONTROLES
+# CONTROLE
 # =========================
 
 boot_done = False
@@ -95,26 +100,82 @@ def make_hash(html):
     return hashlib.md5(html.encode()).hexdigest()
 
 
+def days_left(date_obj):
+    return max((date_obj - datetime.now()).days, 0)
+
+
+def minutes_since(ts):
+    return int((time.time() - ts) / 60)
+
+
+def parse_bts_tour(html):
+
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text("\n", strip=True)
+
+    pattern = r"(\d{4}\.\d{2}\.\d{2}).*?([A-Za-z\s]+)"
+    matches = re.findall(pattern, text)
+
+    eventos = []
+
+    for raw_date, city in matches:
+        try:
+            dt = datetime.strptime(raw_date, "%Y.%m.%d")
+
+            eventos.append({
+                "date": dt,
+                "date_str": dt.strftime("%d/%m/%Y"),
+                "city": city.strip(),
+                "country": "Brasil" if any(x in city.lower() for x in ["são paulo", "rio", "brasil"]) else "USA"
+            })
+
+        except:
+            continue
+
+    if not eventos:
+        return None, None
+
+    now = datetime.now()
+    futuros = [e for e in eventos if e["date"] >= now]
+
+    proximo = min(futuros, key=lambda x: x["date"]) if futuros else None
+
+    brasil = None
+    for e in eventos:
+        if e["country"] == "Brasil":
+            brasil = e
+            break
+
+    return proximo, brasil
+
+
 # =========================
-# 1. RESET / RECONNECT (OBRIGATÓRIO)
+# 1. RESET / RECONNECT
 # =========================
 
 async def send_boot():
-    global boot_done, boot_lock
+
+    global boot_done, boot_lock, panel_message_id, panel_chat_id
 
     boot_lock = True
 
-    # mensagem 1
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
-        text="👾•°•°• Wootteo entrando em rota•°•°•👾"
+        text="🛸•°•Wootteo entrando em rota°•°🛸"
     )
 
-    # mensagem 2
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
         text="🛰️•°•°• Rota localizada•°•°•🛰️"
     )
+
+    msg = await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text="👾 CENTRAL WOOTTEO 👾\n\nInicializando painel..."
+    )
+
+    panel_message_id = msg.message_id
+    panel_chat_id = CHAT_ID
 
     boot_done = True
     boot_lock = False
@@ -123,41 +184,63 @@ async def send_boot():
 
 
 # =========================
-# 2. PAINEL (OBRIGATÓRIO)
+# 2. PAINEL
 # =========================
 
-async def update_panel(tour_data=None):
+async def update_panel():
 
-    global panel_message_id, panel_chat_id
+    global panel_message_id
 
-    if not app_ready:
+    if not panel_message_id:
         return
+
+    try:
+        html = requests.get(BTS_URL, timeout=10).text
+        proximo, brasil = parse_bts_tour(html)
+    except:
+        proximo, brasil = None, None
+
+    if proximo:
+        data = proximo["date_str"]
+        city = proximo["city"]
+        dias = days_left(proximo["date"])
+    else:
+        data = "carregando..."
+        city = "carregando..."
+        dias = "..."
+
+    if brasil:
+        dias_br = days_left(brasil["date"])
+    else:
+        dias_br = "..."
 
     text = f"""👾 CENTRAL WOOTTEO 👾
 
 ⏰ Uptime: {get_uptime()}
 
 ✈️ PRÓXIMAS DATAS:
-🎫 Data: {tour_data['date'] if tour_data else 'ESGOTADO'}
-📍 Local: {tour_data['city'] if tour_data else 'ESGOTADO'}
+🎫 Data: {data}
+📍 Local: {city}
+🔔 Faltam {dias} dias.
 
-🟡 Ticket: {check_ticket}
-🔵 Blue: {check_blue}
+⏳Faltam {dias_br} dias para o BTS no Brasil.
+
+🟡 Ticket: {check_ticket} | último rastreio há {minutes_since(last_ticket_check)} min
+🔵 Blue: {check_blue} | último rastreio há {minutes_since(last_blue_check)} min
 """
 
-    if panel_message_id:
-        try:
-            await bot_ticket.edit_message_text(
-                chat_id=panel_chat_id,
-                message_id=panel_message_id,
-                text=text
-            )
-        except:
-            pass
+    try:
+        await bot_ticket.edit_message_text(
+            chat_id=panel_chat_id,
+            message_id=panel_message_id,
+            text=text
+        )
+    except:
+        pass
 
 
 # =========================
-# 3. ALERTAS OFICIAIS (SEM SPAM)
+# 3. ALERTAS OFICIAIS
 # =========================
 
 async def ticket_reposicao(url, key, found):
@@ -202,18 +285,19 @@ async def agenda_update(data):
     msg = f"""💜AGENDA NOVAS DATAS💜
 📅 Data: {clean(data.get('date'))}
 🏙️ Cidade: {clean(data.get('city'))}
-🌎 País: USA
+🌎 País: {clean(data.get('country'))}
 ⚠️Mais informações em breve!
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 
 # =========================
-# 4. ALERTAS DE TESTE (EXATO POR TIPO)
+# 4. ALERTAS DE TESTE
 # =========================
 
 async def test_reposicao(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
+
 🔥ALERTA DE REPOSIÇÃO 🔥
 📅Data: {clean(key)}
 🔗Link: {url}
@@ -228,6 +312,7 @@ async def test_reposicao(url, key, found):
 
 async def test_nova_data(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
+
 🎁ALERTA DE NOVA DATA🎁
 📅Data: {clean(key)}
 🔗Link: {url}
@@ -242,6 +327,7 @@ async def test_nova_data(url, key, found):
 
 async def test_blue(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
+
 🔵REVENDA BLUE🔵
 📅Data: {clean(key)}
 🔗Link: {url}
@@ -257,10 +343,11 @@ async def test_blue(url, key, found):
 
 async def test_agenda(data):
     msg = f"""⚠️**TESTE**⚠️
+
 💜AGENDA NOVAS DATAS💜
 📅 Data: {data['date']}
 🏙️ Cidade: {data['city']}
-🌎 País: USA
+🌎 País: {data['country']}
 ⚠️Mais informações em breve!
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
@@ -271,57 +358,29 @@ async def test_agenda(data):
 # =========================
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if not app_ready:
         return
 
-    await test_reposicao("https://ticketmaster.com/teste", "31/10/2026", True)
-    await test_nova_data("https://ticketmaster.com/teste2", "30/10/2026", True)
-    await test_blue("https://blue.com/teste", "25/04/2026", True)
-    await test_agenda({"date": "25/04/2026", "city": "Tampa"})
+    await test_reposicao(TICKET_LINKS[0], "31/10/2026", True)
+    await test_nova_data(TICKET_LINKS[1], "30/10/2026", True)
+    await test_blue(BLUE_LINKS[0], "25/04/2026", True)
+    await test_agenda({"date": "25/04/2026", "city": "Tampa", "country": "USA"})
 
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    global panel_message_id, panel_chat_id
-
-    if not app_ready:
-        return
-
-    msg = await context.bot.send_message(
-        chat_id=CHAT_ID,
-        text=f"""👾 CENTRAL WOOTTEO 👾
-
-⏰ Uptime: {get_uptime()}
-
-✈️ PRÓXIMAS DATAS:
-🎫 Data: ESGOTADO
-📍 Local: ESGOTADO
-
-🟡 Ticket: {check_ticket}
-🔵 Blue: {check_blue}
-"""
-    )
-
-    panel_message_id = msg.message_id
-    panel_chat_id = CHAT_ID
+    await update_panel()
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not app_ready:
-        return
-
     await update.message.reply_text(f"UPTIME: {get_uptime()}")
 
 
 # =========================
-# 6. MONITOR (ANTI-SPAM BASE)
+# MONITOR
 # =========================
 
 async def monitor():
-
-    global check_ticket, check_blue
+    global check_ticket, check_blue, last_ticket_check, last_blue_check
 
     while True:
 
@@ -332,15 +391,19 @@ async def monitor():
         check_ticket += 1
         check_blue += 1
 
+        last_ticket_check = time.time()
+        last_blue_check = time.time()
+
+        await update_panel()
+
         await asyncio.sleep(30)
 
 
 # =========================
-# 7. MAIN
+# MAIN
 # =========================
 
 async def main():
-
     global bot_ticket, app_ready
 
     keep_alive()
