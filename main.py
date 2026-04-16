@@ -43,6 +43,7 @@ panel_chat_id = None
 check_ticket = 0
 check_blue = 0
 
+
 # =========================
 # LINKS OFICIAIS
 # =========================
@@ -67,6 +68,7 @@ BTS_URL = "https://ibighit.com/en/bts/tour/"
 boot_done = False
 boot_lock = True
 commands_ready = False
+app_ready = False   # 🔥 FIX CRÍTICO
 
 ticket_state = {}
 blue_state = {}
@@ -101,7 +103,7 @@ def hash_core(html):
 
 
 # =========================
-# 1. RESET / RECONNECT (OBRIGATÓRIO)
+# 1. RESET / RECONNECT
 # =========================
 
 async def send_boot():
@@ -111,12 +113,12 @@ async def send_boot():
 
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
-        text="👾•°•°• Wootteo entrando em rota•°•°•👾"
+        text="🛸•°•Wootteo entrando em rota°•°🛸"
     )
 
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
-        text="🛰️•°•°• Rota localizada•°•°•🛰️"
+        text="🛰️•°• Rota localizada°•°🛰️"
     )
 
     boot_done = True
@@ -126,13 +128,13 @@ async def send_boot():
 
 
 # =========================
-# 2. PAINEL (OBRIGATÓRIO)
+# 2. PAINEL
 # =========================
 
 async def update_panel(tour_data=None):
     global panel_message_id, panel_chat_id
 
-    if not panel_message_id:
+    if not app_ready or not panel_message_id:
         return
 
     text = f"""👾 CENTRAL WOOTTEO 👾
@@ -158,7 +160,7 @@ async def update_panel(tour_data=None):
 
 
 # =========================
-# 3. ALERTAS REAIS (SÓ QUANDO MUDAR)
+# 3. ALERTAS REAIS
 # =========================
 
 async def ticket_alert(url, key, found):
@@ -210,7 +212,7 @@ async def bts_alert(data):
 
 
 # =========================
-# 4. ALERTAS DE TESTE (OBRIGATÓRIO / TESTE COMPLETO)
+# 4. ALERTAS DE TESTE
 # =========================
 
 async def ticket_alert_test(url, key, found):
@@ -270,12 +272,12 @@ async def bts_alert_test(data):
 
 
 # =========================
-# 5. COMANDOS (OBRIGATÓRIO FUNCIONANDO)
+# 5. COMANDOS
 # =========================
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if not commands_ready:
+    if not app_ready:
         return
 
     await ticket_alert_test("https://ticketmaster.com/teste", "31/10/2026", True)
@@ -290,24 +292,28 @@ async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global panel_message_id, panel_chat_id
 
-    if not commands_ready:
+    if not app_ready:
         return
 
-    msg = await update.message.reply_text("👾 PAINEL ATIVADO")
+    msg = await context.bot.send_message(
+        chat_id=CHAT_ID,
+        text="👾 PAINEL ATIVADO"
+    )
+
     panel_message_id = msg.message_id
     panel_chat_id = CHAT_ID
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if not commands_ready:
+    if not app_ready:
         return
 
     await update.message.reply_text(f"UPTIME: {get_uptime()}")
 
 
 # =========================
-# 6. MONITOR (ANTI-SPAM REAL)
+# 6. MONITOR
 # =========================
 
 async def monitor():
@@ -326,26 +332,28 @@ async def monitor():
 
 
 # =========================
-# 7. MAIN
+# 7. MAIN (FIX DEFINITIVO)
 # =========================
 
 async def main():
-    global bot_ticket, commands_ready
+    global bot_ticket, commands_ready, app_ready
 
     keep_alive()
 
     bot_ticket = Bot(os.getenv("BOT_TOKEN_TICKET"))
 
-    app_ticket = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
+    application = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
 
-    app_ticket.add_handler(CommandHandler("teste", teste))
-    app_ticket.add_handler(CommandHandler("painel", painel))
-    app_ticket.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("teste", teste))
+    application.add_handler(CommandHandler("painel", painel))
+    application.add_handler(CommandHandler("status", status))
 
-    await app_ticket.initialize()
-    await app_ticket.start()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()   # 🔥 FIX CRÍTICO REAL
 
     commands_ready = True
+    app_ready = True
 
     await send_boot()
 
