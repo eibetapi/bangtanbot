@@ -87,7 +87,6 @@ BTS_TOUR = [
 
 boot_done = False
 boot_lock = True
-app_ready = False
 
 blink_state = True
 
@@ -343,8 +342,6 @@ async def test_agenda(data):
 # =========================
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not app_ready:
-        return
 
     await test_reposicao(TICKET_LINKS[0], "31/10/2026", True)
     await test_nova_data(TICKET_LINKS[1], "30/10/2026", True)
@@ -396,7 +393,7 @@ async def panel_loop():
 
 async def main():
 
-    global bot_ticket, app_ready
+    global bot_ticket
 
     keep_alive()
 
@@ -409,10 +406,9 @@ async def main():
     app.add_handler(CommandHandler("status", status))
 
     await app.initialize()
+    await app.start()
 
     await bot_ticket.delete_webhook(drop_pending_updates=True)
-
-    app_ready = True
 
     await send_boot()
 
