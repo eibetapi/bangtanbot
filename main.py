@@ -16,17 +16,18 @@ from threading import Thread
 # KEEP ALIVE
 # =========================
 
-app = Flask(__name__)
+app_web = Flask(__name__)
 
-@app.route('/')
+@app_web.route('/')
 def home():
     return "Bots rodando"
 
 def run_web():
-    app.run(host="0.0.0.0", port=8080)
+    app_web.run(host="0.0.0.0", port=8080)
 
 def keep_alive():
     Thread(target=run_web).start()
+
 
 # =========================
 # CONFIG
@@ -47,8 +48,12 @@ check_blue = 0
 last_ticket_check = time.time()
 last_blue_check = time.time()
 
+last_bts_fetch = 0
+bts_cache = None
+
+
 # =========================
-# LINKS (OBRIGATÓRIO)
+# LINKS (NÃO REMOVER)
 # =========================
 
 TICKET_LINKS = [
@@ -63,8 +68,9 @@ BLUE_LINKS = [
 
 BTS_URL = "https://ibighit.com/en/bts/tour/"
 
+
 # =========================
-# CONTROLES
+# CONTROLE
 # =========================
 
 boot_done = False
@@ -74,6 +80,7 @@ app_ready = False
 ticket_state = {}
 blue_state = {}
 bts_state = {}
+
 
 # =========================
 # UTIL
@@ -89,17 +96,14 @@ def resolve_status(found):
 def clean(v):
     return v if v and str(v).strip() else "ESGOTADO"
 
-def make_hash(html):
-    return hashlib.md5(html.encode()).hexdigest()
-
 def days_left(date_obj):
     return max((date_obj - datetime.now()).days, 0)
 
 def minutes_since(ts):
     return int((time.time() - ts) / 60)
 
-def detect_country(city):
 
+def detect_country(city):
     c = city.lower()
 
     if any(x in c for x in [
@@ -118,6 +122,7 @@ def detect_country(city):
         return "USA"
 
     return "Internacional"
+
 
 def parse_bts_tour(html):
 
@@ -160,6 +165,7 @@ def parse_bts_tour(html):
 
     return proximo, brasil
 
+
 # =========================
 # 1. RESET / RECONNECT
 # =========================
@@ -193,21 +199,29 @@ async def send_boot():
 
     await update_panel()
 
+
 # =========================
 # 2. PAINEL
 # =========================
 
 async def update_panel():
 
-    global panel_message_id
+    global panel_message_id, last_bts_fetch, bts_cache
 
     if not panel_message_id:
         return
 
-    try:
-        html = requests.get(BTS_URL, timeout=10).text
-        proximo, brasil = parse_bts_tour(html)
-    except:
+    if time.time() - last_bts_fetch > 60:
+        try:
+            html = requests.get(BTS_URL, timeout=10).text
+            bts_cache = parse_bts_tour(html)
+            last_bts_fetch = time.time()
+        except:
+            pass
+
+    if bts_cache:
+        proximo, brasil = bts_cache
+    else:
         proximo, brasil = None, None
 
     if proximo:
@@ -225,22 +239,20 @@ async def update_panel():
         dt_br = datetime(2026, 10, 28)
         dias_br = days_left(dt_br)
 
-    text = f"""🔴⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜🔴
+    text = f"""🔴*⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜*🔴
 
-👾 CENTRAL WOOTTEO 👾
-
-⏰ Uptime: {get_uptime()}
+👾*PAINEL DE CONTROLE*👾
 
 ✈️ *PRÓXIMAS DATAS*
 
-🎫 Data: {data}
-📍 Local: {city}
-🔔 Faltam {dias} dias.
+🎫 *Data:* {data}
+📍 *Local:* {city}
+🔔 *Faltam* {dias} dias.
 
-⏳Faltam {dias_br} dias para o BTS no Brasil.
+⏳*Faltam {dias_br} dias para o BTS no Brasil.*
 
-🟡 Ticket: {check_ticket} | último rastreio há {minutes_since(last_ticket_check)} min
-🔵 Blue: {check_blue} | último rastreio há {minutes_since(last_blue_check)} min
+🟡 *Ticket:* {check_ticket} | último rastreio há {minutes_since(last_ticket_check)} min
+🔵 *Blue:* {check_blue} | último rastreio há {minutes_since(last_blue_check)} min
 """
 
     try:
@@ -253,53 +265,57 @@ async def update_panel():
     except:
         pass
 
+
 # =========================
 # 3. ALERTAS OFICIAIS
 # =========================
 
 async def ticket_reposicao(url, key, found):
-    msg = f"""🔥ALERTA DE REPOSIÇÃO 🔥
-📅 Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-✅Status: {resolve_status(found)}
+    msg = f"""🔥*ALERTA DE REPOSIÇÃO*🔥
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def ticket_nova_data(url, key, found):
-    msg = f"""🎁ALERTA DE NOVA DATA🎁
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-📊Quantidade: ESGOTADO
-✅Status: {resolve_status(found)}
+    msg = f"""🎁*ALERTA DE NOVA DATA*🎁
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def blue_revenda(url, key, found):
-    msg = f"""🔵REVENDA BLUE🔵
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-💰Valor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-✅Status: {resolve_status(found)}
+    msg = f"""🔵*REVENDA BLUE*🔵
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+💰 *Valor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
+
 async def agenda_update(data):
-    msg = f"""💜AGENDA NOVAS DATAS💜
-📅 Data: {clean(data.get('date'))}
-🏙️ Cidade: {clean(data.get('city'))}
-🌎 País: {clean(data.get('country'))}
-⚠️Mais informações em breve!
+    msg = f"""💜*AGENDA NOVAS DATAS*💜
+📅 *Data:* {clean(data.get('date'))}
+🏙️ *Cidade:* {clean(data.get('city'))}
+🌎 *País:* {clean(data.get('country'))}
+⚠️*Mais informações em breve!*
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 # =========================
 # 4. ALERTAS DE TESTE
@@ -308,56 +324,57 @@ async def agenda_update(data):
 async def test_reposicao(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
 
-🔥ALERTA DE REPOSIÇÃO 🔥
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-📊Quantidade: ESGOTADO
-✅Status: {resolve_status(found)}
+🔥*ALERTA DE REPOSIÇÃO*🔥
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def test_nova_data(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
 
-🎁ALERTA DE NOVA DATA🎁
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-📊Quantidade: ESGOTADO
-✅Status: {resolve_status(found)}
+🎁*ALERTA DE NOVA DATA*🎁
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def test_blue(url, key, found):
     msg = f"""⚠️**TESTE**⚠️
 
-🔵REVENDA BLUE🔵
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-💰Valor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-📊Quantidade: ESGOTADO
-✅Status: {resolve_status(found)}
+🔵*REVENDA BLUE*🔵
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+💰 *Valor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status: {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def test_agenda(data):
     msg = f"""⚠️**TESTE**⚠️
 
-💜AGENDA NOVAS DATAS💜
-📅 Data: {data['date']}
-🏙️ Cidade: {data['city']}
-🌎 País: {data['country']}
-⚠️Mais informações em breve!
+💜*AGENDA NOVAS DATAS*💜
+📅 *Data:* {clean(data.get('date'))}
+🏙️ *Cidade:* {clean(data.get('city'))}
+🌎 *País:* {clean(data.get('country'))}
+⚠️*Mais informações em breve!*
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 # =========================
 # 5. COMANDOS
@@ -372,14 +389,17 @@ async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await test_blue(BLUE_LINKS[0], "25/04/2026", True)
     await test_agenda({"date": "25/04/2026", "city": "Seoul", "country": "Coreia do Sul"})
 
+
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update_panel()
 
+
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"UPTIME: {get_uptime()}")
+    await update.effective_chat.send_message(f"UPTIME: {get_uptime()}")
+
 
 # =========================
-# 6. MONITOR
+# 6. LOOPS
 # =========================
 
 async def monitor():
@@ -398,9 +418,15 @@ async def monitor():
         last_ticket_check = time.time()
         last_blue_check = time.time()
 
-        await update_panel()
-
         await asyncio.sleep(30)
+
+
+async def panel_loop():
+    while True:
+        if not boot_lock:
+            await update_panel()
+        await asyncio.sleep(5)
+
 
 # =========================
 # 7. MAIN
@@ -422,15 +448,17 @@ async def main():
 
     await app.initialize()
     await app.start()
-    await app.updater.start_polling()
+
+    await bot_ticket.delete_webhook(drop_pending_updates=True)
 
     app_ready = True
 
     await send_boot()
 
     asyncio.create_task(monitor())
+    asyncio.create_task(panel_loop())
 
-    await asyncio.Event().wait()
+    await app.run_polling()
 
 
 if __name__ == "__main__":
