@@ -961,18 +961,18 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================
-# 21 MAIN
+# 21 MAIN (VERSÃO ESTÁVEL)
 # =========================
 
 async def main():
     keep_alive()
 
-    # 1. DISCORD
+    # DISCORD
     discord_token = os.getenv("DISCORD_TOKEN")
     if discord_token:
         asyncio.create_task(bot_discord.start(discord_token))
 
-    # 2. TELEGRAM
+    # TELEGRAM
     token = os.getenv("BOT_TOKEN_TICKET")
     if not token:
         return
@@ -986,23 +986,11 @@ async def main():
         MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, handle_commands)
     )
 
-    await app.initialize()
-    await app.start()
-
-    await bot_ticket.delete_webhook(drop_pending_updates=True)
-
-    await send_boot()
-
-    # BACKGROUND TASKS
-    asyncio.create_task(monitor())
-    asyncio.create_task(panel_loop())
-
-    # mantém o bot vivo (CORRETO)
-    await asyncio.Event().wait()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    # 🚀 START LIMPO (sem conflito interno)
+    await app.run_polling(
+        drop_pending_updates=True,
+        close_loop=False
+    )
 
 # =========================
 # 22 MONITOR ENGINE (TEMPO REAL + ANTI DUPLICAÇÃO)
