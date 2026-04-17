@@ -41,7 +41,7 @@ start_time = time.time()
 bot_ticket = None
 
 panel_message_id = None
-panel_chat_id = None
+panel_chat_id = CHAT_ID
 
 check_ticket = 0
 check_blue = 0
@@ -208,18 +208,24 @@ async def send_boot():
 
     await bot_ticket.send_message(chat_id=CHAT_ID, text="🛸•°•Wootteo entrando em rota°•°🛸")
 
-    msg = await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
-    )
+    create_new = True
+    if panel_message_id:
+        try:
+            await update_panel()
+            create_new = False
+        except:
+            create_new = True
 
-    panel_message_id = msg.message_id
-    panel_chat_id = CHAT_ID
-
-    try:
-        await bot_ticket.pin_chat_message(chat_id=panel_chat_id, message_id=panel_message_id, disable_notification=True)
-    except:
-        pass
+    if create_new:
+        msg = await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
+        )
+        panel_message_id = msg.message_id
+        try:
+            await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=panel_message_id, disable_notification=True)
+        except:
+            pass
 
     boot_lock = False
     await update_panel()
@@ -260,23 +266,124 @@ acesso realizado: {check_blue} | último rastreio há {minutes_since(last_blue_c
 
 
 # =========================
-# 3. ALERTAS (OFICIAIS E TESTE)
+# 3. ALERTAS OFICIAIS
+# =========================
+
+async def ticket_reposicao(url, key, found):
+    # Trava para Brasil (28, 30, 31/10)
+    if any(x in str(key) for x in ["28/10", "30/10", "31/10"]):
+        msg = f"""🔥*ALERTA DE REPOSIÇÃO*🔥
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
+"""
+        await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def ticket_nova_data(url, key, found):
+    # Trava para Brasil (28, 30, 31/10 ou texto Brasil)
+    if any(x in str(key) for x in ["28/10", "30/10", "31/10"]) or "Brasil" in str(key):
+        msg = f"""🎁*ALERTA DE NOVA DATA*🎁
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+📊 *Quantidade:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
+"""
+        await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def blue_revenda(url, key, found):
+    # Trava para Brasil (28, 30, 31/10)
+    if any(x in str(key) for x in ["28/10", "30/10", "31/10"]):
+        msg = f"""🔵*REVENDA BLUE*🔵
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+💰 *Valor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
+"""
+        await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def agenda_update(data):
+    # Trava para Brasil
+    country = str(data.get('country', ''))
+    city = str(data.get('city', ''))
+    if "Brasil" in country or "Paulo" in city or "Brasil" in str(data):
+        msg = f"""💜*AGENDA NOVAS DATAS*💜
+📅 *Data:* {clean(data.get('date'))}
+🏙️ *Cidade:* {clean(data.get('city'))}
+🌎 *País:* {clean(data.get('country'))}
+⚠️*Mais informações em breve!*
+"""
+        await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+# =========================
+# 4. ALERTAS DE TESTE
 # =========================
 
 async def test_reposicao(url, key, found):
-    msg = f"⚠️**TESTE**⚠️\n\n🔥ALERTA DE REPOSIÇÃO 🔥\n📅 Data: {clean(key)}\n🔗Link: {url}\n✅Status: {resolve_status(found)}"
+    msg = f"""⚠️**TESTE**⚠️
+
+🔥*ALERTA DE REPOSIÇÃO*🔥
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
+"""
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def test_nova_data(url, key, found):
-    msg = f"⚠️**TESTE**⚠️\n\n🎁ALERTA DE NOVA DATA🎁\n📅Data: {clean(key)}\n🔗Link: {url}\n✅Status: {resolve_status(found)}"
+    msg = f"""⚠️**TESTE**⚠️
+
+🎁*ALERTA DE NOVA DATA*🎁
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+📊 *Quantidade:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
+"""
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
 
 async def test_blue(url, key, found):
-    msg = f"⚠️**TESTE**⚠️\n\n🔵REVENDA BLUE🔵\n📅Data: {clean(key)}\n🔗Link: {url}\n✅Status: {resolve_status(found)}"
+    msg = f"""⚠️**TESTE**⚠️
+
+🔵*REVENDA BLUE*🔵
+📅 *Data:* {clean(key)}
+🔗 *Link:* {url}
+📍 *Setor:* ESGOTADO
+💰 *Valor:* ESGOTADO
+🎫 *Categoria:* ESGOTADO
+🛡️ *Tipo:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
+"""
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
+
 async def test_agenda(data):
-    msg = f"⚠️**TESTE**⚠️\n\n💜AGENDA NOVAS DATAS💜\n📅 Data: {clean(data.get('date'))}\n🏙️ Cidade: {clean(data.get('city'))}\n🌎 País: {clean(data.get('country'))}"
+    msg = f"""⚠️**TESTE**⚠️
+
+💜*AGENDA NOVAS DATAS*💜
+📅 *Data:* {clean(data.get('date'))}
+🏙️ *Cidade:* {clean(data.get('city'))}
+🌎 *País:* {clean(data.get('country'))}
+⚠️*Mais informações em breve!*
+"""
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 
@@ -286,20 +393,16 @@ async def test_agenda(data):
 
 async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
-    
-    # Filtra para responder apenas no Privado
     if update.message.chat.type != "private": return
 
     text = update.message.text.lower()
 
     if "/teste" in text:
+        await test_reposicao(TICKET_LINKS[0], "28/10/2026", True)
         await test_reposicao(TICKET_LINKS[0], "31/10/2026", True)
         await test_nova_data(TICKET_LINKS[1], "30/10/2026", True)
         await test_blue(BLUE_LINKS[0], "25/04/2026", True)
         await test_agenda({"date": "25/04/2026", "city": "Seoul", "country": "Coreia do Sul"})
-
-    elif "/painel" in text:
-        await update_panel()
 
 
 # =========================
@@ -331,19 +434,17 @@ async def main():
     keep_alive()
 
     token = os.getenv("BOT_TOKEN_TICKET")
-    if not token:
-        print("ERRO: Variável BOT_TOKEN_TICKET não encontrada!")
-        return
+    if not token: return
 
     app = ApplicationBuilder().token(token).build()
     bot_ticket = app.bot
 
-    # Handler mais abrangente para capturar mensagens no PV
     app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, handle_commands))
 
     await app.initialize()
     await app.start()
     await bot_ticket.delete_webhook(drop_pending_updates=True)
+    
     await send_boot()
 
     asyncio.create_task(monitor())
