@@ -48,9 +48,6 @@ check_blue = 0
 last_ticket_check = time.time()
 last_blue_check = time.time()
 
-last_bts_fetch = 0
-bts_cache = None
-
 
 # =========================
 # LINKS (NÃO REMOVER)
@@ -70,6 +67,21 @@ BTS_URL = "https://ibighit.com/en/bts/tour/"
 
 
 # =========================
+# AGENDA FIXA
+# =========================
+
+BTS_TOUR = [
+    {"date": "18/04/2026", "city": "Tóquio", "country": "Japão"},
+    {"date": "25/04/2026", "city": "Tampa", "country": "USA"},
+    {"date": "26/04/2026", "city": "Tampa", "country": "USA"},
+    {"date": "28/04/2026", "city": "Tampa", "country": "USA"},
+    {"date": "28/10/2026", "city": "São Paulo", "country": "Brasil"},
+    {"date": "30/10/2026", "city": "São Paulo", "country": "Brasil"},
+    {"date": "31/10/2026", "city": "São Paulo", "country": "Brasil"}
+]
+
+
+# =========================
 # CONTROLE
 # =========================
 
@@ -77,9 +89,7 @@ boot_done = False
 boot_lock = True
 app_ready = False
 
-ticket_state = {}
-blue_state = {}
-bts_state = {}
+blink_state = True
 
 
 # =========================
@@ -103,67 +113,32 @@ def minutes_since(ts):
     return int((time.time() - ts) / 60)
 
 
-def detect_country(city):
-    c = city.lower()
-
-    if any(x in c for x in [
-        "são paulo", "rio de janeiro", "curitiba",
-        "belo horizonte", "brasília", "porto alegre"
-    ]):
-        return "Brasil"
-
-    if "seoul" in c:
-        return "Coreia do Sul"
-
-    if "tokyo" in c:
-        return "Japão"
-
-    if "los angeles" in c or "new york" in c:
-        return "USA"
-
-    return "Internacional"
-
-
-def parse_bts_tour(html):
-
-    soup = BeautifulSoup(html, "html.parser")
-
-    for tag in soup(["script", "style", "noscript"]):
-        tag.extract()
-
-    text = soup.get_text("\n", strip=True)
-
-    pattern = r"(20\d{2}\.\d{2}\.\d{2})\s+([A-Za-zÀ-ÿ\s]+)"
-    matches = re.findall(pattern, text)
+def get_next_shows():
+    now = datetime.now()
 
     eventos = []
+    for e in BTS_TOUR:
+        dt = datetime.strptime(e["date"], "%d/%m/%Y")
+        eventos.append({**e, "dt": dt})
 
-    for raw_date, city in matches:
-        try:
-            dt = datetime.strptime(raw_date, "%Y.%m.%d")
+    eventos.sort(key=lambda x: x["dt"])
 
-            eventos.append({
-                "date": dt,
-                "date_str": dt.strftime("%d/%m/%Y"),
-                "city": city.strip(),
-                "country": detect_country(city)
-            })
-
-        except:
-            continue
-
-    if not eventos:
-        return None, None
-
-    eventos.sort(key=lambda x: x["date"])
-
-    now = datetime.now()
-    futuros = [e for e in eventos if e["date"] >= now]
+    futuros = [e for e in eventos if e["dt"] >= now]
 
     proximo = futuros[0] if futuros else None
     brasil = next((e for e in eventos if e["country"] == "Brasil"), None)
 
     return proximo, brasil
+
+
+def get_alert_text(dias):
+    global blink_state
+
+    if dias <= 3:
+        blink_state = not blink_state
+        return "🚨" if blink_state else "⚠️"
+
+    return ""
 
 
 # =========================
@@ -179,11 +154,6 @@ async def send_boot():
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
         text="🛸•°•Wootteo entrando em rota°•°🛸"
-    )
-
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text="🛰️•°•°• Rota localizada•°•°•🛰️"
     )
 
     msg = await bot_ticket.send_message(
@@ -206,50 +176,40 @@ async def send_boot():
 
 async def update_panel():
 
-    global panel_message_id, last_bts_fetch, bts_cache
+    global panel_message_id
 
     if not panel_message_id:
         return
 
-    if time.time() - last_bts_fetch > 60:
-        try:
-            html = requests.get(BTS_URL, timeout=10).text
-            bts_cache = parse_bts_tour(html)
-            last_bts_fetch = time.time()
-        except:
-            pass
-
-    if bts_cache:
-        proximo, brasil = bts_cache
-    else:
-        proximo, brasil = None, None
+    proximo, brasil = get_next_shows()
 
     if proximo:
-        data = proximo["date_str"]
+        data = proximo["date"]
         city = proximo["city"]
-        dias = days_left(proximo["date"])
+        dias = days_left(proximo["dt"])
+        alerta = get_alert_text(dias)
     else:
-        data = "carregando..."
-        city = "carregando..."
+        data = "..."
+        city = "..."
         dias = "..."
+        alerta = ""
 
     if brasil:
-        dias_br = days_left(brasil["date"])
+        dias_br = days_left(datetime.strptime(brasil["date"], "%d/%m/%Y"))
     else:
-        dt_br = datetime(2026, 10, 28)
-        dias_br = days_left(dt_br)
+        dias_br = "..."
 
-    text = f"""🔴*⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜*🔴
+    text = f"""👾*PAINEL DE CONTROLE*👾
 
-👾*PAINEL DE CONTROLE*👾
+🔴*⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜*🔴
 
 ✈️ *PRÓXIMAS DATAS*
 
-🎫 *Data:* {data}
+🎫 *Data:* {data} {alerta}
 📍 *Local:* {city}
-🔔 *Faltam* {dias} dias.
+🔔 Faltam {dias} dias.
 
-⏳*Faltam {dias_br} dias para o BTS no Brasil.*
+⏳Faltam {dias_br} dias para o BTS no Brasil.
 
 🟡 *Ticket:* {check_ticket} | último rastreio há {minutes_since(last_ticket_check)} min
 🔵 *Blue:* {check_blue} | último rastreio há {minutes_since(last_blue_check)} min
@@ -277,7 +237,7 @@ async def ticket_reposicao(url, key, found):
 📍 *Setor:* ESGOTADO
 🎫 *Categoria:* ESGOTADO
 🛡️ *Tipo:* ESGOTADO
-✅ *Status: {resolve_status(found)}
+✅ *Status:* {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
@@ -289,7 +249,8 @@ async def ticket_nova_data(url, key, found):
 📍 *Setor:* ESGOTADO
 🎫 *Categoria:* ESGOTADO
 🛡️ *Tipo:* ESGOTADO
-✅ *Status: {resolve_status(found)}
+📊 *Quantidade:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
@@ -302,7 +263,7 @@ async def blue_revenda(url, key, found):
 💰 *Valor:* ESGOTADO
 🎫 *Categoria:* ESGOTADO
 🛡️ *Tipo:* ESGOTADO
-✅ *Status: {resolve_status(found)}
+✅ *Status:* {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
@@ -330,7 +291,7 @@ async def test_reposicao(url, key, found):
 📍 *Setor:* ESGOTADO
 🎫 *Categoria:* ESGOTADO
 🛡️ *Tipo:* ESGOTADO
-✅ *Status: {resolve_status(found)}
+✅ *Status:* {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
@@ -344,7 +305,8 @@ async def test_nova_data(url, key, found):
 📍 *Setor:* ESGOTADO
 🎫 *Categoria:* ESGOTADO
 🛡️ *Tipo:* ESGOTADO
-✅ *Status: {resolve_status(found)}
+📊 *Quantidade:* ESGOTADO
+✅ *Status:* {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
@@ -359,7 +321,7 @@ async def test_blue(url, key, found):
 💰 *Valor:* ESGOTADO
 🎫 *Categoria:* ESGOTADO
 🛡️ *Tipo:* ESGOTADO
-✅ *Status: {resolve_status(found)}
+✅ *Status:* {resolve_status(found)}
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
@@ -447,7 +409,6 @@ async def main():
     app.add_handler(CommandHandler("status", status))
 
     await app.initialize()
-    await app.start()
 
     await bot_ticket.delete_webhook(drop_pending_updates=True)
 
@@ -458,7 +419,7 @@ async def main():
     asyncio.create_task(monitor())
     asyncio.create_task(panel_loop())
 
-    await app.run_polling()
+    await app.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
