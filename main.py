@@ -63,21 +63,20 @@ BLUE_LINKS = [
     "https://buyticketbrasil.com/evento/bts-2026-world-tour-arirang"
 ]
 
-BTS_URL = "https://ibighit.com/en/bts/tour/"
-
-
 # =========================
-# AGENDA FIXA
+# AGENDA FIXA (TEMPO REAL CONTROLADO)
 # =========================
 
-BTS_TOUR = [
-    {"date": "18/04/2026", "city": "Tóquio", "country": "Japão"},
-    {"date": "25/04/2026", "city": "Tampa", "country": "USA"},
-    {"date": "26/04/2026", "city": "Tampa", "country": "USA"},
-    {"date": "28/04/2026", "city": "Tampa", "country": "USA"},
-    {"date": "28/10/2026", "city": "São Paulo", "country": "Brasil"},
-    {"date": "30/10/2026", "city": "São Paulo", "country": "Brasil"},
-    {"date": "31/10/2026", "city": "São Paulo", "country": "Brasil"}
+AGENDA = [
+    ("18/04/2026", "Tóquio"),
+    ("25/04/2026", "Tampa"),
+    ("26/04/2026", "Tampa"),
+    ("28/04/2026", "Tampa"),
+    ("02/05/2026", "El Paso"),
+    ("03/05/2026", "El Paso"),
+    ("28/10/2026", "São Paulo"),
+    ("30/10/2026", "São Paulo"),
+    ("31/10/2026", "São Paulo"),
 ]
 
 
@@ -85,10 +84,8 @@ BTS_TOUR = [
 # CONTROLE
 # =========================
 
-boot_done = False
 boot_lock = True
-
-blink_state = True
+app_ready = False
 
 
 # =========================
@@ -105,39 +102,23 @@ def resolve_status(found):
 def clean(v):
     return v if v and str(v).strip() else "ESGOTADO"
 
-def days_left(date_obj):
-    return max((date_obj - datetime.now()).days, 0)
+def days_left(date_str):
+    d = datetime.strptime(date_str, "%d/%m/%Y")
+    return max((d - datetime.now()).days, 0)
 
 def minutes_since(ts):
     return int((time.time() - ts) / 60)
 
 
-def get_next_shows():
+def get_next_show():
     now = datetime.now()
 
-    eventos = []
-    for e in BTS_TOUR:
-        dt = datetime.strptime(e["date"], "%d/%m/%Y")
-        eventos.append({**e, "dt": dt})
+    for d, city in AGENDA:
+        dt = datetime.strptime(d, "%d/%m/%Y")
+        if dt >= now:
+            return d, city, days_left(d)
 
-    eventos.sort(key=lambda x: x["dt"])
-
-    futuros = [e for e in eventos if e["dt"] >= now]
-
-    proximo = futuros[0] if futuros else None
-    brasil = next((e for e in eventos if e["country"] == "Brasil"), None)
-
-    return proximo, brasil
-
-
-def get_alert_text(dias):
-    global blink_state
-
-    if dias <= 3:
-        blink_state = not blink_state
-        return "🚨" if blink_state else "⚠️"
-
-    return ""
+    return "carregando...", "carregando...", "..."
 
 
 # =========================
@@ -146,7 +127,7 @@ def get_alert_text(dias):
 
 async def send_boot():
 
-    global boot_done, boot_lock, panel_message_id, panel_chat_id
+    global boot_lock, panel_message_id, panel_chat_id
 
     boot_lock = True
 
@@ -157,13 +138,12 @@ async def send_boot():
 
     msg = await bot_ticket.send_message(
         chat_id=CHAT_ID,
-        text="👾 CENTRAL WOOTTEO 👾\n\nInicializando painel..."
+        text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
     )
 
     panel_message_id = msg.message_id
     panel_chat_id = CHAT_ID
 
-    boot_done = True
     boot_lock = False
 
     await update_panel()
@@ -180,23 +160,8 @@ async def update_panel():
     if not panel_message_id:
         return
 
-    proximo, brasil = get_next_shows()
-
-    if proximo:
-        data = proximo["date"]
-        city = proximo["city"]
-        dias = days_left(proximo["dt"])
-        alerta = get_alert_text(dias)
-    else:
-        data = "..."
-        city = "..."
-        dias = "..."
-        alerta = ""
-
-    if brasil:
-        dias_br = days_left(datetime.strptime(brasil["date"], "%d/%m/%Y"))
-    else:
-        dias_br = "..."
+    data, city, dias = get_next_show()
+    dias_br = days_left("28/10/2026")
 
     text = f"""👾*PAINEL DE CONTROLE*👾
 
@@ -204,15 +169,15 @@ async def update_panel():
 
 ✈️ *PRÓXIMAS DATAS*
 
-🎫 *Data:* {data} {alerta}
+🎫 *Data:* {data}
 📍 *Local:* {city}
 🔔 Faltam {dias} dias.
 
 ⏳Faltam {dias_br} dias para o BTS no Brasil.
 
-🟡 *Ticketmaster*
+🟡 Ticketmaster
 acesso realizado: {check_ticket} | último rastreio há {minutes_since(last_ticket_check)} min
-🔵 *Buyticket*
+🔵 Buyticket
 acesso realizado: {check_blue} | último rastreio há {minutes_since(last_blue_check)} min
 """
 
@@ -230,20 +195,121 @@ acesso realizado: {check_blue} | último rastreio há {minutes_since(last_blue_c
 # =========================
 # 3. ALERTAS OFICIAIS
 # =========================
-# (mantido exatamente como estava)
+
+async def ticket_reposicao(url, key, found):
+    msg = f"""🔥ALERTA DE REPOSIÇÃO 🔥
+📅 Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def ticket_nova_data(url, key, found):
+    msg = f"""🎁ALERTA DE NOVA DATA🎁
+📅Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+📊Quantidade: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def blue_revenda(url, key, found):
+    msg = f"""🔵REVENDA BLUE🔵
+📅Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+💰Valor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def agenda_update(data):
+    msg = f"""💜AGENDA NOVAS DATAS💜
+📅 Data: {clean(data.get('date'))}
+🏙️ Cidade: {clean(data.get('city'))}
+🌎 País: {clean(data.get('country'))}
+⚠️Mais informações em breve!
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 
 # =========================
 # 4. ALERTAS DE TESTE
 # =========================
-# (mantido exatamente como estava)
+
+async def test_reposicao(url, key, found):
+    msg = f"""⚠️**TESTE**⚠️
+
+🔥ALERTA DE REPOSIÇÃO 🔥
+📅 Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def test_nova_data(url, key, found):
+    msg = f"""⚠️**TESTE**⚠️
+
+🎁ALERTA DE NOVA DATA🎁
+📅Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+📊Quantidade: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def test_blue(url, key, found):
+    msg = f"""⚠️**TESTE**⚠️
+
+🔵REVENDA BLUE🔵
+📅Data: {clean(key)}
+🔗Link: {url}
+📍Setor: ESGOTADO
+💰Valor: ESGOTADO
+🎫Categoria: ESGOTADO
+🛡️Tipo: ESGOTADO
+✅Status: {resolve_status(found)}
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
+
+
+async def test_agenda(data):
+    msg = f"""⚠️**TESTE**⚠️
+
+💜AGENDA NOVAS DATAS💜
+📅 Data: {clean(data.get('date'))}
+🏙️ Cidade: {clean(data.get('city'))}
+🌎 País: {clean(data.get('country'))}
+⚠️Mais informações em breve!
+"""
+    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 
 # =========================
-# 5. COMANDOS
+# 5. COMANDOS (FUNCIONANDO NO CANAL)
 # =========================
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
 
     await test_reposicao(TICKET_LINKS[0], "31/10/2026", True)
     await test_nova_data(TICKET_LINKS[1], "30/10/2026", True)
@@ -253,10 +319,6 @@ async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def painel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update_panel()
-
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_chat.send_message(f"UPTIME: {get_uptime()}")
 
 
 # =========================
@@ -295,7 +357,7 @@ async def panel_loop():
 
 async def main():
 
-    global bot_ticket
+    global bot_ticket, app_ready
 
     keep_alive()
 
@@ -303,21 +365,21 @@ async def main():
 
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN_TICKET")).build()
 
-    app.add_handler(CommandHandler("teste", teste))
-    app.add_handler(CommandHandler("painel", painel))
-    app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("teste", teste, block=False))
+    app.add_handler(CommandHandler("painel", painel, block=False))
 
     await app.initialize()
-    await app.start()
 
     await bot_ticket.delete_webhook(drop_pending_updates=True)
+
+    app_ready = True
 
     await send_boot()
 
     asyncio.create_task(monitor())
     asyncio.create_task(panel_loop())
 
-    await app.run_polling(close_loop=False)
+    await app.run_polling()
 
 
 if __name__ == "__main__":
