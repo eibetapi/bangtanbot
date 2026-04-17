@@ -1,6 +1,3 @@
-Aqui está o código completo. Atualizei a lista AGENDA com todas as novas datas fornecidas, mantendo a lógica de funcionamento, os links e a estrutura de classes e funções exatamente como no original.
-Também mantive a correção técnica no main() para garantir que o bot processe os comandos e o painel simultaneamente no Railway.
-```python
 import asyncio
 import time
 import requests
@@ -69,7 +66,7 @@ BLUE_LINKS = [
 
 
 # =========================
-# AGENDA FIXA (ATUALIZADA)
+# AGENDA FIXA
 # =========================
 
 AGENDA = [
@@ -206,15 +203,10 @@ def get_next_show():
 # =========================
 
 async def send_boot():
-
     global boot_lock, panel_message_id, panel_chat_id
-
     boot_lock = True
 
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text="🛸•°•Wootteo entrando em rota°•°🛸"
-    )
+    await bot_ticket.send_message(chat_id=CHAT_ID, text="🛸•°•Wootteo entrando em rota°•°🛸")
 
     msg = await bot_ticket.send_message(
         chat_id=CHAT_ID,
@@ -224,8 +216,12 @@ async def send_boot():
     panel_message_id = msg.message_id
     panel_chat_id = CHAT_ID
 
-    boot_lock = False
+    try:
+        await bot_ticket.pin_chat_message(chat_id=panel_chat_id, message_id=panel_message_id, disable_notification=True)
+    except:
+        pass
 
+    boot_lock = False
     await update_panel()
 
 
@@ -234,11 +230,8 @@ async def send_boot():
 # =========================
 
 async def update_panel():
-
     global panel_message_id
-
-    if not panel_message_id:
-        return
+    if not panel_message_id: return
 
     data, city, dias = get_next_show()
     dias_br = days_left("28/10/2026")
@@ -260,152 +253,50 @@ acesso realizado: {check_ticket} | último rastreio há {minutes_since(last_tick
 🔵 Buyticket
 acesso realizado: {check_blue} | último rastreio há {minutes_since(last_blue_check)} min
 """
-
     try:
-        await bot_ticket.edit_message_text(
-            chat_id=panel_chat_id,
-            message_id=panel_message_id,
-            text=text,
-            parse_mode="Markdown"
-        )
-    except Exception:
+        await bot_ticket.edit_message_text(chat_id=panel_chat_id, message_id=panel_message_id, text=text, parse_mode="Markdown")
+    except:
         pass
 
 
 # =========================
-# 3. ALERTAS OFICIAIS
-# =========================
-
-async def ticket_reposicao(url, key, found):
-    msg = f"""🔥ALERTA DE REPOSIÇÃO 🔥
-📅 Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-✅Status: {resolve_status(found)}
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-
-async def ticket_nova_data(url, key, found):
-    msg = f"""🎁ALERTA DE NOVA DATA🎁
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-📊Quantidade: ESGOTADO
-✅Status: {resolve_status(found)}
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-
-async def blue_revenda(url, key, found):
-    msg = f"""🔵REVENDA BLUE🔵
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-💰Valor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-✅Status: {resolve_status(found)}
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-
-async def agenda_update(data):
-    msg = f"""💜AGENDA NOVAS DATAS💜
-📅 Data: {clean(data.get('date'))}
-🏙️ Cidade: {clean(data.get('city'))}
-🌎 País: {clean(data.get('country'))}
-⚠️Mais informações em breve!
-"""
-    await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
-
-# =========================
-# 4. ALERTAS DE TESTE
+# 3. ALERTAS (OFICIAIS E TESTE)
 # =========================
 
 async def test_reposicao(url, key, found):
-    msg = f"""⚠️**TESTE**⚠️
-
-🔥ALERTA DE REPOSIÇÃO 🔥
-📅 Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-✅Status: {resolve_status(found)}
-"""
+    msg = f"⚠️**TESTE**⚠️\n\n🔥ALERTA DE REPOSIÇÃO 🔥\n📅 Data: {clean(key)}\n🔗Link: {url}\n✅Status: {resolve_status(found)}"
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
 
 async def test_nova_data(url, key, found):
-    msg = f"""⚠️**TESTE**⚠️
-
-🎁ALERTA DE NOVA DATA🎁
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-📊Quantidade: ESGOTADO
-✅Status: {resolve_status(found)}
-"""
+    msg = f"⚠️**TESTE**⚠️\n\n🎁ALERTA DE NOVA DATA🎁\n📅Data: {clean(key)}\n🔗Link: {url}\n✅Status: {resolve_status(found)}"
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
-
 
 async def test_blue(url, key, found):
-    msg = f"""⚠️**TESTE**⚠️
-
-🔵REVENDA BLUE🔵
-📅Data: {clean(key)}
-🔗Link: {url}
-📍Setor: ESGOTADO
-💰Valor: ESGOTADO
-🎫Categoria: ESGOTADO
-🛡️Tipo: ESGOTADO
-✅Status: {resolve_status(found)}
-"""
+    msg = f"⚠️**TESTE**⚠️\n\n🔵REVENDA BLUE🔵\n📅Data: {clean(key)}\n🔗Link: {url}\n✅Status: {resolve_status(found)}"
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 async def test_agenda(data):
-    msg = f"""⚠️**TESTE**⚠️
-
-💜AGENDA NOVAS DATAS💜
-📅 Data: {clean(data.get('date'))}
-🏙️ Cidade: {clean(data.get('city'))}
-🌎 País: {clean(data.get('country'))}
-⚠️Mais informações em breve!
-"""
+    msg = f"⚠️**TESTE**⚠️\n\n💜AGENDA NOVAS DATAS💜\n📅 Data: {clean(data.get('date'))}\n🏙️ Cidade: {clean(data.get('city'))}\n🌎 País: {clean(data.get('country'))}"
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 
 # =========================
-# 5. COMANDOS (PV → CANAL)
+# 5. COMANDOS (PV)
 # =========================
 
 async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text: return
+    
+    # Filtra para responder apenas no Privado
+    if update.message.chat.type != "private": return
 
-    msg = update.message
-
-    if not msg or msg.chat.type != "private":
-        return
-
-    text = msg.text.lower()
+    text = update.message.text.lower()
 
     if "/teste" in text:
         await test_reposicao(TICKET_LINKS[0], "31/10/2026", True)
         await test_nova_data(TICKET_LINKS[1], "30/10/2026", True)
         await test_blue(BLUE_LINKS[0], "25/04/2026", True)
-        await test_agenda({
-            "date": "25/04/2026",
-            "city": "Seoul",
-            "country": "Coreia do Sul"
-        })
+        await test_agenda({"date": "25/04/2026", "city": "Seoul", "country": "Coreia do Sul"})
 
     elif "/painel" in text:
         await update_panel()
@@ -416,28 +307,18 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 
 async def monitor():
-
     global check_ticket, check_blue, last_ticket_check, last_blue_check
-
     while True:
-
-        if boot_lock:
-            await asyncio.sleep(5)
-            continue
-
-        check_ticket += 1
-        check_blue += 1
-
-        last_ticket_check = time.time()
-        last_blue_check = time.time()
-
+        if not boot_lock:
+            check_ticket += 1
+            check_blue += 1
+            last_ticket_check = time.time()
+            last_blue_check = time.time()
         await asyncio.sleep(30)
-
 
 async def panel_loop():
     while True:
-        if not boot_lock:
-            await update_panel()
+        if not boot_lock: await update_panel()
         await asyncio.sleep(5)
 
 
@@ -446,24 +327,23 @@ async def panel_loop():
 # =========================
 
 async def main():
-
     global bot_ticket
-
     keep_alive()
 
     token = os.getenv("BOT_TOKEN_TICKET")
-    
-    app = ApplicationBuilder().token(token).build()
+    if not token:
+        print("ERRO: Variável BOT_TOKEN_TICKET não encontrada!")
+        return
 
+    app = ApplicationBuilder().token(token).build()
     bot_ticket = app.bot
 
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND | filters.COMMAND), handle_commands))
+    # Handler mais abrangente para capturar mensagens no PV
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, handle_commands))
 
     await app.initialize()
     await app.start()
-    
     await bot_ticket.delete_webhook(drop_pending_updates=True)
-
     await send_boot()
 
     asyncio.create_task(monitor())
@@ -474,11 +354,5 @@ async def main():
     while True:
         await asyncio.sleep(3600)
 
-
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        pass
-
-```
+    asyncio.run(main())
