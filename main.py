@@ -963,13 +963,13 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
 
     # =========================
-    # 20 TESTE COMPLETO (TELEGRAM + DISCORD)
-    # =========================
-  if text.strip() == "/teste":
+# 20 TESTE COMPLETO (TELEGRAM + DISCORD)
+# =========================
+if text.strip() == "/teste":
 
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
-        text="🧪 INICIANDO TESTE COMPLETO DE ALERTAS..."
+        text="👩🏻‍💻 INICIANDO TESTE COMPLETO DE ALERTAS..."
     )
 
     testes = [
@@ -1001,6 +1001,13 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await func(*args)
         await send_alert(alert_type, f"🧪 TESTE {alert_type.upper()}")
 
+    # =========================
+    # FINALIZAÇÃO
+    # =========================
+    await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
+    )
 
         # =========================
         # 21 TICKETS
@@ -1346,4 +1353,3 @@ async def panel_loop():
 
         await asyncio.sleep(15)
 
- 
