@@ -406,7 +406,7 @@ def send_alert(alert_type, message):
 # 12 DISCORD SENDER 
 # =========================
 
-def send_discord(channel_id, message):
+async def send_discord(channel_id, message):
     global bot_discord
 
     if not bot_discord:
@@ -416,16 +416,13 @@ def send_discord(channel_id, message):
         channel = bot_discord.get_channel(channel_id)
 
         if not channel:
-            # fallback seguro se cache não tiver canal
-            loop = asyncio.get_running_loop()
-            loop.create_task(bot_discord.fetch_channel(channel_id))
-            return
+            channel = await bot_discord.fetch_channel(channel_id)
 
-        loop = asyncio.get_running_loop()
-        loop.create_task(channel.send(message))
+        await channel.send(message)
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[DISCORD SEND ERROR] {e}")
+
 
 # =========================
 # 13 MENSAGEM DE RESET / RECONNECT
@@ -600,7 +597,7 @@ async def agenda_update(data):
 # 16 ALERTAS WEVERSE
 # =========================
 
-async def test_weverse_post(url, member_name, title, message_translated, found):
+async def weverse_post(url, member_name, title, message_translated, found):
     emoji = get_member_emoji(member_name)
     msg = f"""🩷*WEVERSE POST*🩷
 {emoji} {member_name.upper()} publicou uma mensagem:
@@ -899,6 +896,80 @@ async def test_tiktok_live(url, member_name, title, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
+async def run_test_suite():
+    # TICKETS
+    await test_ticket_reposicao(
+        TICKET_LINKS[0],
+        "28/10/2026",
+        True
+    )
+
+    await test_ticket_nova_data(
+        TICKET_LINKS[1],
+        "30/10/2026",
+        True
+    )
+
+    await test_ticket_reposicao(
+        TICKET_LINKS[2],
+        "31/10/2026",
+        True
+    )
+
+    # BUY / REVENDA
+    await test_buy_revenda(
+        BUY_LINKS[0],
+        "28/10/2026",
+        True
+    )
+
+    # AGENDA
+    await test_agenda({
+        "date": "28/10/2026",
+        "city": "São Paulo",
+        "country": "Brasil"
+    })
+
+    # WEVERSE
+    await test_weverse_post(
+        TICKET_LINKS[0],
+        "bts",
+        "Update",
+        "We are coming back stronger than ever 💜",
+        True
+    )
+
+    await test_weverse_live(
+        TICKET_LINKS[0],
+        "jungkook",
+        True
+    )
+
+    await test_weverse_news(
+        TICKET_LINKS[0],
+        "rm",
+        "Special announcement coming soon",
+        True
+    )
+
+    await test_weverse_media(
+        TICKET_LINKS[0],
+        "v",
+        "Behind the scenes",
+        "Exclusive content",
+        True
+    )
+
+    # INSTAGRAM
+    await test_instagram_post(TIKTOK_LINKS["bts"], "bts", "post", True)
+    await test_instagram_reel(TIKTOK_LINKS["bts"], "bts", "reel", True)
+    await test_instagram_story(TIKTOK_LINKS["bts"], "bts", "story", True)
+    await test_instagram_live(TIKTOK_LINKS["bts"], "bts", "live", True)
+
+    # TIKTOK
+    await test_tiktok_post(TIKTOK_LINKS["bts"], "bts", "video", True)
+    await test_tiktok_live(TIKTOK_LINKS["bts"], "bts", "live", True)
+
 # =========================
 # 20 COMANDOS (PV EXCLUSIVO TELEGRAM)
 # =========================
@@ -913,47 +984,109 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text.lower()
 
+    # =========================
+    # 🧪 TESTE COMPLETO (TELEGRAM + DISCORD)
+    # =========================
     if "/teste" in text:
 
+        await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text="🧪 INICIANDO TESTE COMPLETO DE ALERTAS..."
+        )
+
+        # =========================
         # TICKETS
-        await test_ticket_reposicao(
-            TICKET_LINKS[0],
-            "28/10/2026",
-            True
-        )
+        # =========================
+        await test_ticket_reposicao(TICKET_LINKS[0], "28/10/2026", True)
+        await send_alert("ticket", "🔥 Ticket Reposição TESTE")
 
-        await test_ticket_nova_data(
-            TICKET_LINKS[1],
-            "30/10/2026",
-            True
-        )
+        await test_ticket_nova_data(TICKET_LINKS[1], "30/10/2026", True)
+        await send_alert("ticket", "🎁 Nova Data TESTE")
 
-        await test_ticket_reposicao(
-            TICKET_LINKS[2],
-            "31/10/2026",
-            True
-        )
+        await test_ticket_reposicao(TICKET_LINKS[2], "31/10/2026", True)
+        await send_alert("ticket", "🔥 Ticket Reposição 2 TESTE")
 
-        # REVENDA / BUY
-        await test_buy_revenda(
-            BUY_LINKS[0],
-            "28/10/2026",
-            True
-        )
+        # =========================
+        # BUY / REVENDA
+        # =========================
+        await test_buy_revenda(BUY_LINKS[0], "28/10/2026", True)
+        await send_alert("revenda", "🔵 BuyTicket TESTE")
 
+        # =========================
         # AGENDA
+        # =========================
         await test_agenda({
             "date": "28/10/2026",
             "city": "São Paulo",
             "country": "Brasil"
         })
+        await send_alert("agenda", "💜 Agenda TESTE")
 
+        # =========================
+        # WEVERSE
+        # =========================
+        await test_weverse_post(
+            TICKET_LINKS[0],
+            "bts",
+            "Update",
+            "We are coming back stronger than ever 💜",
+            True
+        )
+        await send_alert("weverse_post", "🩷 Weverse Post TESTE")
+
+        await test_weverse_live(TICKET_LINKS[0], "jungkook", True)
+        await send_alert("weverse_live", "📹 Weverse Live TESTE")
+
+        await test_weverse_news(TICKET_LINKS[0], "rm", "Special announcement", True)
+        await send_alert("weverse_news", "🚨 Weverse News TESTE")
+
+        await test_weverse_media(TICKET_LINKS[0], "v", "Behind the scenes", "Exclusive content", True)
+        await send_alert("weverse_media", "📀 Weverse Media TESTE")
+
+        # =========================
+        # INSTAGRAM
+        # =========================
+        await test_instagram_post(TIKTOK_LINKS["bts"], "bts", "post", True)
+        await send_alert("instagram_post", "🌟 Instagram Post TESTE")
+
+        await test_instagram_reel(TIKTOK_LINKS["bts"], "bts", "reel", True)
+        await send_alert("instagram_reels", "🎬 Instagram Reel TESTE")
+
+        await test_instagram_story(TIKTOK_LINKS["bts"], "bts", "story", True)
+        await send_alert("instagram_stories", "🫧 Instagram Story TESTE")
+
+        await test_instagram_live(TIKTOK_LINKS["bts"], "bts", "live", True)
+        await send_alert("instagram_live", "🎥 Instagram Live TESTE")
+
+        # =========================
+        # TIKTOK
+        # =========================
+        await test_tiktok_post(TIKTOK_LINKS["bts"], "bts", "video", True)
+        await send_alert("tiktok_post", "🎵 TikTok Post TESTE")
+
+        await test_tiktok_live(TIKTOK_LINKS["bts"], "bts", "live", True)
+        await send_alert("tiktok_live", "🎥 TikTok Live TESTE")
+
+        # =========================
+        # FINALIZAÇÃO
+        # =========================
+        await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
+        )
+
+    # =========================
+    # PING
+    # =========================
     elif "/ping" in text:
         await bot_ticket.send_message(
             chat_id=CHAT_ID,
             text="🏓 Bot ativo e funcionando!"
         )
 
+    # =========================
+    # STATUS
+    # =========================
     elif "/status" in text:
         await bot_ticket.send_message(
             chat_id=CHAT_ID,
@@ -967,6 +1100,7 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ⏱ Uptime: {get_uptime()}
 """
         )
+
 
 # =========================
 # 21 MAIN (VERSÃO ESTÁVEL)
@@ -1006,23 +1140,26 @@ async def safe_boot_loop():
             await asyncio.sleep(1)
         except Exception:
             await send_boot_message()
-asyncio.create_task(safe_boot_loop())
+
 
 # =========================
-# SAFE BOOT LOOP START (FIX)
+# SAFE BOOT LOOP (FIX)
 # =========================
 
 async def safe_boot_loop():
     while True:
         try:
-            await asyncio.sleep(60)
+            # fica vivo e detecta restart/reconnect indireto
+            await asyncio.sleep(5)
 
-            # opcional: só dispara se bot já estiver ativo
+            # garante boot sempre ativo
             if bot_ticket:
                 await send_boot()
 
         except Exception as e:
-            print("[SAFE_BOOT_LOOP ERROR]", e)
+            print(f"[SAFE_BOOT_LOOP ERROR] {e}")
+            await asyncio.sleep(3)
+asyncio.run(main())
 
 # =========================
 # 22 MONITOR ENGINE (TEMPO REAL + ANTI DUPLICAÇÃO)
@@ -1192,4 +1329,3 @@ async def panel_loop():
 
         await asyncio.sleep(15)
 
- 
