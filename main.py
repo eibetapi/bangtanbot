@@ -29,16 +29,20 @@ intents=intents
 
 @bot_discord.event
 async def on_ready():
-print(f"[DISCORD] Conectado como {bot_discord.user}")
+    print(f"[DISCORD] Conectado como {bot_discord.user}")
 
-try:
-synced = await bot_discord.tree.sync()
-print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
-except Exception as e:
-print(f"[DISCORD SYNC ERROR] {e}")
+    try:
+        synced = await bot_discord.tree.sync()
+        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
+    except Exception as e:
+        print(f"[DISCORD SYNC ERROR] {e}")
 
-await safe_boot()
-bot_discord.loop.create_task(monitor_loop())
+    # 🚀 BOOT ÚNICO (ANTI DUPLICAÇÃO)
+    await safe_boot()
+
+    # 🚀 MONITOR (UMA VEZ SÓ)
+    bot_discord.loop.create_task(monitor_loop())
+
 
 # =========================
 # 2 TELEGRAM + FLASK
