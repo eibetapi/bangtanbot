@@ -502,65 +502,72 @@ async def send_boot():
 
         await update_panel()
 
-# =========================
-# 15 TELEGRAM RESET
-# =========================
-try:
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text=msg
-    )
-except Exception:
-    pass
+async def send_boot():
+    global panel_message_id, panel_chat_id, panel_initialized, discord_panel_message_id
 
+    if not bot_ticket or not bot_discord:
+        return
 
-# =========================
-# 16 DISCORD RESET
-# =========================
-try:
-    channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
-    if channel:
-        await channel.send(msg)
-except Exception:
-    pass
+    async with boot_lock:
 
+        msg = "🛸•°•Wootteo entrando em rota°•°🛸"
 
-# =========================
-# 17 CRIA PAINEL (1x) - PROTEGIDO
-# =========================
-if not panel_initialized or not panel_message_id:
-
-    try:
-        panel = await bot_ticket.send_message(
-            chat_id=CHAT_ID,
-            text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
-        )
-
-        # 🔒 trava imediata (evita duplicação em race condition)
-        panel_message_id = panel.message_id
-        panel_chat_id = CHAT_ID
-        panel_initialized = True
-
+        # =========================
+        # 15 TELEGRAM RESET
+        # =========================
         try:
-            await bot_ticket.pin_chat_message(
+            await bot_ticket.send_message(
                 chat_id=CHAT_ID,
-                message_id=panel_message_id,
-                disable_notification=True
+                text=msg
             )
         except Exception:
             pass
 
-    except Exception:
-        return
+        # =========================
+        # 16 DISCORD RESET
+        # =========================
+        try:
+            channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
+            if channel:
+                await channel.send(msg)
+        except Exception:
+            pass
 
+        # =========================
+        # 17 CRIA PAINEL (1x)
+        # =========================
+        if not panel_initialized or not panel_message_id:
 
-# =========================
-# 18 PRIMEIRO UPDATE DO PAINEL
-# =========================
-try:
-    await update_panel()
-except Exception:
-    pass
+            try:
+                panel = await bot_ticket.send_message(
+                    chat_id=CHAT_ID,
+                    text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
+                )
+
+                panel_message_id = panel.message_id
+                panel_chat_id = CHAT_ID
+                panel_initialized = True
+
+                try:
+                    await bot_ticket.pin_chat_message(
+                        chat_id=CHAT_ID,
+                        message_id=panel_message_id,
+                        disable_notification=True
+                    )
+                except Exception:
+                    pass
+
+            except Exception:
+                return
+
+        # =========================
+        # 18 PRIMEIRO UPDATE DO PAINEL
+        # =========================
+        try:
+            await update_panel()
+        except Exception:
+            pass
+
 
 # =========================
 # 19 PAINEL FIXADO (TEMPO REAL + SEM SPAM)
@@ -609,7 +616,7 @@ async def update_panel():
 """
 
         # =========================
-        # 19 🔥 NÃO EDITA SE FOR IGUAL
+        # 20 🔥 NÃO EDITA SE FOR IGUAL
         # =========================
         if text == last_panel_text:
             return
@@ -617,7 +624,7 @@ async def update_panel():
         last_panel_text = text
 
         # =========================
-        # 20 TELEGRAM (EDITA FIXADO)
+        # 21 TELEGRAM (EDITA FIXADO)
         # =========================
         await bot_ticket.edit_message_text(
             chat_id=panel_chat_id,
