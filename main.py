@@ -63,7 +63,6 @@ app_web = Flask(__name__)
 def home():
     return "Bots rodando"
 
-
 def run_web():
     port = int(os.environ.get("PORT", 8080))
     app_web.run(
@@ -123,8 +122,6 @@ def make_hash(data: str):
         data.encode("utf-8", errors="ignore")
     ).hexdigest()
 
-
-def is_new(url: str, html: str):
     """
     ✔ Detecta mudança real de conteúdo
     ✔ Evita spam duplicado
