@@ -1017,9 +1017,6 @@ if text.strip() == "/teste":
         await test_ticket_nova_data(TICKET_LINKS[1], "30/10/2026", True)
         await send_alert("ticket", "🎁 Nova Data TESTE")
 
-        await test_ticket_reposicao(TICKET_LINKS[2], "31/10/2026", True)
-        await send_alert("ticket", "🔥 Ticket Reposição 2 TESTE")
-
         # =========================
         # 22 BUY / REVENDA
         # =========================
@@ -1352,4 +1349,3 @@ async def panel_loop():
 
         await asyncio.sleep(15)
 
- 
