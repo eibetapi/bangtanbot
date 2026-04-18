@@ -743,7 +743,6 @@ async def test_agenda(data):
 
 async def test_weverse_post(url, member_name, title, message_translated, found):
     emoji = get_member_emoji(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🩷*WEVERSE POST*🩷
@@ -757,7 +756,6 @@ async def test_weverse_post(url, member_name, title, message_translated, found):
 
 async def test_weverse_live(url, member_name, found):
     emoji = get_member_emoji(member_name)
-
     msg = f"""{TEST_HEADER}
 
 📹*WEVERSE LIVE*📹
@@ -770,7 +768,6 @@ async def test_weverse_live(url, member_name, found):
 
 async def test_weverse_news(url, member_name, message_translated, found):
     emoji = get_member_emoji(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🚨*WEVERSE NEWS*🚨
@@ -783,7 +780,6 @@ async def test_weverse_news(url, member_name, message_translated, found):
 
 async def test_weverse_media(url, member_name, title, message_translated, found):
     emoji = get_member_emoji(member_name)
-
     msg = f"""{TEST_HEADER}
 
 📀*WEVERSE MÍDIA*📀
@@ -797,7 +793,6 @@ async def test_weverse_media(url, member_name, title, message_translated, found)
 
 async def test_instagram_post(url, member_name, title, found):
     emoji, name = format_member(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🌟*INSTAGRAM POST*🌟
@@ -810,7 +805,6 @@ async def test_instagram_post(url, member_name, title, found):
 
 async def test_instagram_reel(url, member_name, title, found):
     emoji, name = format_member(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🎬*INSTAGRAM REELS*🎬
@@ -821,10 +815,8 @@ async def test_instagram_reel(url, member_name, title, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 async def test_instagram_story(url, member_name, title, found):
     emoji, name = format_member(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🫧*INSTAGRAM STORIES*🫧
@@ -837,7 +829,6 @@ async def test_instagram_story(url, member_name, title, found):
 
 async def test_instagram_live(url, member_name, title, found):
     emoji, name = format_member(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🎥*INSTAGRAM LIVE*🎥
@@ -850,7 +841,6 @@ async def test_instagram_live(url, member_name, title, found):
 
 async def test_tiktok_post(url, member_name, title, found):
     emoji = get_member_emoji(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🎵*TIKTOK POST*🎵
@@ -863,7 +853,6 @@ async def test_tiktok_post(url, member_name, title, found):
 
 async def test_tiktok_live(url, member_name, title, found):
     emoji = get_member_emoji(member_name)
-
     msg = f"""{TEST_HEADER}
 
 🎥*TIKTOK LIVE*🎥
@@ -874,79 +863,6 @@ async def test_tiktok_live(url, member_name, title, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-async def run_test_suite():
-    # TICKETS
-    await test_ticket_reposicao(
-        TICKET_LINKS[0],
-        "28/10/2026",
-        True
-    )
-
-    await test_ticket_nova_data(
-        TICKET_LINKS[1],
-        "30/10/2026",
-        True
-    )
-
-    await test_ticket_reposicao(
-        TICKET_LINKS[2],
-        "31/10/2026",
-        True
-    )
-
-    # BUY / REVENDA
-    await test_buy_revenda(
-        BUY_LINKS[0],
-        "28/10/2026",
-        True
-    )
-
-    # AGENDA
-    await test_agenda({
-        "date": "28/10/2026",
-        "city": "São Paulo",
-        "country": "Brasil"
-    })
-
-    # WEVERSE
-    await test_weverse_post(
-        TICKET_LINKS[0],
-        "bts",
-        "Update",
-        "We are coming back stronger than ever 💜",
-        True
-    )
-
-    await test_weverse_live(
-        TICKET_LINKS[0],
-        "jungkook",
-        True
-    )
-
-    await test_weverse_news(
-        TICKET_LINKS[0],
-        "rm",
-        "Special announcement coming soon",
-        True
-    )
-
-    await test_weverse_media(
-        TICKET_LINKS[0],
-        "v",
-        "Behind the scenes",
-        "Exclusive content",
-        True
-    )
-
-    # INSTAGRAM
-    await test_instagram_post(TIKTOK_LINKS["bts"], "bts", "post", True)
-    await test_instagram_reel(TIKTOK_LINKS["bts"], "bts", "reel", True)
-    await test_instagram_story(TIKTOK_LINKS["bts"], "bts", "story", True)
-    await test_instagram_live(TIKTOK_LINKS["bts"], "bts", "live", True)
-
-    # TIKTOK
-    await test_tiktok_post(TIKTOK_LINKS["bts"], "bts", "video", True)
-    await test_tiktok_live(TIKTOK_LINKS["bts"], "bts", "live", True)
 
 # =========================
 # 19 COMANDOS (PV EXCLUSIVO TELEGRAM)
@@ -956,74 +872,56 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    # só funciona no PV
     if update.message.chat.type != "private":
         return
 
     text = update.message.text.lower()
 
-# =========================
-# 🧪 TESTE COMPLETO (TELEGRAM + DISCORD)
-# =========================
-if text.strip() == "/teste":
+    # =========================
+    # 🧪 TESTE
+    # =========================
+    if text.strip() == "/teste":
 
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text="🧪 INICIANDO TESTE COMPLETO DE ALERTAS..."
-    )
+        await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text="🧪 INICIANDO TESTE COMPLETO DE ALERTAS..."
+        )
 
-    testes = [
-        ("ticket", test_ticket_reposicao, TICKET_LINKS[0], "28/10/2026"),
-        ("ticket", test_ticket_nova_data, TICKET_LINKS[1], "30/10/2026"),
-        ("ticket", test_ticket_reposicao, TICKET_LINKS[2], "31/10/2026"),
+        await test_ticket_reposicao(TICKET_LINKS[0], "28/10/2026", True)
+        await test_ticket_nova_data(TICKET_LINKS[1], "30/10/2026", True)
+        await test_buy_revenda(BUY_LINKS[0], "28/10/2026", True)
 
-        ("revenda", test_buy_revenda, BUY_LINKS[0], "28/10/2026"),
-
-        ("agenda", test_agenda, {
+        await test_agenda({
             "date": "28/10/2026",
             "city": "São Paulo",
             "country": "Brasil"
-        }),
+        })
 
-        ("weverse_post", test_weverse_post, TICKET_LINKS[0], "bts"),
-        ("weverse_live", test_weverse_live, TICKET_LINKS[0], "jungkook"),
-        ("weverse_news", test_weverse_news, TICKET_LINKS[0], "rm"),
-        ("weverse_media", test_weverse_media, TICKET_LINKS[0], "v"),
+        await test_weverse_post(TICKET_LINKS[0], "bts", "Update", "msg", True)
+        await test_weverse_live(TICKET_LINKS[0], "jungkook", True)
+        await test_weverse_news(TICKET_LINKS[0], "rm", "msg", True)
+        await test_weverse_media(TICKET_LINKS[0], "v", "title", "msg", True)
 
-        ("instagram_post", test_instagram_post, TIKTOK_LINKS["bts"], "bts"),
-        ("instagram_reels", test_instagram_reel, TIKTOK_LINKS["bts"], "bts"),
-        ("instagram_stories", test_instagram_story, TIKTOK_LINKS["bts"], "bts"),
-        ("instagram_live", test_instagram_live, TIKTOK_LINKS["bts"], "bts"),
+        await test_instagram_post(TIKTOK_LINKS["bts"], "bts", "post", True)
+        await test_instagram_reel(TIKTOK_LINKS["bts"], "bts", "reel", True)
+        await test_instagram_story(TIKTOK_LINKS["bts"], "bts", "story", True)
+        await test_instagram_live(TIKTOK_LINKS["bts"], "bts", "live", True)
 
-        ("tiktok_post", test_tiktok_post, TIKTOK_LINKS["bts"], "bts"),
-        ("tiktok_live", test_tiktok_live, TIKTOK_LINKS["bts"], "bts"),
-    ]
+        await test_tiktok_post(TIKTOK_LINKS["bts"], "bts", "video", True)
+        await test_tiktok_live(TIKTOK_LINKS["bts"], "bts", "live", True)
 
-    for alert_type, func, *args in testes:
-        await func(*args)
-        await send_alert(alert_type, f"🧪 TESTE {alert_type.upper()}")
+        await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
+        )
 
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
-    )
+    elif "/ping" in text:
+        await bot_ticket.send_message(chat_id=CHAT_ID, text="🏓 Bot ativo e funcionando!")
 
-# =========================
-# 28 PING
-# =========================
-elif "/ping" in text:
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text="🏓 Bot ativo e funcionando!"
-    )
-
-# =========================
-# 29 STATUS
-# =========================
-elif "/status" in text:
-    await bot_ticket.send_message(
-        chat_id=CHAT_ID,
-        text=f"""📊 STATUS DO BOT
+    elif "/status" in text:
+        await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text=f"""📊 STATUS DO BOT
 
 🟣 Weverse: OK
 ⚪ Redes sociais: OK
@@ -1032,7 +930,7 @@ elif "/status" in text:
 
 ⏱ Uptime: {get_uptime()}
 """
-    )
+        )
 
 # =========================
 # 30 MAIN (VERSÃO ESTÁVEL)
