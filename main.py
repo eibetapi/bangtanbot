@@ -9,7 +9,7 @@ import hashlib
 from bs4 import BeautifulSoup
 import os
 import re
-from datetime import datetime 
+from datetime import datetime
 
 # =========================
 # 1 DISCORD (CORRIGIDO - INSTÂNCIA ÚNICA)
@@ -22,30 +22,23 @@ from discord import app_commands
 intents = discord.Intents.default()
 intents.message_content = True
 
-# ✅ BOT ÚNICO (usar esse em TODO o código)
 bot_discord = commands.Bot(
-    command_prefix="!",
-    intents=intents
+command_prefix="!",
+intents=intents
 )
 
-# =========================
-# EVENTO READY (GARANTE QUE CONECTOU)
-# =========================
 @bot_discord.event
 async def on_ready():
-    print(f"[DISCORD] Conectado como {bot_discord.user}")
+print(f"[DISCORD] Conectado como {bot_discord.user}")
 
-    try:
-        synced = await bot_discord.tree.sync()
-        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
-    except Exception as e:
-        print(f"[DISCORD SYNC ERROR] {e}")
+try:
+synced = await bot_discord.tree.sync()
+print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
+except Exception as e:
+print(f"[DISCORD SYNC ERROR] {e}")
 
-    # 🚀 BOOT ÚNICO (ANTI DUPLICAÇÃO)
-    await safe_boot()
-
-    # 🚀 MONITOR (UMA VEZ SÓ)
-    bot_discord.loop.create_task(monitor_loop())
+await safe_boot()
+bot_discord.loop.create_task(monitor_loop())
 
 # =========================
 # 2 TELEGRAM + FLASK
@@ -53,7 +46,6 @@ async def on_ready():
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
-
 from flask import Flask
 from threading import Thread
 
@@ -61,35 +53,23 @@ from threading import Thread
 # 3 KEEP ALIVE
 # =========================
 
-from flask import Flask
-from threading import Thread
-import os
-
 app_web = Flask(__name__)
 
 @app_web.route('/')
 def home():
-    return "Bots rodando"
+return "Bots rodando"
 
 def run_web():
-    port = int(os.environ.get("PORT", 8080))
-
-    # desativa reloader para evitar duplicação de thread no Railway
-    app_web.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False,
-        use_reloader=False
-    )
+port = int(os.environ.get("PORT", 8080))
+app_web.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 def keep_alive():
-    # evita múltiplas threads acidentais
-    if not getattr(keep_alive, "_running", False):
-        Thread(target=run_web, daemon=True).start()
-        keep_alive._running = True
+if not getattr(keep_alive, "_running", False):
+Thread(target=run_web, daemon=True).start()
+keep_alive._running = True
 
 # =========================
-# 4 CONFIG (PAINEL CONTROLADO)
+# 4 CONFIG
 # =========================
 
 CHAT_ID = -1003972186058
@@ -98,135 +78,102 @@ start_time = time.time()
 
 bot_ticket = None
 
-# 🔥 CONTROLE DO PAINEL TELEGRAM
 panel_message_id = None
 panel_chat_id = CHAT_ID
-panel_initialized = False  # ✅ ESSENCIAL
+panel_initialized = False
 
-# 🔵 CONTROLE DO PAINEL DISCORD (vamos usar depois)
 discord_panel_message_id = None
-
-# =========================
-# DISCORD CHANNEL IDS (OBRIGATÓRIO)
-# =========================
 
 DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
 DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
 DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
 DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
 
-# =========================
-# CONTADORES (MONITOR) ✅ CORRIGIDO
-# =========================
-
 check_ticket = 0
 check_buy = 0
 check_weverse = 0
 check_social = 0
-
-# =========================
-# CONTROLE DE TEMPO
-# =========================
 
 last_ticket_check = time.time()
 last_buy_check = time.time()
 last_weverse_check = time.time()
 last_social_check = time.time()
 
-# =========================
-# CACHE DEDICADO (ANTI-SPAM POR SISTEMA)
-# =========================
-
 SEEN_TICKET = set()
 SEEN_BUY = set()
 SEEN_WEVERSE = set()
 SEEN_SOCIAL = set()
 
-# =========================
-# 🔥 CACHE GLOBAL (ANTI DUPLICAÇÃO REAL)
-# =========================
-
-CONTENT_HASH = {}  # url -> hash do conteúdo
+CONTENT_HASH = {}
 
 def make_hash(data: str):
-    return hashlib.sha256(data.encode("utf-8", errors="ignore")).hexdigest()
-
+return hashlib.sha256(data.encode("utf-8", errors="ignore")).hexdigest()
 
 def is_new(url: str, html: str):
-    """
-    ✔ Detecta mudança real de conteúdo
-    ✔ Evita spam duplicado
-    ✔ Funciona mesmo se página mudar levemente
-    """
+if not html:
+return False
 
-    if not html:
-        return False
+new_hash = make_hash(html)
+old_hash = CONTENT_HASH.get(url)
 
-    new_hash = make_hash(html)
+if old_hash is None:
+CONTENT_HASH[url] = new_hash
+return True
 
-    old_hash = CONTENT_HASH.get(url)
+if old_hash != new_hash:
+CONTENT_HASH[url] = new_hash
+return True
 
-    # primeira vez vendo essa URL
-    if old_hash is None:
-        CONTENT_HASH[url] = new_hash
-        return True
-
-    # mudou conteúdo
-    if old_hash != new_hash:
-        CONTENT_HASH[url] = new_hash
-        return True
-
-    return False
+return False
 
 # =========================
-# 6 LINKS (NÃO REMOVER)
+# 5 LINKS
 # =========================
 
 TICKET_LINKS = [
-    "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-28-10",
-    "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-30-10",
-    "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-31-10"
+"https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-28-10",
+"https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-30-10",
+"https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-31-10"
 ]
 
 BUY_LINKS = [
-    "https://bts.buyticketbrasil.com/ingressos?data=28-10-2026",
-    "https://bts.buyticketbrasil.com/ingressos?data=30-10-2026",
-    "https://bts.buyticketbrasil.com/ingressos?data=31-10-2026"
+"https://bts.buyticketbrasil.com/ingressos?data=28-10-2026",
+"https://bts.buyticketbrasil.com/ingressos?data=30-10-2026",
+"https://bts.buyticketbrasil.com/ingressos?data=31-10-2026"
 ]
 
 INSTAGRAM_LINKS = {
-    "rm": "https://www.instagram.com/rkive/",
-    "jin": "https://www.instagram.com/jin/",
-    "suga": "https://www.instagram.com/agustd/",
-    "jhope": "https://www.instagram.com/uarmyhope/",
-    "jimin": "https://www.instagram.com/j.m/",
-    "v": "https://www.instagram.com/thv/",
-    "jungkook": "https://www.instagram.com/mnijungkook/",
-    "bts": "https://www.instagram.com/bts.bighitofficial/",
-    "wootteo": "https://www.instagram.com/wootteo/"
+"rm": "https://www.instagram.com/rkive/",
+"jin": "https://www.instagram.com/jin/",
+"suga": "https://www.instagram.com/agustd/",
+"jhope": "https://www.instagram.com/uarmyhope/",
+"jimin": "https://www.instagram.com/j.m/",
+"v": "https://www.instagram.com/thv/",
+"jungkook": "https://www.instagram.com/mnijungkook/",
+"bts": "https://www.instagram.com/bts.bighitofficial/",
+"wootteo": "https://www.instagram.com/wootteo/"
 }
 
 TIKTOK_LINKS = {
-    "jungkook": "https://www.tiktok.com/@mnijungkook",
-    "jhope": "https://www.tiktok.com/@iamuhope",
-    "v": "https://www.tiktok.com/@tete",
-    "bts": "https://www.tiktok.com/@bts_official_bighit"
+"jungkook": "https://www.tiktok.com/@mnijungkook",
+"jhope": "https://www.tiktok.com/@iamuhope",
+"v": "https://www.tiktok.com/@tete",
+"bts": "https://www.tiktok.com/@bts_official_bighit"
 }
 
-
 WEVERSE_LINKS = [
-    "https://weverse.io/bts/artist",
-    "https://weverse.io/bts/live",
-    "https://weverse.io/bts/notice",
-    "https://weverse.io/bts/media"
+"https://weverse.io/bts/artist",
+"https://weverse.io/bts/live",
+"https://weverse.io/bts/notice",
+"https://weverse.io/bts/media"
 ]
 
 X_LINKS = [
-    "https://x.com/BTS_twt"
+"https://x.com/BTS_twt"
 ]
 
 # =========================
-# 7 AGENDA FIXA
+# 6 AGENDA FIXA
 # =========================
 
 AGENDA = [
@@ -299,71 +246,51 @@ AGENDA = [
 ]
 
 # =========================
-# 8 CONTROLE
+# 7 CONTROLE
 # =========================
 
-import asyncio
-
-# trava de inicialização (evita múltiplos boots simultâneos)
 boot_lock = asyncio.Lock()
-
-# estado do sistema (controle global de boot seguro)
 boot_initialized = False
 
 def get_uptime():
-    s = int(time.time() - start_time)
-    return f"{s//3600}h {(s%3600)//60}m {s%60}s"
+s = int(time.time() - start_time)
+return f"{s//3600}h {(s%3600)//60}m {s%60}s"
 
 def resolve_status(found):
-    return "DISPONÍVEL" if found else "ESGOTADO"
+return "DISPONÍVEL" if found else "ESGOTADO"
 
 def clean(v):
-    return v if v and str(v).strip() else "ESGOTADO"
+return v if v and str(v).strip() else "ESGOTADO"
 
 def days_left(date_str):
-    try:
-        d = datetime.strptime(date_str, "%d/%m/%Y")
-        delta = (d - datetime.now()).days
-        return max(delta, 0)
-    except:
-        return 0
+try:
+d = datetime.strptime(date_str, "%d/%m/%Y")
+delta = (d - datetime.now()).days
+return max(delta, 0)
+except:
+return 0
 
 def minutes_since(ts):
-    try:
-        return int((time.time() - ts) / 60)
-    except:
-        return 0
+return int((time.time() - ts) / 60)
 
 def get_next_show():
-    now = datetime.now()
+now = datetime.now()
 
-    for item in AGENDA:
-        try:
-            date_str = item[0]
-            city_info = f"{item[1]}, {item[2]}"
-            time_str = item[3]
+for item in AGENDA:
+try:
+dt_show = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
+if dt_show > now:
+return item[0], f"{item[1]}, {item[2]}", days_left(item[0])
+except:
+continue
 
-            dt_show = datetime.strptime(
-                f"{date_str} {time_str}",
-                "%d/%m/%Y %H:%M"
-            )
-
-            if dt_show > now:
-                return date_str, city_info, days_left(date_str)
-
-        except Exception:
-            continue
-
-    return "Continua…", "---", 0
+return "Continua…", "---", 0
 
 def status_color(last_check):
-    try:
-        return "🟢" if (time.time() - last_check) < 1800 else "🔴"
-    except:
-        return "🔴"
+return "🟢" if (time.time() - last_check) < 1800 else "🔴"
 
 # =========================
-#  9 AIOHTTP GLOBAL SESSION (ESTÁVEL)
+# 8 SESSION
 # =========================
 
 import aiohttp
@@ -371,46 +298,37 @@ import aiohttp
 http_session = None
 
 async def get_session():
-    """
-    ✔ garante 1 sessão única global
-    ✔ evita leak de conexão
-    ✔ evita crash silencioso no monitor
-    """
-    global http_session
-
-    if http_session is None or http_session.closed:
-        http_session = aiohttp.ClientSession()
-
-    return http_session
+global http_session
+if http_session is None or http_session.closed:
+http_session = aiohttp.ClientSession()
+return http_session
 
 # =========================
-#10 EMOJIS
+# 9 EMOJIS
 # =========================
 
 MEMBER_EMOJI = {
-    "rm": "🐨",
-    "jin": "🐹",
-    "suga": "🐱",
-    "jhope": "🐿️",
-    "jimin": "🐥",
-    "v": "🐻",
-    "jungkook": "🐰",
-    "bts": "💜",
-    "wootteo": "🛸"
+"rm": "🐨",
+"jin": "🐹",
+"suga": "🐱",
+"jhope": "🐿️",
+"jimin": "🐥",
+"v": "🐻",
+"jungkook": "🐰",
+"bts": "💜",
+"wootteo": "🛸"
 }
 
 def get_member_emoji(member_name):
-    if not member_name:
-        return "💜"
-    return MEMBER_EMOJI.get(str(member_name).lower(), "💜")
+return MEMBER_EMOJI.get(str(member_name).lower(), "💜")
 
 def format_member(member_name):
-    emoji = get_member_emoji(member_name)
-    name = str(member_name).upper() if member_name else "UNKNOWN"
-    return emoji, name
+emoji = get_member_emoji(member_name)
+name = str(member_name).upper()
+return emoji, name 
 
 # =========================
-# 11 DISCORD + TELEGRAM ROUTER
+# 10 DISCORD + TELEGRAM ROUTER (CORRIGIDO)
 # =========================
 
 def send_telegram(message):
@@ -435,7 +353,8 @@ async def send_discord(channel_id, message):
 
     try:
         channel = await bot_discord.fetch_channel(channel_id)
-        return await channel.send(message)
+        if channel:
+            return await channel.send(message)
     except Exception:
         return None
 
@@ -445,26 +364,36 @@ def send_alert(alert_type, message):
     Router principal de alertas (Telegram + Discord)
     """
 
-    # sempre Telegram
+    # =========================
+    # 11 TELEGRAM (SEMPRE PRIMEIRO)
+    # =========================
     send_telegram(message)
 
-    # garante loop ativo para create_task
+    # =========================
+    # 12 LOOP SAFE
+    # =========================
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         return
 
-    # Discord por categoria
+    # =========================
+    # 13 DISCORD ROUTING
+    # =========================
+
+    # 🎫 Tickets / eventos
     if alert_type in ["ticket", "reposicao", "nova_data", "revenda", "agenda"]:
         loop.create_task(
             send_discord(DISCORD_TICKETS_CHANNEL_ID, message)
         )
 
+    # 🩷 Weverse
     elif alert_type in ["weverse_post", "weverse_live", "weverse_news", "weverse_media"]:
         loop.create_task(
             send_discord(DISCORD_WEVERSE_CHANNEL_ID, message)
         )
 
+    # 📱 Redes sociais
     elif alert_type in [
         "instagram_post", "instagram_reels", "instagram_stories", "instagram_live",
         "tiktok_post", "tiktok_live"
@@ -473,10 +402,17 @@ def send_alert(alert_type, message):
             send_discord(DISCORD_SOCIAL_CHANNEL_ID, message)
         )
 
+    # 🧠 fallback seguro (evita crash se esquecer categoria)
     else:
-        loop.create_task(
-            send_discord(DISCORD_NEWS_CHANNEL_ID, message)
-        )
+        if 'DISCORD_NEWS_CHANNEL_ID' in globals():
+            loop.create_task(
+                send_discord(DISCORD_NEWS_CHANNEL_ID, message)
+            )
+
+
+# =========================
+# 14 BOOT FIX (INÍCIO LIMPO)
+# =========================
 
 async def send_boot():
     global panel_message_id, panel_chat_id, panel_initialized, discord_panel_message_id
@@ -486,33 +422,25 @@ async def send_boot():
 
     async with boot_lock:
 
+        # 🔥 CORREÇÃO QUE VOCÊ MANDOU (mantida)
         msg = "🛸•°•Wootteo entrando em rota°•°🛸"
 
-        # =========================
-        # TELEGRAM RESET
-        # =========================
+        # TELEGRAM
         try:
-            await bot_ticket.send_message(
-                chat_id=CHAT_ID,
-                text=msg
-            )
+            await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
         except Exception:
             pass
 
-        # =========================
-        # DISCORD RESET
-        # =========================
+        # DISCORD
         try:
             channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
-            await channel.send(msg)
+            if channel:
+                await channel.send(msg)
         except Exception:
             pass
 
-        # =========================
-        # CRIA PAINEL (1x)
-        # =========================
+        # PAINEL (1x)
         if not panel_initialized or not panel_message_id:
-
             try:
                 panel = await bot_ticket.send_message(
                     chat_id=CHAT_ID,
@@ -526,8 +454,7 @@ async def send_boot():
                 try:
                     await bot_ticket.pin_chat_message(
                         chat_id=CHAT_ID,
-                        message_id=panel_message_id,
-                        disable_notification=True
+                        message_id=panel_message_id
                     )
                 except Exception:
                     pass
@@ -535,13 +462,70 @@ async def send_boot():
             except Exception:
                 return
 
-        # =========================
-        # PRIMEIRO UPDATE DO PAINEL
-        # =========================
         await update_panel()
 
 # =========================
-# 13 PAINEL FIXADO (TEMPO REAL + SEM SPAM)
+# 15 TELEGRAM RESET
+# =========================
+try:
+    await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text=msg
+    )
+except Exception:
+    pass
+
+
+# =========================
+# 16 DISCORD RESET
+# =========================
+try:
+    channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
+    if channel:
+        await channel.send(msg)
+except Exception:
+    pass
+
+
+# =========================
+# 17 CRIA PAINEL (1x) - PROTEGIDO
+# =========================
+if not panel_initialized or not panel_message_id:
+
+    try:
+        panel = await bot_ticket.send_message(
+            chat_id=CHAT_ID,
+            text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
+        )
+
+        # 🔒 trava imediata (evita duplicação em race condition)
+        panel_message_id = panel.message_id
+        panel_chat_id = CHAT_ID
+        panel_initialized = True
+
+        try:
+            await bot_ticket.pin_chat_message(
+                chat_id=CHAT_ID,
+                message_id=panel_message_id,
+                disable_notification=True
+            )
+        except Exception:
+            pass
+
+    except Exception:
+        return
+
+
+# =========================
+# 18 PRIMEIRO UPDATE DO PAINEL
+# =========================
+try:
+    await update_panel()
+except Exception:
+    pass
+
+# =========================
+# 19 PAINEL FIXADO (TEMPO REAL + SEM SPAM)
 # =========================
 
 last_panel_text = None  # 🔥 evita editar sem mudança
@@ -587,7 +571,7 @@ async def update_panel():
 """
 
         # =========================
-        # 🔥 NÃO EDITA SE FOR IGUAL
+        # 19 🔥 NÃO EDITA SE FOR IGUAL
         # =========================
         if text == last_panel_text:
             return
@@ -595,7 +579,7 @@ async def update_panel():
         last_panel_text = text
 
         # =========================
-        # TELEGRAM (EDITA FIXADO)
+        # 20 TELEGRAM (EDITA FIXADO)
         # =========================
         await bot_ticket.edit_message_text(
             chat_id=panel_chat_id,
@@ -608,7 +592,7 @@ async def update_panel():
 
 
 # =========================
-# 14 ALERTAS OFICIAIS (ORDEM: REPOSIÇÃO, NOVAS DATAS, REVENDA, AGENDA)
+# 21 ALERTAS OFICIAIS (ORDEM: REPOSIÇÃO, NOVAS DATAS, REVENDA, AGENDA)
 # =========================
 
 async def ticket_reposicao(url, key, found):
@@ -664,7 +648,7 @@ async def agenda_update(data):
         await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# 15 ALERTAS WEVERSE
+# 22 ALERTAS WEVERSE
 # =========================
 
 async def weverse_post(url, member_name, title, message_translated, found):
@@ -705,7 +689,7 @@ async def test_weverse_media(url, member_name, title, message_translated, found)
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# 16  ALERTAS INSTAGRAM
+# 23  ALERTAS INSTAGRAM
 # =========================
 
 async def instagram_post(url, member_name, title, found):
@@ -745,7 +729,7 @@ async def instagram_live(url, member_name, title, found):
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# 17 ALERTAS TIKTOK
+# 24 ALERTAS TIKTOK
 # =========================
 
 async def tiktok_post(url, member_name, title, found):
@@ -767,7 +751,7 @@ async def tiktok_live(url, member_name, title, found):
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
 # =========================
-# 18 ALERTAS DE TESTE (UNIFICADO)
+# 25 ALERTAS DE TESTE (UNIFICADO)
 # =========================
 
 TEST_HEADER = "⚠️ TESTE ⚠️"
@@ -955,9 +939,8 @@ async def test_tiktok_live(url, member_name, title, found):
 """
     await bot_ticket.send_message(chat_id=CHAT_ID, text=msg)
 
-
 # =========================
-# 19 COMANDOS (PV EXCLUSIVO TELEGRAM)
+# 26 COMANDOS (PV EXCLUSIVO TELEGRAM)
 # =========================
 
 async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -970,7 +953,7 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
 
     # =========================
-    # 🧪 TESTE
+    # 27 TESTE
     # =========================
     if text.strip() == "/teste":
 
@@ -1025,7 +1008,7 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================
-# SAFE BOOT (1X + GARANTIDO)
+# 28 SAFE BOOT (1X + GARANTIDO)
 # =========================
 
 boot_executed = False
@@ -1050,7 +1033,7 @@ async def safe_boot():
         print(f"[SAFE_BOOT ERROR] {e}")
 
 # =========================
-# ALERT ENGINE (ANTI-SPAM REAL + SINCRONIZADO)
+# 29 ALERT ENGINE (ANTI-SPAM REAL + SINCRONIZADO)
 # =========================
 
 import asyncio
@@ -1068,7 +1051,7 @@ async def send_alert(alert_type, message):
     async with ALERT_LOCK:
 
         # =========================
-        # TELEGRAM (OBRIGATÓRIO)
+        # 30 TELEGRAM (OBRIGATÓRIO)
         # =========================
         try:
             if bot_ticket:
@@ -1080,7 +1063,7 @@ async def send_alert(alert_type, message):
             print(f"[ALERT TELEGRAM ERROR] {e}")
 
         # =========================
-        # DISCORD (ROTEAMENTO LIMPO)
+        # 31 DISCORD (ROTEAMENTO LIMPO)
         # =========================
         try:
             loop = asyncio.get_running_loop()
@@ -1114,7 +1097,7 @@ async def send_alert(alert_type, message):
             )
 
 # =========================
-# FETCH UNIVERSAL (OBRIGATÓRIO)
+# 32 FETCH UNIVERSAL (OBRIGATÓRIO)
 # =========================
 
 import aiohttp
@@ -1136,7 +1119,7 @@ async def fetch(session, url):
         return None
 
 # =========================
-# CHECKS
+# 33 CHECKS
 # =========================
 
 async def check_ticketmaster(session):
@@ -1195,7 +1178,7 @@ async def check_weverse(session):
             await update_panel()
 
 # =========================
-# CHECK SOCIAL (CORRIGIDO - SEM SPAM + IDENTIFICA MEMBRO)
+# 34 CHECK SOCIAL (CORRIGIDO - SEM SPAM + IDENTIFICA MEMBRO)
 # =========================
 async def check_social(session):
     global last_social_check, check_social
@@ -1235,7 +1218,7 @@ async def check_social(session):
     await update_panel()
 
 # =========================
-# LOOP PRINCIPAL (MONITOR CONTROLADO)
+# 35 LOOP PRINCIPAL (MONITOR CONTROLADO)
 # =========================
 
 async def monitor_loop():
@@ -1246,34 +1229,36 @@ async def monitor_loop():
     async with aiohttp.ClientSession() as session:
         while True:
             try:
+
+
                 # =========================
-                # TICKETMASTER
+                # 35 TICKETMASTER
                 # =========================
                 await check_ticketmaster(session)
 
                 await asyncio.sleep(5)
 
                 # =========================
-                # BUYTICKET
+                # 37 BUYTICKET
                 # =========================
                 await check_buyticket(session)
 
                 await asyncio.sleep(5)
 
                 # =========================
-                # WEVERSE
+                # 38 WEVERSE
                 # =========================
                 await check_weverse(session)
 
                 await asyncio.sleep(5)
 
                 # =========================
-                # SOCIAL
+                # 39 SOCIAL
                 # =========================
                 await check_social(session)
 
                 # =========================
-                # INTERVALO GERAL
+                # 40 INTERVALO GERAL
                 # =========================
                 await asyncio.sleep(30)
 
