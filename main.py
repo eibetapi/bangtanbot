@@ -125,6 +125,32 @@ def make_hash(data: str):
 
 
 def is_new(url: str, html: str):
+    """
+    ✔ Detecta mudança real de conteúdo
+    ✔ Evita spam duplicado
+    ✔ Funciona mesmo se página mudar levemente
+    """
+
+    if not html:
+        return False
+
+    new_hash = make_hash(html)
+    old_hash = CONTENT_HASH.get(url)
+
+    # primeira vez vendo essa URL
+    if old_hash is None:
+        CONTENT_HASH[url] = new_hash
+        return True
+
+    # mudou conteúdo
+    if old_hash != new_hash:
+        CONTENT_HASH[url] = new_hash
+        return True
+
+    return False
+
+
+def is_new(url: str, html: str):
 if not html:
 return False
 
