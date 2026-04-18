@@ -947,84 +947,32 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================
-# 30 MAIN (VERSÃO ESTÁVEL)
+# 30 MAIN + ENGINE (BLOCO ÚNICO CORRIGIDO)
 # =========================
 
-async def main():
-    keep_alive()
-
-    # =========================
-    # 31 DISCORD
-    # =========================
-    discord_token = os.getenv("DISCORD_TOKEN")
-    if discord_token:
-        asyncio.create_task(bot_discord.start(discord_token))
-
-   # =========================
-   # 32 TELEGRAM (CORRIGIDO)
-   # =========================
-
-token = os.getenv("BOT_TOKEN_TICKET")
-if not token:
-    return
-
-app = ApplicationBuilder().token(token).build()
-
-global bot_ticket
-bot_ticket = app.bot
-
-app.add_handler(
-    MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, handle_commands)
-)
-
-# ✅ START CORRETO (v20+)
-await app.initialize()
-await app.start()
-await app.bot.initialize()
-
-# polling correto
-asyncio.create_task(app.run_polling(drop_pending_updates=True))
-
-
-    # =========================
-    #33  MONITOR + PANEL EM PARALELO
-    # =========================
-    asyncio.create_task(monitor())
-    asyncio.create_task(panel_loop())
-    asyncio.create_task(safe_boot_loop())
-
-    # mantém vivo
-    await asyncio.Event().wait()
-
 # =========================
-# 34 SAFE BOOT LOOP (FIX)
+# SAFE BOOT LOOP
 # =========================
 
 async def safe_boot_loop():
     while True:
         try:
-            # fica vivo e detecta restart/reconnect indireto
             await asyncio.sleep(5)
 
-            # garante boot sempre ativo
             if bot_ticket:
                 await send_boot()
 
         except Exception as e:
             print(f"[SAFE_BOOT_LOOP ERROR] {e}")
             await asyncio.sleep(3)
-if __name__ == "__main__":
-    asyncio.run(main())
-
 
 # =========================
-# 35 MONITOR ENGINE (TEMPO REAL + ANTI DUPLICAÇÃO)
+# MONITOR ENGINE (ANTI DUPLICAÇÃO)
 # =========================
 
 import hashlib
 import aiohttp
 
-# cache global anti-duplicação
 SEEN_HASHES = set()
 
 def make_hash(content: str):
@@ -1045,7 +993,7 @@ def is_new(content):
     return True
 
 # =========================
-# 35 TICKETMASTER CHECK
+# CHECKS
 # =========================
 
 async def check_ticketmaster(session):
@@ -1053,13 +1001,10 @@ async def check_ticketmaster(session):
 
     for url in TICKET_LINKS:
         html = await fetch(session, url)
-
         if not html:
             continue
 
-        # filtro simples de mudança real
         if is_new(html):
-
             found = "esgotado" not in html.lower()
 
             await ticket_reposicao(url, url, found)
@@ -1068,21 +1013,16 @@ async def check_ticketmaster(session):
             last_ticket_check = time.time()
             await update_panel()
 
-# =========================
-# 36 BUYTICKET CHECK
-# =========================
 
 async def check_buyticket(session):
     global last_buy_check
 
     for url in BUY_LINKS:
         html = await fetch(session, url)
-
         if not html:
             continue
 
         if is_new(html):
-
             found = "esgotado" not in html.lower()
 
             await buy_revenda(url, url, found)
@@ -1091,47 +1031,30 @@ async def check_buyticket(session):
             last_buy_check = time.time()
             await update_panel()
 
-# =========================
-# 37 WEVERSE CHECK
-# =========================
 
 async def check_weverse(session):
     global last_weverse_check
 
     for url in WEVERSE_LINKS:
         html = await fetch(session, url)
-
         if not html:
             continue
 
         if is_new(html):
-
             await test_weverse_post(url, "bts", "Update", "Novo conteúdo", True)
             await send_alert("weverse_post", f"🩷 Weverse update:\n{url}")
 
             last_weverse_check = time.time()
             await update_panel()
 
-# =========================
-# 38 SOCIAL CHECK (INSTAGRAM / X / TIKTOK)
-# =========================
+
 async def check_social(session):
     global last_social_check
 
-    all_links = []
-
-    for v in INSTAGRAM_LINKS.values():
-        all_links.append(v)
-
-    for v in TIKTOK_LINKS.values():
-        all_links.append(v)
-
-    for v in X_LINKS:
-        all_links.append(v)
+    all_links = list(INSTAGRAM_LINKS.values()) + list(TIKTOK_LINKS.values()) + X_LINKS
 
     for url in all_links:
         html = await fetch(session, url)
-
         if not html:
             continue
 
@@ -1153,12 +1076,11 @@ async def check_social(session):
     await update_panel()
 
 # =========================
-# 39 LOOP PRINCIPAL
+# LOOP PRINCIPAL MONITOR
 # =========================
 
 async def monitor():
     async with aiohttp.ClientSession() as session:
-
         while True:
             try:
                 await check_ticketmaster(session)
@@ -1169,11 +1091,10 @@ async def monitor():
             except Exception as e:
                 print("Monitor error:", e)
 
-            # delay obrigatório anti flood
             await asyncio.sleep(20)
 
 # =========================
-# 40 PANEL LOOP (TEMPO REAL)
+# PANEL LOOP
 # =========================
 
 async def panel_loop():
@@ -1184,4 +1105,55 @@ async def panel_loop():
             pass
 
         await asyncio.sleep(15)
+
+# =========================
+# MAIN (FINAL ESTÁVEL)
+# =========================
+
+async def main():
+    keep_alive()
+
+    # DISCORD
+    discord_token = os.getenv("DISCORD_TOKEN")
+    if discord_token:
+        asyncio.create_task(bot_discord.start(discord_token))
+    else:
+        print("[ERRO] DISCORD_TOKEN não definido")
+
+    # TELEGRAM
+    token = os.getenv("BOT_TOKEN_TICKET")
+    if not token:
+        print("[ERRO] BOT_TOKEN_TICKET não definido")
+        return
+
+    app = ApplicationBuilder().token(token).build()
+
+    global bot_ticket
+    bot_ticket = app.bot
+
+    app.add_handler(
+        MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, handle_commands)
+    )
+
+    await app.initialize()
+    await app.start()
+
+    # polling paralelo correto
+    asyncio.create_task(app.run_polling(drop_pending_updates=True))
+
+    # TASKS
+    asyncio.create_task(monitor())
+    asyncio.create_task(panel_loop())
+    asyncio.create_task(safe_boot_loop())
+
+    # mantém vivo
+    await asyncio.Event().wait()
+
+# =========================
+# START
+# =========================
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
 
