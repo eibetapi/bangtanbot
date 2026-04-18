@@ -962,14 +962,14 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text.lower()
 
-    # =========================
-# 20 TESTE COMPLETO (TELEGRAM + DISCORD)
+# =========================
+# 🧪 TESTE COMPLETO (TELEGRAM + DISCORD)
 # =========================
 if text.strip() == "/teste":
 
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
-        text="👩🏻‍💻 INICIANDO TESTE COMPLETO DE ALERTAS..."
+        text="🧪 INICIANDO TESTE COMPLETO DE ALERTAS..."
     )
 
     testes = [
@@ -979,7 +979,11 @@ if text.strip() == "/teste":
 
         ("revenda", test_buy_revenda, BUY_LINKS[0], "28/10/2026"),
 
-        ("agenda", test_agenda, {"date":"28/10/2026","city":"São Paulo","country":"Brasil"}),
+        ("agenda", test_agenda, {
+            "date": "28/10/2026",
+            "city": "São Paulo",
+            "country": "Brasil"
+        }),
 
         ("weverse_post", test_weverse_post, TICKET_LINKS[0], "bts"),
         ("weverse_live", test_weverse_live, TICKET_LINKS[0], "jungkook"),
@@ -995,15 +999,10 @@ if text.strip() == "/teste":
         ("tiktok_live", test_tiktok_live, TIKTOK_LINKS["bts"], "bts"),
     ]
 
-    for item in testes:
-        alert_type, func, *args = item
-
+    for alert_type, func, *args in testes:
         await func(*args)
         await send_alert(alert_type, f"🧪 TESTE {alert_type.upper()}")
 
-    # =========================
-    # FINALIZAÇÃO
-    # =========================
     await bot_ticket.send_message(
         chat_id=CHAT_ID,
         text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
@@ -1350,6 +1349,6 @@ async def panel_loop():
             await update_panel()
         except:
             pass
- 
+
         await asyncio.sleep(15)
 
