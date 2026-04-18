@@ -119,7 +119,10 @@ SEEN_SOCIAL = set()
 CONTENT_HASH = {}
 
 def make_hash(data: str):
-return hashlib.sha256(data.encode("utf-8", errors="ignore")).hexdigest()
+    return hashlib.sha256(
+        data.encode("utf-8", errors="ignore")
+    ).hexdigest()
+
 
 def is_new(url: str, html: str):
 if not html:
