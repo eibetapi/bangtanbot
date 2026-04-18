@@ -61,16 +61,24 @@ app_web = Flask(__name__)
 
 @app_web.route('/')
 def home():
-return "Bots rodando"
+    return "Bots rodando"
+
 
 def run_web():
-port = int(os.environ.get("PORT", 8080))
-app_web.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    port = int(os.environ.get("PORT", 8080))
+    app_web.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False,
+        use_reloader=False
+    )
+
 
 def keep_alive():
-if not getattr(keep_alive, "_running", False):
-Thread(target=run_web, daemon=True).start()
-keep_alive._running = True
+    if not getattr(keep_alive, "_running", False):
+        Thread(target=run_web, daemon=True).start()
+        keep_alive._running = True
+
 
 # =========================
 # 4 CONFIG
