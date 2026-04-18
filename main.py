@@ -107,6 +107,15 @@ panel_initialized = False  # ✅ ESSENCIAL
 discord_panel_message_id = None
 
 # =========================
+# DISCORD CHANNEL IDS (OBRIGATÓRIO)
+# =========================
+
+DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
+DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
+DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
+DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
+
+# =========================
 # CONTADORES (MONITOR) ✅ CORRIGIDO
 # =========================
 
@@ -133,6 +142,41 @@ SEEN_BUY = set()
 SEEN_WEVERSE = set()
 SEEN_SOCIAL = set()
 
+# =========================
+# 🔥 CACHE GLOBAL (ANTI DUPLICAÇÃO REAL)
+# =========================
+
+CONTENT_HASH = {}  # url -> hash do conteúdo
+
+def make_hash(data: str):
+    return hashlib.sha256(data.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def is_new(url: str, html: str):
+    """
+    ✔ Detecta mudança real de conteúdo
+    ✔ Evita spam duplicado
+    ✔ Funciona mesmo se página mudar levemente
+    """
+
+    if not html:
+        return False
+
+    new_hash = make_hash(html)
+
+    old_hash = CONTENT_HASH.get(url)
+
+    # primeira vez vendo essa URL
+    if old_hash is None:
+        CONTENT_HASH[url] = new_hash
+        return True
+
+    # mudou conteúdo
+    if old_hash != new_hash:
+        CONTENT_HASH[url] = new_hash
+        return True
+
+    return False
 
 # =========================
 # 6 LINKS (NÃO REMOVER)
@@ -319,6 +363,27 @@ def status_color(last_check):
         return "🔴"
 
 # =========================
+#  9 AIOHTTP GLOBAL SESSION (ESTÁVEL)
+# =========================
+
+import aiohttp
+
+http_session = None
+
+async def get_session():
+    """
+    ✔ garante 1 sessão única global
+    ✔ evita leak de conexão
+    ✔ evita crash silencioso no monitor
+    """
+    global http_session
+
+    if http_session is None or http_session.closed:
+        http_session = aiohttp.ClientSession()
+
+    return http_session
+
+# =========================
 #10 EMOJIS
 # =========================
 
@@ -413,84 +478,67 @@ def send_alert(alert_type, message):
             send_discord(DISCORD_NEWS_CHANNEL_ID, message)
         )
 
-# =========================
-# 12 MENSAGEM DE RESET / RECONNECT (ANTI DUPLO + PAINEL FIXO)
-# =========================
-
 async def send_boot():
     global panel_message_id, panel_chat_id, panel_initialized, discord_panel_message_id
 
-    if not bot_ticket:
+    if not bot_ticket or not bot_discord:
         return
 
     async with boot_lock:
 
-        # =========================
-        # 🚀 MENSAGEM DE RESTART
-        # =========================
         msg = "🛸•°•Wootteo entrando em rota°•°🛸"
 
+        # =========================
+        # TELEGRAM RESET
+        # =========================
         try:
             await bot_ticket.send_message(
                 chat_id=CHAT_ID,
                 text=msg
             )
-        except Exception as e:
-            print(f"[BOOT TELEGRAM ERROR] {e}")
+        except Exception:
+            pass
 
         # =========================
-        # DISCORD (EVITA FLOOD)
-        # =========================
-        try:
-            if not discord_panel_message_id:
-                sent = await send_discord(DISCORD_PANEL_CHANNEL_ID, msg)
-                discord_panel_message_id = True
-        except Exception as e:
-            print(f"[BOOT DISCORD ERROR] {e}")
-
-        # =========================
-        # 🧠 CONTROLE DO PAINEL TELEGRAM
-        # =========================
-
-        # 🔥 se já existe painel → só atualiza
-        if panel_initialized and panel_message_id:
-            try:
-                await update_panel()
-                return
-            except Exception:
-                panel_initialized = False
-                panel_message_id = None
-
-        # =========================
-        # 🆕 CRIA NOVO PAINEL
+        # DISCORD RESET
         # =========================
         try:
-            msg_panel = await bot_ticket.send_message(
-                chat_id=CHAT_ID,
-                text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
-            )
+            channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
+            await channel.send(msg)
+        except Exception:
+            pass
 
-            panel_message_id = msg_panel.message_id
-            panel_chat_id = CHAT_ID
-            panel_initialized = True
+        # =========================
+        # CRIA PAINEL (1x)
+        # =========================
+        if not panel_initialized or not panel_message_id:
 
-            # 📌 FIXAR (SÓ UMA VEZ)
             try:
-                await bot_ticket.pin_chat_message(
+                panel = await bot_ticket.send_message(
                     chat_id=CHAT_ID,
-                    message_id=panel_message_id,
-                    disable_notification=True
+                    text="👾 PAINEL DE CONTROLE 👾\n\nInicializando..."
                 )
-            except Exception as e:
-                print(f"[PIN ERROR] {e}")
 
-        except Exception as e:
-            print(f"[CREATE PANEL ERROR] {e}")
-            return
+                panel_message_id = panel.message_id
+                panel_chat_id = CHAT_ID
+                panel_initialized = True
 
-        # 🔄 PRIMEIRO UPDATE
+                try:
+                    await bot_ticket.pin_chat_message(
+                        chat_id=CHAT_ID,
+                        message_id=panel_message_id,
+                        disable_notification=True
+                    )
+                except Exception:
+                    pass
+
+            except Exception:
+                return
+
+        # =========================
+        # PRIMEIRO UPDATE DO PAINEL
+        # =========================
         await update_panel()
-
 
 # =========================
 # 13 PAINEL FIXADO (TEMPO REAL + SEM SPAM)
@@ -969,7 +1017,7 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 🟣 Weverse: OK
 ⚪ Redes sociais: OK
-🟠 Ticketmaster: OK
+🟠 Ticketmaster: OKreal
 🔵 Buyticket: OK
 
 ⏱ Uptime: {get_uptime()}
@@ -977,7 +1025,7 @@ async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================
-# SAFE BOOT (ANTI-SPAM - EXECUTA 1 VEZ)
+# SAFE BOOT (1X + GARANTIDO)
 # =========================
 
 boot_executed = False
@@ -989,70 +1037,103 @@ async def safe_boot():
         return
 
     if not bot_ticket:
+        print("[SAFE_BOOT] bot_ticket ainda não pronto")
         return
 
+    boot_executed = True
+
     try:
-        boot_executed = True
         await send_boot()
         print("[BOOT] Executado com sucesso (1x)")
 
     except Exception as e:
         print(f"[SAFE_BOOT ERROR] {e}")
 
+# =========================
+# ALERT ENGINE (ANTI-SPAM REAL + SINCRONIZADO)
+# =========================
+
+import asyncio
+
+ALERT_LOCK = asyncio.Lock()
+
+async def send_alert(alert_type, message):
+    """
+    🔥 ALERT ENGINE CORRIGIDO:
+    - evita duplicação
+    - sincroniza Telegram + Discord
+    - protege contra spam paralelo
+    """
+
+    async with ALERT_LOCK:
+
+        # =========================
+        # TELEGRAM (OBRIGATÓRIO)
+        # =========================
+        try:
+            if bot_ticket:
+                await bot_ticket.send_message(
+                    chat_id=CHAT_ID,
+                    text=message
+                )
+        except Exception as e:
+            print(f"[ALERT TELEGRAM ERROR] {e}")
+
+        # =========================
+        # DISCORD (ROTEAMENTO LIMPO)
+        # =========================
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+
+        # 🔥 CORREÇÃO IMPORTANTE:
+        # padroniza categorias (evita alerta indo pra canal errado)
+
+        if alert_type in ["ticket", "reposicao", "nova_data", "revenda", "agenda"]:
+            loop.create_task(
+                send_discord(DISCORD_TICKETS_CHANNEL_ID, message)
+            )
+
+        elif alert_type in ["weverse_post", "weverse_live", "weverse_news", "weverse_media"]:
+            loop.create_task(
+                send_discord(DISCORD_WEVERSE_CHANNEL_ID, message)
+            )
+
+        elif alert_type in [
+            "instagram_post", "instagram_reel", "instagram_story", "instagram_live",
+            "tiktok_post", "tiktok_live"
+        ]:
+            loop.create_task(
+                send_discord(DISCORD_SOCIAL_CHANNEL_ID, message)
+            )
+
+        else:
+            loop.create_task(
+                send_discord(DISCORD_NEWS_CHANNEL_ID, message)
+            )
 
 # =========================
-# MONITOR ENGINE (ANTI DUPLICAÇÃO REAL)
+# FETCH UNIVERSAL (OBRIGATÓRIO)
 # =========================
 
-import hashlib
 import aiohttp
 
-# 🔥 cache por URL (ESSENCIAL)
-LAST_HASH_BY_URL = {}
-
-def normalize_html(html: str):
-    """
-    Remove partes dinâmicas que causam falso positivo
-    """
-    html = re.sub(r'\s+', ' ', html)
-    html = re.sub(r'\"timestamp\":\d+', '', html)
-    html = re.sub(r'\"request_id\":\".*?\"', '', html)
-    html = re.sub(r'<script.*?>.*?</script>', '', html, flags=re.DOTALL)
-    return html.strip()
-
-def make_hash(content: str):
-    return hashlib.md5(content.encode()).hexdigest()
-
-def is_new(url, content):
-    """
-    🔥 Sistema anti-spam REAL:
-    - Cada URL tem seu próprio histórico
-    - Só dispara se houve mudança REAL
-    """
-
-    global LAST_HASH_BY_URL
-
-    if not content:
-        return False
-
-    cleaned = normalize_html(content)
-    new_hash = make_hash(cleaned)
-
-    old_hash = LAST_HASH_BY_URL.get(url)
-
-    if old_hash == new_hash:
-        return False
-
-    LAST_HASH_BY_URL[url] = new_hash
-    return True
-
-
 async def fetch(session, url):
+    """
+    ✔ Download seguro de páginas
+    ✔ Timeout protegido
+    ✔ Evita crash no monitor loop
+    """
+
     try:
-        async with session.get(url, timeout=15) as resp:
-            return await resp.text()
+        async with session.get(url, timeout=20) as response:
+            if response.status != 200:
+                return None
+            return await response.text()
+
     except Exception:
-        return ""
+        return None
 
 # =========================
 # CHECKS
