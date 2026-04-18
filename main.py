@@ -1008,100 +1008,22 @@ if text.strip() == "/teste":
         text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
     )
 
-        # =========================
-        # 21 TICKETS
-        # =========================
-        await test_ticket_reposicao(TICKET_LINKS[0], "28/10/2026", True)
-        await send_alert("ticket", "🔥 Ticket Reposição TESTE")
+# =========================
+# 28 PING
+# =========================
+elif "/ping" in text:
+    await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text="🏓 Bot ativo e funcionando!"
+    )
 
-        await test_ticket_nova_data(TICKET_LINKS[1], "30/10/2026", True)
-        await send_alert("ticket", "🎁 Nova Data TESTE")
-
-        # =========================
-        # 22 BUY / REVENDA
-        # =========================
-        await test_buy_revenda(BUY_LINKS[0], "28/10/2026", True)
-        await send_alert("revenda", "🔵 BuyTicket TESTE")
-
-        # =========================
-        # 23 AGENDA
-        # =========================
-        await test_agenda({
-            "date": "28/10/2026",
-            "city": "São Paulo",
-            "country": "Brasil"
-        })
-        await send_alert("agenda", "💜 Agenda TESTE")
-
-        # =========================
-        # 24 WEVERSE
-        # =========================
-        await test_weverse_post(
-            TICKET_LINKS[0],
-            "bts",
-            "Update",
-            "We are coming back stronger than ever 💜",
-            True
-        )
-        await send_alert("weverse_post", "🩷 Weverse Post TESTE")
-
-        await test_weverse_live(TICKET_LINKS[0], "jungkook", True)
-        await send_alert("weverse_live", "📹 Weverse Live TESTE")
-
-        await test_weverse_news(TICKET_LINKS[0], "rm", "Special announcement", True)
-        await send_alert("weverse_news", "🚨 Weverse News TESTE")
-
-        await test_weverse_media(TICKET_LINKS[0], "v", "Behind the scenes", "Exclusive content", True)
-        await send_alert("weverse_media", "📀 Weverse Media TESTE")
-
-        # =========================
-        # 25 INSTAGRAM
-        # =========================
-        await test_instagram_post(TIKTOK_LINKS["bts"], "bts", "post", True)
-        await send_alert("instagram_post", "🌟 Instagram Post TESTE")
-
-        await test_instagram_reel(TIKTOK_LINKS["bts"], "bts", "reel", True)
-        await send_alert("instagram_reels", "🎬 Instagram Reel TESTE")
-
-        await test_instagram_story(TIKTOK_LINKS["bts"], "bts", "story", True)
-        await send_alert("instagram_stories", "🫧 Instagram Story TESTE")
-
-        await test_instagram_live(TIKTOK_LINKS["bts"], "bts", "live", True)
-        await send_alert("instagram_live", "🎥 Instagram Live TESTE")
-
-        # =========================
-        # 26 TIKTOK
-        # =========================
-        await test_tiktok_post(TIKTOK_LINKS["bts"], "bts", "video", True)
-        await send_alert("tiktok_post", "🎵 TikTok Post TESTE")
-
-        await test_tiktok_live(TIKTOK_LINKS["bts"], "bts", "live", True)
-        await send_alert("tiktok_live", "🎥 TikTok Live TESTE")
-
-        # =========================
-        # 27 FINALIZAÇÃO
-        # =========================
-        await bot_ticket.send_message(
-            chat_id=CHAT_ID,
-            text="✅ TESTE COMPLETO FINALIZADO (TELEGRAM + DISCORD)"
-        )
-
-    # =========================
-    # 28 PING
-    # =========================
-    elif "/ping" in text:
-        await bot_ticket.send_message(
-            chat_id=CHAT_ID,
-            text="🏓 Bot ativo e funcionando!"
-        )
-
-    # =========================
-    # 29 STATUS
-    # =========================
-    elif "/status" in text:
-        await bot_ticket.send_message(
-            chat_id=CHAT_ID,
-            text=f"""📊 STATUS DO BOT
+# =========================
+# 29 STATUS
+# =========================
+elif "/status" in text:
+    await bot_ticket.send_message(
+        chat_id=CHAT_ID,
+        text=f"""📊 STATUS DO BOT
 
 🟣 Weverse: OK
 ⚪ Redes sociais: OK
@@ -1110,8 +1032,7 @@ if text.strip() == "/teste":
 
 ⏱ Uptime: {get_uptime()}
 """
-        )
-
+    )
 
 # =========================
 # 30 MAIN (VERSÃO ESTÁVEL)
