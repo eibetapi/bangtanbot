@@ -1350,6 +1350,6 @@ async def panel_loop():
             await update_panel()
         except:
             pass
-
+ 
         await asyncio.sleep(15)
 
