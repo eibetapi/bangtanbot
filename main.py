@@ -11,6 +11,20 @@ import os
 import re
 from datetime import datetime
 
+# ==========================================
+# DEFINIÇÃO DE CONTADORES GLOBAIS (AQUI!)
+# ==========================================
+total_tickets = 0
+total_buy = 0
+total_weverse = 0
+total_social = 0
+
+# Timestamps para o painel não bugar
+last_ticket_check = 0
+last_buy_check = 0
+last_weverse_check = 0
+last_social_check = 0
+
 # =========================
 # 1 DISCORD (CORRIGIDO - INTENTS COMPLETOS)
 # =========================
@@ -1051,85 +1065,60 @@ async def fetch(session, url):
         return None
 
 # =========================
-# 33 CHECKS (CORRIGIDOS)
+# 33 CHECKS (NOMES DE VARIÁVEIS CORRIGIDOS)
 # =========================
 
 async def check_ticketmaster(session):
-    global last_ticket_check, check_ticket
+    global last_ticket_check, total_tickets # 🔥 Nome alterado
     for url in TICKET_LINKS:
         html = await fetch(session, url)
-        if not html: continue
-
-        if is_new(url, html):
+        if html and is_new(url, html):
             found = "esgotado" not in html.lower()
-            check_ticket += 1 
-            
+            total_tickets += 1 # ✅ Agora o Python sabe que é um número
             await ticket_reposicao(url, url, found)
             await send_alert("ticket", f"🎫 Ticket update detectado:\n{url}")
-            
             last_ticket_check = time.time()
             await update_panel()
 
 async def check_buyticket(session):
-    global last_buy_check, check_buy
+    global last_buy_check, total_buy # 🔥 Nome alterado
     for url in BUY_LINKS:
         html = await fetch(session, url)
-        if not html: continue
-
-        if is_new(url, html):
+        if html and is_new(url, html):
             found = "esgotado" not in html.lower()
-            check_buy += 1
-            
+            total_buy += 1
             await buy_revenda(url, url, found)
             await send_alert("revenda", f"🔵 BuyTicket update:\n{url}")
-            
             last_buy_check = time.time()
             await update_panel()
 
 async def check_weverse(session):
-    global last_weverse_check, check_weverse
+    global last_weverse_check, total_weverse # 🔥 Nome alterado
     for url in WEVERSE_LINKS:
         html = await fetch(session, url)
-        if not html: continue
-
-        if is_new(url, html):
-            check_weverse += 1
+        if html and is_new(url, html):
+            total_weverse += 1
             await test_weverse_post(url, "bts", "Update", "Novo conteúdo", True)
             await send_alert("weverse_post", f"🩷 Weverse update:\n{url}")
-            
             last_weverse_check = time.time()
             await update_panel()
 
 # =========================
-# 34 CHECK SOCIAL (CORRIGIDO: AWAIT ADICIONADO)
+# 34 CHECK SOCIAL (NOMES DE VARIÁVEIS CORRIGIDOS)
 # =========================
 async def check_social(session):
-    global last_social_check, check_social
+    global last_social_check, total_social # 🔥 Nome alterado
     all_links = list(INSTAGRAM_LINKS.items()) + list(TIKTOK_LINKS.items())
-
     for member, url in all_links:
         html = await fetch(session, url)
-        if not html or not is_new(url, html):
-            continue
-
-        check_social += 1
-
-        if "instagram" in url:
-            await instagram_post(url, member, "update", True)
-            # ✅ Corrigido: Adicionado await
-            await send_alert(
-                "instagram_post", 
-                f"📷 Instagram update detectado ({member.upper()}):\n{url}"
-            )
-
-        elif "tiktok" in url:
-            await tiktok_post(url, member, "update", True)
-            # ✅ Corrigido: Adicionado await
-            await send_alert(
-                "tiktok_post", 
-                f"🎵 TikTok update detectado ({member.upper()}):\n{url}"
-            )
-
+        if html and is_new(url, html):
+            total_social += 1
+            if "instagram" in url:
+                await instagram_post(url, member, "update", True)
+                await send_alert("instagram_post", f"📷 Instagram update ({member.upper()}):\n{url}")
+            elif "tiktok" in url:
+                await tiktok_post(url, member, "update", True)
+                await send_alert("tiktok_post", f"🎵 TikTok update ({member.upper()}):\n{url}")
     last_social_check = time.time()
     await update_panel()
 
@@ -1237,6 +1226,3 @@ if __name__ == "__main__":
         pass
     except Exception as e:
         print(f"[FATAL] Ocorreu um erro inesperado: {e}")
-
-
-
