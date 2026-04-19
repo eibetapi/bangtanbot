@@ -439,79 +439,54 @@ TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
 # O motor de busca no Bloco 8 lerá automaticamente a lista completa.
 
 # =============================================================
-# 12 GESTÃO DO PAINEL (TELEGRAM & DISCORD)
+# 12 GESTÃO DO PAINEL (FIXO E ÚNICO)
 # =============================================================
-
-import os
-
-def salvar_id_telegram(msg_id):
-    try:
-        with open("tg_panel_id.txt", "w") as f:
-            f.write(str(msg_id))
-    except Exception as e:
-        print(f"[DEBUG] Erro ao gravar arquivo de ID: {e}")
-
-def carregar_id_telegram():
-    if os.path.exists("tg_panel_id.txt"):
-        try:
-            with open("tg_panel_id.txt", "r") as f:
-                content = f.read().strip()
-                return int(content) if content else None
-        except: return None
-    return None
 
 async def update_panel():
     global panel_message_id, discord_panel_msg_id
     
     data_show, city, d_prox, d_br = get_countdown_data()
+    # Puxa o texto formatado da função abaixo
     texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
-    # --- LÓGICA TELEGRAM ---
+    # --- TELEGRAM: BUSCA O MAIS RECENTE NO CANAL SE NÃO TIVER ID ---
     if bot_ticket and PANEL_CHAT_ID:
-        if not panel_message_id:
-            panel_message_id = carregar_id_telegram()
+        try:
+            if not panel_message_id:
+                panel_message_id = carregar_id_telegram()
 
-        sucesso_edicao = False
-        if panel_message_id:
-            try:
-                await bot_ticket.edit_message_text(
-                    chat_id=PANEL_CHAT_ID,
-                    message_id=panel_message_id,
-                    text=texto,
-                    parse_mode="Markdown"
-                )
-                sucesso_edicao = True
-            except Exception as e:
-                # Se não achou a mensagem para editar, precisamos de um novo
-                if "message to edit not found" in str(e).lower():
-                    panel_message_id = None
-                else:
-                    # Erro de rede ou flood: não cria novo para não duplicar
-                    sucesso_edicao = True 
+            if panel_message_id:
+                try:
+                    await bot_ticket.edit_message_text(
+                        chat_id=PANEL_CHAT_ID,
+                        message_id=panel_message_id,
+                        text=texto,
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    if "message to edit not found" in str(e).lower():
+                        panel_message_id = None 
 
-        # SE FALHOU OU NÃO TINHA ID: CRIA NOVO E LIMPA O CANAL
-        if not sucesso_edicao:
-            try:
-                # Tenta desfixar tudo antes de mandar o novo (limpeza preventiva)
+            if not panel_message_id:
                 try: await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
                 except: pass
-
+                
                 msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
                 panel_message_id = msg.message_id
                 salvar_id_telegram(panel_message_id)
-                
-                await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
-            except Exception as e:
-                print(f"[DEBUG] Erro ao gerar novo painel: {e}")
+                try: await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
+                except: pass
+        except Exception as e:
+            print(f"[DEBUG] Falha update TG: {e}")
 
-    # --- LÓGICA DISCORD ---
+    # --- DISCORD ---
     if DISCORD_PANEL_CHANNEL_ID:
         channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
         if channel:
             embed = discord.Embed(description=texto, color=0x8A2BE2)
             try:
                 if not discord_panel_msg_id:
-                    async for message in channel.history(limit=5):
+                    async for message in channel.history(limit=10):
                         if message.author == bot_discord.user:
                             discord_panel_msg_id = message.id
                             break
@@ -521,18 +496,7 @@ async def update_panel():
                 else:
                     msg = await channel.send(embed=embed)
                     discord_panel_msg_id = msg.id
-            except: 
-                discord_panel_msg_id = None
-
-def status_color(last_time):
-    diff = time.time() - last_time
-    if diff < 40: return "🟢"
-    if diff < 120: return "🟡"
-    return "🔴"
-
-def minutes_since(last_time):
-    res = int((time.time() - last_time) / 60)
-    return res if res >= 0 else 0
+            except: pass
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
     global total_weverse, total_social, total_tickets, total_buy
@@ -1087,42 +1051,45 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Erro na sincronização Discord: {e}")
 
-# ==========================================
-# 21 INICIALIZAÇÃO FINAL (MAIN)
-# ==========================================
+ # =============================================================
+# 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL
+# =============================================================
 
 async def main():
-    # 1. Inicia o servidor Keep Alive
+    # 1. Inicia o servidor Keep Alive (Flask/Web)
     keep_alive()
     
     # 2. Configurações do Telegram
     if TELEGRAM_TOKEN:
-        from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
+        from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
         
-        # CRIAMOS A APPLICATION AQUI PARA EVITAR O NAMEERROR
+        # Construção da Application
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
         
-        # Registra os comandos no Telegram
+        # Registro de Handlers
         application.add_handler(CommandHandler("ping", handle_commands_telegram))
         application.add_handler(CommandHandler("teste", handle_commands_telegram))
         application.add_handler(CommandHandler("comandos", handle_commands_telegram))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram))
         
-        # Inicia o motor do Telegram
+        # Inicialização correta para evitar Conflict
         await application.initialize()
         await application.start()
-        await application.updater.start_polling()
+        
+        # O drop_pending_updates=True limpa mensagens antigas que causariam crash no boot
+        await application.updater.start_polling(drop_pending_updates=True)
         print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
-    # 3. Inicia o Motor de Monitoramento em segundo plano
+    # 3. Inicia o Motor de Monitoramento (Loop do Bloco 17)
     asyncio.create_task(monitor_loop())
     print("[SISTEMA] Motor de monitoramento Arirang iniciado.")
 
-    # 4. Inicia o Discord (Bloqueante)
+    # 4. Inicia o Discord (Mantendo o loop vivo)
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
         if token:
             print("[DISCORD] Tentando login...")
+            # Usamos o start() em vez de run() dentro do main async
             await bot_discord.start(token)
         else:
             print("[ERRO] Token do Discord não encontrado.")
@@ -1130,7 +1097,9 @@ async def main():
         print(f"[FATAL] Erro ao conectar ao Discord: {e}")
 
 if __name__ == "__main__":
+    # Padrão recomendado para rodar múltiplos bots assíncronos
     try:
-        asyncio.run(main())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
     except (KeyboardInterrupt, SystemExit):
         print("\n[DESLIGANDO] Motores Arirang parados.")
