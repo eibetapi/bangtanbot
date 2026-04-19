@@ -443,13 +443,10 @@ TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
 # =============================================================
 
 async def update_panel():
-    """
-    Função mestra: Tenta editar os painéis existentes. 
-    """
     global panel_message_id, discord_panel_msg_id
     
-    # Busca dados atualizados do countdown e contadores
     data_show, city, d_prox, d_br = get_countdown_data()
+    # Geramos o texto garantindo que ele leia as globais atualizadas
     texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
     # --- LÓGICA TELEGRAM ---
@@ -463,15 +460,12 @@ async def update_panel():
                     parse_mode="Markdown"
                 )
             else:
-                # Se não tem ID salvo, cria novo e fixa
                 msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
                 panel_message_id = msg.message_id
                 try: await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
                 except: pass
         except Exception as e:
-            # Se der erro (ex: mensagem apagada), limpa o ID para gerar novo no próximo ciclo
-            print(f"[DEBUG] Erro TG: {e}")
-            panel_message_id = None
+            if "not found" in str(e).lower(): panel_message_id = None
 
     # --- LÓGICA DISCORD ---
     if DISCORD_PANEL_CHANNEL_ID:
@@ -479,62 +473,76 @@ async def update_panel():
         if channel:
             embed = discord.Embed(description=texto, color=0x8A2BE2)
             try:
-                # Recuperação por histórico no Discord (evita duplicidade)
                 if not discord_panel_msg_id:
-                    async for message in channel.history(limit=10):
+                    async for message in channel.history(limit=5):
                         if message.author == bot_discord.user:
                             discord_panel_msg_id = message.id
                             break
-
                 if discord_panel_msg_id:
                     msg = await channel.fetch_message(discord_panel_msg_id)
                     await msg.edit(content=None, embed=embed)
                 else:
                     msg = await channel.send(embed=embed)
                     discord_panel_msg_id = msg.id
-            except Exception as e:
-                print(f"[DEBUG] Erro DC: {e}")
-                discord_panel_msg_id = None
+            except: discord_panel_msg_id = None
 
 def status_color(last_time):
-    """🟢 < 40s | 🟡 < 120s | 🔴 > 120s"""
     diff = time.time() - last_time
     if diff < 40: return "🟢"
     if diff < 120: return "🟡"
     return "🔴"
 
 def minutes_since(last_time):
-    return int((time.time() - last_time) / 60)
+    res = int((time.time() - last_time) / 60)
+    return res if res >= 0 else 0
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
-    # IMPORTANTE: Chamamos as globais aqui para garantir que o texto pegue o valor atualizado
+    # Forçamos a leitura das globais exatas aqui
     global total_weverse, total_social, total_tickets, total_buy
     global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
 
     return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
 
+
 **✈️ PRÓXIMAS DATAS**
+
   🎫 Data: **{data_show}**
+
   📍 Local: **{city}**
+
   🔔 Faltam **{d_prox}** dias.
+
   🔔 Faltam **{d_br}** dias para o BTS no Brasil!
+
 
 •°•👾•°•° **ATUALIZAÇÕES** •°•°🛸
 
+
   🟣 **Weverse** {status_color(last_weverse_check)}
+
   🎯 Acessos realizados: **{total_weverse}**
+
   ⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
 
+
   ⚪ **Redes sociais** {status_color(last_social_check)}
+
   🎯 Acessos realizados: **{total_social}**
+
   ⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
 
+
   🟠 **Ticketmaster** {status_color(last_ticket_check)}
+
   🎯 Acessos realizados: **{total_tickets}**
+
   ⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
 
+
   🔵 **Buyticket** {status_color(last_buy_check)}
+
   🎯 Acessos realizados: **{total_buy}**
+
   ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**"""
 
 # =========================
@@ -947,10 +955,12 @@ async def check_ticketmaster(session):
     global last_ticket_check, total_tickets
     if 'TICKET_LINKS' not in globals() or not TICKET_LINKS: return
     
+    # Atualiza o tempo e incrementa ANTES do loop para o painel registrar
     last_ticket_check = time.time()
+    total_tickets += 1 
+
     for url in TICKET_LINKS:
         try:
-            total_tickets += 1
             html = await fetch(session, url)
             if html and is_new(url, html):
                 found = "esgotado" not in html.lower()
@@ -963,9 +973,10 @@ async def check_buyticket(session):
     if 'BUY_LINKS' not in globals() or not BUY_LINKS: return
     
     last_buy_check = time.time()
+    total_buy += 1
+
     for url in BUY_LINKS:
         try:
-            total_buy += 1
             html = await fetch(session, url)
             if html and is_new(url, html):
                 found = "esgotado" not in html.lower()
@@ -978,72 +989,65 @@ async def check_weverse(session):
     if 'WEVERSE_LINKS' not in globals() or not WEVERSE_LINKS: return
     
     last_weverse_check = time.time()
+    total_weverse += 1
+
     for url in WEVERSE_LINKS:
         try:
-            total_weverse += 1
             html = await fetch(session, url)
             if html and is_new(url, html):
-                # Logica Weverse (Ex: weverse_post)
+                # Chamada de alerta Weverse aqui
                 pass
         except Exception as e:
             print(f"[ERR WEVERSE] {e}")
 
 async def check_social(session):
-    """Monitoramento de redes sociais (Instagram, TikTok, Twitter)"""
+    """Monitoramento integrado: Instagram, TikTok, Twitter e YouTube"""
     global last_social_check, total_social
-    if 'SOCIAL_LINKS' not in globals() or not SOCIAL_LINKS: return
     
+    # Registra atividade social no painel
     last_social_check = time.time()
-    for url in SOCIAL_LINKS:
-        try:
-            total_social += 1
-            html = await fetch(session, url)
-            if html and is_new(url, html):
-                # Aqui dispara as funções tiktok_post, instagram_post, etc
-                pass
-        except Exception as e:
-            print(f"[ERR SOCIAL] {e}")
+    total_social += 1 
+
+    # 1. Parte: SOCIAL_LINKS (Instagram/TikTok/Twitter)
+    if 'SOCIAL_LINKS' in globals() and SOCIAL_LINKS:
+        for url in SOCIAL_LINKS:
+            try:
+                html = await fetch(session, url)
+                if html and is_new(url, html):
+                    # Alertas sociais aqui
+                    pass
+            except Exception as e:
+                print(f"[ERR SOCIAL] {e}")
+
+    # 2. Parte: YouTube (Sempre roda se o módulo social rodar)
+    await check_youtube(session)
 
 async def check_youtube(session):
-    """Monitoramento de Vídeos e Lives integrado ao módulo de Redes Sociais"""
+    """Sub-função do módulo social"""
     global last_social_check, total_social
     youtube_url = "https://www.youtube.com/@BTS"
     
-    # Atualiza o timestamp social para o painel piscar em verde/amarelo
-    last_social_check = time.time()
-    
     try:
-        total_social += 1
         html = await fetch(session, f"{youtube_url}/videos")
-        
         if html:
-            # Identificação de Live
             is_live = '{"text":"AO VIVO"}' in html or '"style":"LIVE"' in html or "watch?v=" in html and "live" in html.lower()
-            
             if is_live:
                 if is_new(youtube_url + "/live", "LIVE"):
                     await youtube_live(youtube_url)
-            
-            # Identificação de Vídeo Novo
             elif is_new(youtube_url, html):
-                # Tenta capturar o link do vídeo mais recente se possível, ou usa o da aba vídeos
                 await youtube_post(youtube_url, youtube_url)
-                
     except Exception as e:
         print(f"[ERR YOUTUBE] {e}")
 
 # =============================================================
-# 19.1 AUXILIAR DE ALERTA SOCIAL (SIMPLIFICADO)
+# 19.1 AUXILIAR DE ALERTA SOCIAL
 # =============================================================
 
 async def enviar_alerta_social(mensagem):
-    """Envia o alerta para os canais de redes sociais no TG e Discord"""
-    # Envio Telegram
     if bot_ticket and PANEL_CHAT_ID:
         try: await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=mensagem, parse_mode="Markdown")
         except: pass
         
-    # Envio Discord
     channel = bot_discord.get_channel(DISCORD_SOCIAL_CHANNEL_ID)
     if channel:
         try: await channel.send(content=mensagem)
