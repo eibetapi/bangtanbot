@@ -284,7 +284,7 @@ AGENDA = [
 ]
 
 # =========================
-# 8 CONTROLE
+# 8 CONTROLE (AJUSTADO)
 # =========================
 boot_lock = asyncio.Lock()
 boot_initialized = False
@@ -300,9 +300,12 @@ def clean(v):
     return v if v and str(v).strip() else "ESGOTADO"
 
 def days_left(date_str):
+    """Calcula dias restantes para uma data específica no formato DD/MM/AAAA"""
     try:
-        d = datetime.strptime(date_str, "%d/%m/%Y")
-        delta = (d - datetime.now()).days
+        # Usamos .date() para garantir que o cálculo seja baseado no dia e não nos segundos
+        d = datetime.strptime(date_str, "%d/%m/%Y").date()
+        hoje = datetime.now().date()
+        delta = (d - hoje).days
         return max(delta, 0)
     except:
         return 0
@@ -310,21 +313,51 @@ def days_left(date_str):
 def minutes_since(ts):
     return int((time.time() - ts) / 60)
 
-def get_next_show():
-    now = datetime.now()
-    if 'AGENDA' not in globals(): return "Continua…", "---", 0
-    
-    for item in AGENDA:
-        try:
-            dt_show = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
-            if dt_show > now:
-                return item[0], f"{item[1]}, {item[2]}", days_left(item[0])
-        except:
-            continue
-    return "Continua…", "---", 0
-
 def status_color(last_check):
+    # Se o último rastreio foi há menos de 30 minutos, fica verde
     return "🟢" if (time.time() - last_check) < 1800 else "🔴"
+
+def get_countdown_data():
+    """
+    Retorna os dados processados para o painel:
+    (data_show, local, dias_prox, dias_brasil)
+    """
+    now = datetime.now()
+    
+    # 1. Busca o Próximo Show Geral na Agenda
+    prox_data = "Continua…"
+    prox_local = "---"
+    dias_prox = 0
+    
+    if 'AGENDA' in globals() and AGENDA:
+        for item in AGENDA:
+            try:
+                # item[0]=data, item[3]=hora
+                dt_show = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
+                if dt_show > now:
+                    prox_data = item[0]
+                    prox_local = f"{item[1]}, {item[2]}"
+                    dias_prox = days_left(item[0])
+                    break
+            except:
+                continue
+
+    # 2. Busca especificamente o primeiro show no BRASIL na Agenda
+    # Se não encontrar na agenda, usa a data padrão 28/10/2026
+    dias_brasil = 0
+    found_br = False
+    if 'AGENDA' in globals():
+        for item in AGENDA:
+            if "brasil" in item[2].lower() or "brazil" in item[2].lower():
+                dias_brasil = days_left(item[0])
+                found_br = True
+                break
+    
+    if not found_br:
+        dias_brasil = days_left("28/10/2026")
+
+    return prox_data, prox_local, dias_prox, dias_brasil
+
 # =========================
 # 9 SESSION (FIX: CLIENT SESSION ÚNICA)
 # =========================
@@ -417,20 +450,20 @@ async def send_boot():
 •°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸
 
 🟣 Weverse 🟢
-   🎯 Acessos realizados: 0
-   ⏳ Último rastreio há: 0 min
+🎯 Acessos realizados: 0
+⏳ Último rastreio há: 0 min
 
 ⚪ Redes sociais 🟢
-   🎯 Acessos realizados: 0
-   ⏳ Último rastreio há: 0 min
+🎯 Acessos realizados: 0
+⏳ Último rastreio há: 0 min
 
 🟠 Ticketmaster 🟢
-   🎯 Acessos realizados: 0
-   ⏳ Último rastreio há: 0 min
+🎯 Acessos realizados: 0
+⏳ Último rastreio há: 0 min
 
 🔵 Buyticket 🟢
-   🎯 Acessos realizados: 0
-  ⏳ Último rastreio há: 0 min"""
+🎯 Acessos realizados: 0
+⏳ Último rastreio há: 0 min"""
 
     if bot_ticket and CHAT_ID:
         try:
@@ -454,38 +487,38 @@ async def update_discord_panel():
     channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
     if not channel: return
 
-    data_show, city, dias = get_next_show()
+    # Chama a função ajustada do Bloco 8 para separar os dias
+    data_show, city, d_prox, d_br = get_countdown_data()
     
     # Criando o Embed com a borda roxa solicitada
     embed = discord.Embed(color=0x8A2BE2)
     
-    # O conteúdo abaixo é um espelho exato do Bloco 12
-    # A bolinha (status_color) está colada ao nome para mudar de cor dinamicamente
+    # O conteúdo abaixo mantém seu alinhamento exato, corrigindo apenas as variáveis
     embed.description = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
 🎫 Data: {data_show}
 📍 Local: {city}
-🔔 Faltam {dias} dias.
-🔔 Faltam {dias} dias para o BTS no Brasil! 
+🔔 Faltam {d_prox} dias.
+🔔 Faltam {d_br} dias para o BTS no Brasil! 
 
 •°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸
 
 🟣 Weverse {status_color(last_weverse_check)}
-   🎯 Acessos realizados: {total_weverse}
-   ⏳ Último rastreio há: {minutes_since(last_weverse_check)} min
+🎯 Acessos realizados: {total_weverse}
+⏳ Último rastreio há: {minutes_since(last_weverse_check)} min
 
 ⚪ Redes sociais {status_color(last_social_check)}
-   🎯 Acessos realizados: {total_social}
-   ⏳ Último rastreio há: {minutes_since(last_social_check)} min
+🎯 Acessos realizados: {total_social}
+⏳ Último rastreio há: {minutes_since(last_social_check)} min
 
 🟠 Ticketmaster {status_color(last_ticket_check)}
-   🎯 Acessos realizados: {total_tickets}
-   ⏳ Último rastreio há: {minutes_since(last_ticket_check)} min
+🎯 Acessos realizados: {total_tickets}
+⏳ Último rastreio há: {minutes_since(last_ticket_check)} min
 
 🔵 Buyticket {status_color(last_buy_check)}
-   🎯 Acessos realizados: {total_buy}
-   ⏳ Último rastreio há: {minutes_since(last_buy_check)} min"""
+🎯 Acessos realizados: {total_buy}
+⏳ Último rastreio há: {minutes_since(last_buy_check)} min"""
 
     try:
         if discord_panel_msg_id is None:
@@ -708,6 +741,13 @@ async def run_full_test():
     await test_instagram_post(t_link, "bts", "post", True)
     await test_tiktok_post("https://www.tiktok.com/@bts_official_bighit", "bts", "video", True)
 
+    # --- ATUALIZAÇÃO DO PAINEL (REGISTRO DO TESTE) ---
+    try:
+        await update_panel()          # Atualiza Telegram
+        await update_discord_panel()  # Atualiza Discord (Borda Roxa)
+    except:
+        pass
+
 # --- FUNÇÕES DE LAYOUT PARA O TESTE (PRESERVADAS) ---
 
 async def test_ticket_reposicao(url, key, found):
@@ -765,8 +805,8 @@ async def monitor_loop():
     
     # 2. INICIALIZAÇÃO
     try:
-        await send_boot() # Telegram
-        await update_discord_panel() # Discord (Cria o primeiro embed roxo)
+        await send_boot()            # Cria/Fixa Painel Telegram
+        await update_discord_panel()  # Cria Painel Discord (Borda Roxa)
         print("[SISTEMA] Painéis Arirang inicializados com sucesso.")
     except Exception as e:
         print(f"[BOOT ERROR] Falha ao iniciar: {e}")
@@ -783,7 +823,8 @@ async def monitor_loop():
                 if panel_message_id is None:
                     await send_boot()
 
-                # --- VARREDURA (Chamadas do Bloco 20) ---
+                # --- VARREDURA (Chamadas das funções de Check) ---
+                # Cada função aqui atualiza as globais last_check e total_
                 await check_ticketmaster(session)
                 await asyncio.sleep(2)
                 
@@ -796,11 +837,12 @@ async def monitor_loop():
                 await check_social(session)
 
                 # --- ATUALIZAÇÃO DOS PAINÉIS EM TEMPO REAL ---
-                # Atualiza o Telegram (Layout padrão fixado)
-                await update_panel() 
-                
-                # Atualiza o Discord (Embed com Borda Roxa)
-                await update_discord_panel() 
+                # Registra o resultado do rastreio nos dois painéis simultaneamente
+                try:
+                    await update_panel()          # Atualiza Layout Telegram
+                    await update_discord_panel()  # Atualiza Layout Discord (Borda Roxa)
+                except Exception as up_err:
+                    print(f"[UPDATE ERROR] Falha ao atualizar painéis: {up_err}")
 
                 # Pausa de 30 segundos entre ciclos
                 await asyncio.sleep(30)
@@ -821,17 +863,24 @@ async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT
     if "/teste" in user_cmd:
         await update.message.reply_text("🚀 Iniciando sequência de testes Arirang...")
         await run_full_test()
+        # Força atualização para o registro aparecer no painel na hora
+        await update_panel()
+        await update_discord_panel()
     elif "/ping" in user_cmd:
-        await update.message.reply_text(f"🏓 Pong! Uptime: {get_uptime()}")
+        await update.message.reply_text(f"🏓 Pong! Wootteo operando há {get_uptime()}")
 
 # No Discord (Slash Command)
 @bot_discord.tree.command(name="teste", description="Executa o teste completo de layout e roteamento")
 async def teste_discord(interaction: discord.Interaction):
     await interaction.response.send_message("🚀 Iniciando sequência de testes nos canais específicos...", ephemeral=True)
     await run_full_test()
+    # Força atualização para o registro aparecer no painel na hora
+    await update_panel()
+    await update_discord_panel()
 
 @bot_discord.tree.command(name="ping", description="Verifica a saúde do bot")
 async def ping_discord(interaction: discord.Interaction):
+    # O uptime já puxa do Bloco 8 que ajustamos
     await interaction.response.send_message(f"🏓 Pong! Wootteo operando há {get_uptime()}", ephemeral=True)
 
 # =========================
