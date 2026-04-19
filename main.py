@@ -28,7 +28,7 @@ from telegram.ext import ContextTypes
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
 # Corrigido: Removido caractere invisível/espaço após o ID
-CHAT_ID = -1003972186058 
+CHAT_ID = -1003920883053 
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
@@ -450,7 +450,7 @@ async def send_boot():
 
 
 # =============================================================
-# 13 PAINEL FIXADO (TEMPO REAL + SEM SPAM)
+# 13 PAINEL FIXADO (TEMPO REAL + SEM SPAM) - LAYOUT ARIRANG TOUR
 # =============================================================
 
 # INICIALIZAÇÃO OBRIGATÓRIA
@@ -458,15 +458,15 @@ panel_message_id = None
 panel_chat_id = None
 panel_initialized = False
 last_panel_text = None
+discord_panel_msg_id = None # Para editar no Discord também
 
 async def update_panel():
-    global panel_message_id, panel_chat_id, last_panel_text
+    global panel_message_id, panel_chat_id, last_panel_text, discord_panel_msg_id
     global total_weverse, total_social, total_tickets, total_buy
-
-    if not bot_ticket or not panel_message_id:
-        return
+    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
 
     try:
+        # Puxa os dados das funções auxiliares
         data, city, dias = get_next_show()
 
         weverse_min = minutes_since(last_weverse_check)
@@ -474,6 +474,7 @@ async def update_panel():
         ticket_min = minutes_since(last_ticket_check)
         buy_min = minutes_since(last_buy_check)
 
+        # O LAYOUT OBRIGATÓRIO
         text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
@@ -500,20 +501,45 @@ async def update_panel():
    ⏱ Último rastreio há: {buy_min} min
 """
 
+        # Verifica se algo mudou para evitar processamento desnecessário
         if text == last_panel_text:
             return
 
         last_panel_text = text
 
-        await bot_ticket.edit_message_text(
-            chat_id=panel_chat_id if panel_chat_id else CHAT_ID,
-            message_id=panel_message_id,
-            text=text
-        )
+        # --- ATUALIZAÇÃO TELEGRAM ---
+        if bot_ticket and panel_message_id:
+            try:
+                await bot_ticket.edit_message_text(
+                    chat_id=panel_chat_id if panel_chat_id else CHAT_ID,
+                    message_id=panel_message_id,
+                    text=text
+                )
+            except Exception as e:
+                print(f"[TELEGRAM PANEL ERROR] {e}")
+
+        # --- ATUALIZAÇÃO DISCORD (ID ...625) ---
+        try:
+            canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+            if canal:
+                # Se já temos uma mensagem enviada, editamos ela para não gerar spam
+                if discord_panel_msg_id:
+                    try:
+                        msg = await canal.fetch_message(discord_panel_msg_id)
+                        await msg.edit(content=text)
+                    except:
+                        # Se a mensagem sumiu, reseta o ID para enviar uma nova
+                        discord_panel_msg_id = None
+
+                # Se não temos mensagem ou a edição falhou, envia nova
+                if not discord_panel_msg_id:
+                    new_msg = await canal.send(text)
+                    discord_panel_msg_id = new_msg.id
+        except Exception as e:
+            print(f"[DISCORD PANEL ERROR] {e}")
 
     except Exception as e:
         print(f"[PAINEL ERROR] {e}")
-
 
 # =========================
 # 14 ALERTAS OFICIAIS
