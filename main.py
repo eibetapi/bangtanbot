@@ -1032,4 +1032,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         # Finalização limpa ao pressionar Ctrl+C
-        print("\n🛸 Desligando motores e recolhendo Wootteo...")
+        print("\n🛸 Desligando motores e recolhendo Wootteo...")  
