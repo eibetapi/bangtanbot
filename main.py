@@ -446,7 +446,7 @@ async def send_boot():
 *🔔 Faltam* {d_prox} *dias.*
 *🔔 Faltam* {d_br} *dias para o BTS no Brasil!*
 
-•°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸
+•°•👾•°•°*ATUALIZAÇÕES*•°•°🛸
 
 *🟣 Weverse* {status_color(last_weverse_check)}
 *🎯 Acessos realizados:* {total_weverse}
@@ -478,17 +478,17 @@ async def send_boot():
             print(f"[ERR BOOT TELEGRAM] {e}")
 
 # =============================================================
-# 12.1 PAINEL DISCORD (UPDATE - FIX CONTADORES)
+# 12.1 ATUALIZAÇÃO DOS PAINÉIS (TELEGRAM & DISCORD)
 # =============================================================
 
 async def update_panel():
-    global panel_message_id, PANEL_CHAT_ID
-    if not panel_message_id: return
-
+    global panel_message_id, PANEL_CHAT_ID, discord_panel_msg_id
+    
     data_show, city, d_prox, d_br = get_countdown_data()
     
-    # Texto para o Telegram (Edição)
-    texto = f"""🪭 *⊙⊝⊜ARIRANG TOUR⊙⊝⊜* 🪭
+    # --- 1. ATUALIZAÇÃO TELEGRAM ---
+    if panel_message_id:
+        texto_tg = f"""🪭 ⊙⊝⊜*ARIRANG TOUR*⊙⊝⊜🪭
 
 *✈️ PRÓXIMAS DATAS*
 *🎫 Data:* {data_show}
@@ -496,7 +496,7 @@ async def update_panel():
 *🔔 Faltam* {d_prox} *dias.*
 *🔔 Faltam* {d_br} *dias para o BTS no Brasil!*
 
-•°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸
+•°•👾•°•°**ATUALIZAÇÕES**•°•°🛸
 
 *🟣 Weverse* {status_color(last_weverse_check)}
 *🎯 Acessos realizados:* {total_weverse}
@@ -514,17 +514,50 @@ async def update_panel():
 *🎯 Acessos realizados:* {total_buy}
 *⏳ Último rastreio há:* {minutes_since(last_buy_check)} *min*"""
 
+        try:
+            await bot_ticket.edit_message_text(
+                chat_id=PANEL_CHAT_ID,
+                message_id=panel_message_id,
+                text=texto_tg,
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            if "message to edit not found" in str(e).lower():
+                panel_message_id = None
+
+    # --- 2. ATUALIZAÇÃO DISCORD ---
+    await update_discord_panel() # Chama a função do Discord
+
+async def update_discord_panel():
+    global discord_panel_msg_id
+    channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+    if not channel: return
+
+    data_show, city, d_prox, d_br = get_countdown_data()
+    
+    embed = discord.Embed(title="🪭 ⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜ 🪭", color=0x8A2BE2)
+    embed.description = f"""
+**✈️ PRÓXIMAS DATAS**
+**🎫 Data:** {data_show} | **📍 Local:** {city}
+**🔔 Faltam** {d_prox} **dias.**
+**🔔 Faltam** {d_br} **dias para o Brasil!**
+
+•°• 👾•°• °•°**ATUALIZAÇÕES**•°• °•°🛸
+
+**🟣 Weverse** {status_color(last_weverse_check)} | Acessos: {total_weverse}
+**⚪ Social** {status_color(last_social_check)} | Acessos: {total_social}
+**🟠 Ticketmaster** {status_color(last_ticket_check)} | Acessos: {total_tickets}
+**🔵 Buyticket** {status_color(last_buy_check)} | Acessos: {total_buy}
+"""
     try:
-        await bot_ticket.edit_message_text(
-            chat_id=PANEL_CHAT_ID,
-            message_id=panel_message_id,
-            text=texto,
-            parse_mode="Markdown"
-        )
-    except Exception as e:
-        if "message to edit not found" in str(e).lower():
-            print("[AVISO] Mensagem fixada deletada. Resetando ID...")
-            panel_message_id = None
+        if discord_panel_msg_id is None:
+            msg = await channel.send(embed=embed)
+            discord_panel_msg_id = msg.id
+            await msg.pin()
+        else:
+            msg = await channel.fetch_message(discord_panel_msg_id)
+            await msg.edit(embed=embed)
+    except: pass
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
@@ -794,7 +827,7 @@ async def monitor_loop():
 
     try:
         await send_boot()
-        # await update_discord_panel() # Se houver a função do painel roxo
+        await update_discord_panel() # Ativa o painel do Discord no boot
         print("[SISTEMA] Paineis inicializados.")
     except Exception as e:
         print(f"[BOOT ERROR] {e}")
@@ -802,28 +835,36 @@ async def monitor_loop():
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                # Se o painel sumiu, recria
+                # Se o painel do Telegram sumiu, recria
                 if panel_message_id is None:
                     await send_boot()
 
                 # EXECUÇÃO DOS CHECKS
+                # Cada função abaixo agora atualiza seu próprio timestamp e contador
                 await check_ticketmaster(session)
                 await asyncio.sleep(2)
+                
                 await check_buyticket(session)
                 await asyncio.sleep(2)
+                
                 await check_weverse(session)
                 await asyncio.sleep(2)
+                
                 await check_social(session)
 
-                # ATUALIZAÇÃO DOS PAINÉIS (Para refletir os novos contadores)
+                # ATUALIZAÇÃO OBRIGATÓRIA DOS PAINÉIS
+                # Isso faz a bolinha piscar e os números subirem no Telegram e Discord
                 try:
-                    await update_panel()          
+                    await update_panel()          # Atualiza Telegram
+                    await update_discord_panel()  # Atualiza Discord
                 except Exception as up_err:
                     if "not found" in str(up_err).lower():
                         panel_message_id = None
+                    print(f"[UPDATE ERROR] {up_err}")
 
                 # Intervalo entre varreduras completas
-                await asyncio.sleep(30)
+                # Diminuído para 20s para uma pulsação mais visível
+                await asyncio.sleep(20)
 
             except Exception as e:
                 print(f"[MONITOR ERROR] {e}")
@@ -854,6 +895,7 @@ async def teste_discord(interaction: discord.Interaction):
 
 @bot_discord.tree.command(name="ping", description="Verifica a saúde do bot")
 async def ping_discord(interaction: discord.Interaction):
+    # O ephemeral=True faz apenas você ver a resposta do ping
     await interaction.response.send_message(f"🏓 Pong! Wootteo operando há {get_uptime()}", ephemeral=True)
 
 # =========================
@@ -870,32 +912,30 @@ async def fetch(session, url):
         return None
 
 # =============================================================
-# 19 CHECKS (CORRIGIDO: CONTADORES E PULSAÇÃO ATIVOS)
+# 19 CHECKS (VERSÃO FINAL: PULSAÇÃO E CONTADORES)
 # =============================================================
 
 async def check_ticketmaster(session):
     global last_ticket_check, total_tickets
+    last_ticket_check = time.time() # Atualiza o tempo ANTES para garantir o pulso
     if 'TICKET_LINKS' not in globals(): return
     
     for url in TICKET_LINKS:
         html = await fetch(session, url)
-        # Atualiza o timestamp para a bolinha piscar e o tempo resetar para 0 min
-        last_ticket_check = time.time() 
         if html:
-            total_tickets += 1 # Sobe o contador a cada tentativa (trabalho em tempo real)
+            total_tickets += 1
             if is_new(url, html):
                 found = "esgotado" not in html.lower()
-                # Tenta chamar a função de alerta
                 try: await ticket_reposicao(url, url, found)
                 except: pass
 
 async def check_buyticket(session):
     global last_buy_check, total_buy
+    last_buy_check = time.time() # Garante bolinha piscando
     if 'BUY_LINKS' not in globals(): return
     
     for url in BUY_LINKS:
         html = await fetch(session, url)
-        last_buy_check = time.time()
         if html:
             total_buy += 1
             if is_new(url, html):
@@ -905,21 +945,18 @@ async def check_buyticket(session):
 
 async def check_weverse(session):
     global last_weverse_check, total_weverse
+    last_weverse_check = time.time()
     if 'WEVERSE_LINKS' not in globals(): return
     
     for url in WEVERSE_LINKS:
         html = await fetch(session, url)
-        last_weverse_check = time.time()
         if html:
             total_weverse += 1
-            # A lógica is_new aqui dispararia os alertas do Bloco 13
+            # Lógica Weverse (Bloco 13) aqui
 
 async def check_social(session):
     global last_social_check, total_social
-    # Soma Instagram e TikTok no mesmo contador de minutos
     last_social_check = time.time()
-    
-    # Simulação de acesso para atualizar o painel
     total_social += 1
 
 # =========================
