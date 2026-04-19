@@ -190,7 +190,7 @@ INSTAGRAM_LINKS = {
 
 TIKTOK_LINKS = {
     "jungkook": "https://www.tiktok.com/@mnijungkook",
-    "jhope": "https://www.tiktok.com/@iamuhope",
+    "jhope": "https://www.tiktok.com/@iamurhope",
     "v": "https://www.tiktok.com/@tete",
     "bts": "https://www.tiktok.com/@bts_official_bighit"
 }
