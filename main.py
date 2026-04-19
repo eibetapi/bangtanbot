@@ -79,7 +79,7 @@ SEEN_WEVERSE = set()
 SEEN_SOCIAL = set()
 
 # =========================
-# 3 DISCORD SETUP
+# 3 DISCORD SETUP (CORRIGIDO)
 # =========================
 
 intents = discord.Intents.default()
@@ -88,34 +88,57 @@ intents.members = True
 
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
 
+
+# =========================
+# 3.1 ON_READY (ÚNICO E LIMPO)
+# =========================
 @bot_discord.event
 async def on_ready():
     print(f"[DISCORD] Conectado como {bot_discord.user}")
-    
-    # Define a presença do bot
+
+    # status do bot
     await bot_discord.change_presence(
         activity=discord.Activity(
-            type=discord.ActivityType.listening, 
+            type=discord.ActivityType.listening,
             name="Em tournê - ouvindo: Arirang 🪭"
         ),
         status=discord.Status.online
     )
 
-    # Sincroniza comandos slash
+    # sincroniza slash commands
     try:
         synced = await bot_discord.tree.sync()
         print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
     except Exception as e:
         print(f"[DISCORD SYNC ERROR] {e}")
 
-    # Inicia o servidor Keep Alive
+    # inicia keep alive
     keep_alive()
-    
-    # Garante que o monitor só inicie se não houver um rodando
-    if not hasattr(bot_discord, 'monitor_started'):
+
+    # garante monitor único
+    if not hasattr(bot_discord, "monitor_started"):
         bot_discord.loop.create_task(monitor_loop())
         bot_discord.monitor_started = True
 
+# =========================
+# 3.2 SLASH COMMAND GUARD (ANTI DUPLICAÇÃO)
+# =========================
+
+REGISTERED_COMMANDS = set()
+
+def safe_slash(name):
+    """
+    Evita CommandAlreadyRegistered duplicado no Discord
+    """
+    def decorator(func):
+        if name in REGISTERED_COMMANDS:
+            print(f"[SLASH BLOCKED] {name} já registrado, ignorando duplicata.")
+            return func
+
+        REGISTERED_COMMANDS.add(name)
+        return bot_discord.tree.command(name=name, description=func.__doc__ or "Sem descrição")(func)
+
+    return decorator
 # =========================
 # 4 WEB SERVER (KEEP ALIVE)
 # =========================
@@ -166,7 +189,7 @@ def is_new(url, html):
     return False
 
 # =========================
-# 6 LINKS
+# 6 LINKS (ÚNICO - NÃO DUPLICAR)
 # =========================
 
 TICKET_LINKS = [
@@ -179,6 +202,13 @@ BUY_LINKS = [
     "https://bts.buyticketbrasil.com/ingressos?data=28-10-2026",
     "https://bts.buyticketbrasil.com/ingressos?data=30-10-2026",
     "https://bts.buyticketbrasil.com/ingressos?data=31-10-2026"
+]
+
+WEVERSE_LINKS = [
+    "https://weverse.io/bts/artist",
+    "https://weverse.io/bts/live",
+    "https://weverse.io/bts/notice",
+    "https://weverse.io/bts/media"
 ]
 
 INSTAGRAM_LINKS = {
@@ -200,19 +230,12 @@ TIKTOK_LINKS = {
     "bts": "https://www.tiktok.com/@bts_official_bighit"
 }
 
-WEVERSE_LINKS = [
-    "https://weverse.io/bts/artist",
-    "https://weverse.io/bts/live",
-    "https://weverse.io/bts/notice",
-    "https://weverse.io/bts/media"
-]
-
 X_LINKS = [
     "https://x.com/BTS_twt"
 ]
 
 YOUTUBE_LINKS = [
-    "https://www.youtube.com/@BTS",
+    "https://www.youtube.com/@BTS"
 ]
 
 def get_next_show():
@@ -1027,21 +1050,46 @@ async def enviar_alerta_social(mensagem):
         except: pass
 
 # =========================
-# 20 DISCORD: EVENTO ON_READY
+# 20 MONITOR LOOP (ESTÁVEL + ANTI DUPLICAÇÃO)
 # =========================
 
-@bot_discord.event
-async def on_ready():
-    print(f"✅ Logado no Discord como {bot_discord.user}")
-    status_formatado = "🪭 Em tournê! Ouvindo: Arirang"
-    await bot_discord.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.listening, name=status_formatado),
-        status=discord.Status.online
-    )
-    try:
-        await bot_discord.tree.sync()
-    except Exception as e:
-        print(f"❌ Erro na sincronização Discord: {e}")
+monitor_lock = asyncio.Lock()
+monitor_running = False
+
+async def monitor_loop():
+    global monitor_running
+
+    # impede múltiplos loops rodando ao mesmo tempo
+    if monitor_running:
+        print("[MONITOR] Loop já ativo, ignorando duplicação.")
+        return
+
+    monitor_running = True
+    print("[MONITOR] Loop iniciado com sucesso.")
+
+    session = None
+
+    while True:
+        try:
+            async with monitor_lock:
+
+                # cria sessão única reutilizável
+                if session is None or session.closed:
+                    session = await get_session()
+
+                # =========================
+                # RASTREIOS PRINCIPAIS
+                # =========================
+                await check_ticketmaster(session)
+                await check_buyticket(session)
+                await check_weverse(session)
+                await check_social(session)
+
+        except Exception as e:
+            print(f"[MONITOR ERROR] {e}")
+
+        # intervalo seguro (evita flood + CPU alta)
+        await asyncio.sleep(15)
 
  # =============================================================
 # 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL
