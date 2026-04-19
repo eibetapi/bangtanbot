@@ -455,12 +455,11 @@ async def update_panel():
     # --- LÓGICA TELEGRAM ---
     if bot_ticket and PANEL_CHAT_ID:
         try:
-            # Busca automática se o ID for perdido
+            # 1. Recuperação de ID (Ajustado para v20+)
             if not panel_message_id:
-                async for message in bot_ticket.get_chat_history(PANEL_CHAT_ID, limit=5):
-                    if message.from_user.id == bot_ticket.id:
-                        panel_message_id = message.message_id
-                        break
+                # Nota: get_chat_history não existe no objeto Bot. 
+                # Se não tiver o ID, vamos postar um novo para garantir.
+                pass 
 
             if panel_message_id:
                 await bot_ticket.edit_message_text(
@@ -470,12 +469,15 @@ async def update_panel():
                     parse_mode="Markdown"
                 )
             else:
+                # Cria um novo e fixa
                 msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
                 panel_message_id = msg.message_id
                 await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
         except Exception as e:
+            # Se der erro de "Message to edit not found", resetamos o ID
+            if "not found" in str(e).lower() or "not modified" in str(e).lower():
+                panel_message_id = None
             print(f"[DEBUG] Erro Telegram: {e}")
-            if "not found" in str(e).lower(): panel_message_id = None
 
     # --- LÓGICA DISCORD (EMBED ROXO / SEM PIN) ---
     if DISCORD_PANEL_CHANNEL_ID:
