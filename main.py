@@ -381,65 +381,18 @@ async def send_to_all(alert_type, message):
         print(f"[DISCORD ROUTING ERROR] {e}")
 
 # =============================================================
-# 12 FUNÇÃO DE BOOT (INICIALIZAÇÃO - SEM PAINEL GENÉRICO)
+# 12 FUNÇÃO DE BOOT (ENTREGA IMEDIATA DO PAINEL COMPLETO)
 # =============================================================
 
 async def send_boot():
-    """Lança apenas o layout obrigatório no Telegram e Discord."""
+    """Lança o painel oficial completo no Telegram e Discord sem textos de espera."""
     global panel_message_id, panel_chat_id, panel_initialized, discord_panel_msg_id
     
-    boot_msg = "🛸•°•Wootteo entrando em rota°•°🛸"
-    # Conteúdo inicial respeitando o seu layout
-    conteudo_inicial = "🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭\n\n⌛ Sincronizando com os servidores..."
-
-    # --- TELEGRAM ---
-    if bot_ticket and CHAT_ID:
-        try:
-            await bot_ticket.send_message(chat_id=CHAT_ID, text=boot_msg)
-            # Posta o painel real
-            p_msg = await bot_ticket.send_message(chat_id=CHAT_ID, text=conteudo_inicial)
-            panel_message_id = p_msg.message_id
-            panel_chat_id = CHAT_ID
-            # Fixa no canal
-            await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=panel_message_id)
-        except Exception as e:
-            print(f"[TELEGRAM BOOT ERROR] {e}")
-
-    # --- DISCORD ---
-    try:
-        canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-        if canal:
-            await canal.send(boot_msg)
-            # Envia o Layout Obrigatório direto no Embed Roxo (sem o título genérico)
-            embed = discord.Embed(description=conteudo_inicial, color=0x9b59b6)
-            d_msg = await canal.send(embed=embed)
-            discord_panel_msg_id = d_msg.id
-    except Exception as e:
-        print(f"[DISCORD BOOT ERROR] {e}")
-
-    panel_initialized = True
-
-# =============================================================
-# 13 PAINEL FIXADO (LAYOUT INTEGRAL - SEM OMISSÕES)
-# =============================================================
-
-async def update_panel():
-    global panel_message_id, panel_chat_id, last_panel_text, discord_panel_msg_id
-    global total_weverse, total_social, total_tickets, total_buy
-    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
-
-    try:
-        # Puxa os dados das funções de suporte
-        data_show, city, dias = get_next_show()
-
-        # Cálculo de tempo (Garante que não apareça "None")
-        w_min = minutes_since(last_weverse_check)
-        s_min = minutes_since(last_social_check)
-        t_min = minutes_since(last_ticket_check)
-        b_min = minutes_since(last_buy_check)
-
-        # LAYOUT COMPLETO OBRIGATÓRIO
-        text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
+    # 1. Coleta os dados reais imediatamente para o primeiro post
+    data_show, city, dias = get_next_show()
+    
+    # 2. Monta o seu LAYOUT OBRIGATÓRIO INTEGRAL (Exatamente como solicitado)
+    layout_final = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
 🎫 Data: {data_show}
@@ -450,52 +403,50 @@ async def update_panel():
 
 🟣 Weverse {status_color(last_weverse_check)}
    🎯 Acessos realizados: {total_weverse}
-   ⏱ Último rastreio há: {w_min} min
+   ⏱ Último rastreio há: {minutes_since(last_weverse_check)} min
 
 ⚪ Redes sociais {status_color(last_social_check)}
    🎯 Acessos realizados: {total_social}
-   ⏱ Último rastreio há: {s_min} min
+   ⏱ Último rastreio há: {minutes_since(last_social_check)} min
 
 🟠 Ticketmaster {status_color(last_ticket_check)}
    🎯 Acessos realizados: {total_tickets}
-   ⏱ Último rastreio há: {t_min} min
+   ⏱ Último rastreio há: {minutes_since(last_ticket_check)} min
 
 🔵 Buyticket {status_color(last_buy_check)}
    🎯 Acessos realizados: {total_buy}
-   ⏱ Último rastreio há: {b_min} min
+   ⏱ Último rastreio há: {minutes_since(last_buy_check)} min
 """
 
-        if text == last_panel_text:
-            return
-        last_panel_text = text
+    # --- ENVIO TELEGRAM (Posta e Fixa) ---
+    if bot_ticket and CHAT_ID:
+        try:
+            # Envia direto o painel completo (sem boot_msg)
+            p_msg = await bot_ticket.send_message(chat_id=CHAT_ID, text=layout_final)
+            panel_message_id = p_msg.message_id
+            panel_chat_id = CHAT_ID
+            
+            # Fixa o painel no canal automaticamente
+            await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=panel_message_id)
+        except Exception as e:
+            print(f"[TELEGRAM BOOT ERROR] {e}")
 
-        # --- TELEGRAM ---
-        if bot_ticket and panel_message_id:
-            try:
-                await bot_ticket.edit_message_text(
-                    chat_id=panel_chat_id,
-                    message_id=panel_message_id,
-                    text=text
-                )
-            except: pass
-
-        # --- DISCORD (BORDA ROXA) ---
+    # --- ENVIO DISCORD (Borda Roxa Direta) ---
+    try:
         canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-        if canal and discord_panel_msg_id:
-            try:
-                msg = await canal.fetch_message(discord_panel_msg_id)
-                # Mantém a borda roxa e o conteúdo exato
-                await msg.edit(embed=discord.Embed(description=text, color=0x9b59b6))
-            except:
-                # Se a mensagem sumiu, cria o painel novamente com borda roxa
-                new_msg = await canal.send(embed=discord.Embed(description=text, color=0x9b59b6))
-                discord_panel_msg_id = new_msg.id
-
+        if canal:
+            # Envia o painel dentro do Embed Roxo sem mensagens de texto fora dele
+            embed = discord.Embed(description=layout_final, color=0x9b59b6)
+            d_msg = await canal.send(embed=embed)
+            discord_panel_msg_id = d_msg.id
     except Exception as e:
-        print(f"[PAINEL ERROR] {e}")
+        print(f"[DISCORD BOOT ERROR] {e}")
+
+    panel_initialized = True
+
 
 # =========================
-# 14 ALERTAS OFICIAIS
+# 13 ALERTAS OFICIAIS
 # =========================
 
 async def ticket_reposicao(url, key, found):
@@ -549,7 +500,7 @@ async def agenda_update(data):
         await send_to_all("agenda", msg)
 
 # =========================
-# 15 ALERTAS WEVERSE (CORRIGIDO)
+# 14 ALERTAS WEVERSE (CORRIGIDO)
 # =========================
 
 # Memórias para evitar spam de posts e lives repetidas
@@ -620,7 +571,7 @@ async def test_weverse_media(url, member_name, title, message_translated, found)
     await send_alert("weverse_media", msg)
 
 # =========================
-# 16 ALERTAS INSTAGRAM (CORRIGIDO)
+# 15 ALERTAS INSTAGRAM (CORRIGIDO)
 # =========================
 
 # Memória para evitar repetição do último post/story
@@ -680,7 +631,7 @@ async def instagram_live(url, member_name, title, found):
 
 
 # =========================
-# 17 ALERTAS TIKTOK (CORRIGIDO)
+# 16 ALERTAS TIKTOK (CORRIGIDO)
 # =========================
 
 # Memória para evitar que o mesmo post repita (Spam)
@@ -723,7 +674,7 @@ async def tiktok_live(url, member_name, title, found):
     await send_alert("tiktok_live", msg)
 
 # =============================================================
-# 18 SISTEMA DE TESTE SOB DEMANDA (/TESTE)
+# 17 SISTEMA DE TESTE SOB DEMANDA (/TESTE)
 # =============================================================
 
 TEST_HEADER = "⚠️ TESTE ⚠️"
@@ -949,7 +900,7 @@ async def test_tiktok_live(url, member_name, title, found):
 
 
 # =============================================================
-# 19 COMANDOS DE INTERAÇÃO (TELEGRAM + DISCORD)
+# 18 COMANDOS DE INTERAÇÃO (TELEGRAM + DISCORD)
 # =============================================================
 
 # --- HANDLER TELEGRAM (PV EXCLUSIVO) ---
@@ -998,7 +949,7 @@ async def discord_ping(interaction: discord.Interaction):
     await interaction.response.send_message(f"🏓 Pong! Latência: {latency}ms")
 
 # =============================================================
-# 20 SAFE BOOT E MOTOR DE MONITORAMENTO
+# 19 SAFE BOOT E MOTOR DE MONITORAMENTO
 # =============================================================
 
 async def safe_boot():
@@ -1062,7 +1013,7 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 # =============================================================
-# 21 ENGINE DE ALERTA (BLOQUEIO DE CANAL INDEVIDO)
+# 20 ENGINE DE ALERTA (BLOQUEIO DE CANAL INDEVIDO)
 # =============================================================
 
 async def send_alert(alert_type, message):
@@ -1108,7 +1059,7 @@ async def send_alert(alert_type, message):
             print(f"[ERROR SEND_ALERT] {e}")
 
 # =========================
-# 22 FETCH UNIVERSAL
+# 21 FETCH UNIVERSAL
 # =========================
 
 async def fetch(session, url):
@@ -1123,7 +1074,7 @@ async def fetch(session, url):
         return None
 
 # =========================
-# 23 CHECKS (MONITORAMENTO ATIVO)
+# 22 CHECKS (MONITORAMENTO ATIVO)
 # =========================
 
 async def check_ticketmaster(session):
@@ -1184,7 +1135,7 @@ async def check_social(session):
             last_social_check = time.time()
             await update_panel()
 # =========================
-# 24 LOOP PRINCIPAL (MOTOR)
+# 23 LOOP PRINCIPAL (MOTOR)
 # =========================
 
 async def monitor_loop():
@@ -1216,7 +1167,7 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 # =========================
-# 26 DISCORD: EVENTO ON_READY
+# 24 DISCORD: EVENTO ON_READY
 # =========================
 
 @bot_discord.event
@@ -1239,7 +1190,7 @@ async def on_ready():
         print(f"❌ Erro na sincronização: {e}")
 
 # =========================
-# 27 INICIALIZAÇÃO FINAL (MAIN)
+# 25 INICIALIZAÇÃO FINAL (MAIN)
 # =========================
 
 async def main():
