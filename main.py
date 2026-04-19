@@ -430,53 +430,88 @@ TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
 # 12 & 12.1 GESTÃO DO PAINEL (TELEGRAM & DISCORD)
 # =============================================================
 
-async def send_boot():
-    """Cria o painel inicial se não existir."""
-    global panel_message_id
+async def update_panel():
+    """
+    Função mestra: Tenta editar os painéis existentes. 
+    Só cria novos se os IDs forem perdidos ou as mensagens deletadas.
+    """
+    global panel_message_id, discord_panel_msg_id
     
-    # Se já temos um ID, não fazemos nada no boot para evitar duplicatas
-    if panel_message_id is not None:
-        return
-
     data_show, city, d_prox, d_br = get_countdown_data()
     texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
+    # --- LÓGICA TELEGRAM ---
     if bot_ticket and PANEL_CHAT_ID:
-        try:
-            p_msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
-            panel_message_id = p_msg.message_id
-            await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
-            print(f"[SISTEMA] Novo Painel Telegram fixado: {panel_message_id}")
-        except Exception as e:
-            print(f"[ERR BOOT] {e}")
+        if panel_message_id:
+            try:
+                # Tenta APENAS editar
+                await bot_ticket.edit_message_text(
+                    chat_id=PANEL_CHAT_ID,
+                    message_id=panel_message_id,
+                    text=texto,
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                # Se cair aqui, é porque a mensagem foi deletada ou o ID é inválido
+                print(f"[AVISO] Painel TG não encontrado, criando novo... {e}")
+                panel_message_id = None
+        
+        # Se o ID está vazio (porque falhou acima ou é o boot), cria um novo
+        if panel_message_id is None:
+            try:
+                msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
+                panel_message_id = msg.message_id
+                await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
+            except Exception as e:
+                print(f"[ERR TG CREATE] {e}")
+
+    # --- LÓGICA DISCORD ---
+    if DISCORD_PANEL_CHANNEL_ID:
+        channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+        if channel:
+            if discord_panel_msg_id:
+                try:
+                    msg = await channel.fetch_message(discord_panel_msg_id)
+                    await msg.edit(content=texto)
+                except Exception:
+                    discord_panel_msg_id = None
+            
+            if discord_panel_msg_id is None:
+                try:
+                    msg = await channel.send(content=texto)
+                    discord_panel_msg_id = msg.id
+                    try: await msg.pin()
+                    except: pass
+                except Exception as e:
+                    print(f"[ERR DC CREATE] {e}")
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
-    """Gera o padrão visual idêntico para ambos os apps."""
-    return f"""🪭 ⊙⊝⊜*ARIRANG TOUR*⊙⊝⊜🪭
+    """Padrão visual em NEGRITO para evitar itálico no Discord."""
+    return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
 
-*✈️ PRÓXIMAS DATAS*
-*🎫 Data:* {data_show}
-*📍 Local:* {city}
-*🔔 Faltam* {d_prox} *dias.*
-*🔔 Faltam* {d_br} *dias para o BTS no Brasil!*
+**✈️ PRÓXIMAS DATAS**
+**🎫 Data:** {data_show}
+**📍 Local:** {city}
+**🔔 Faltam** {d_prox} **dias.**
+**🔔 Faltam** {d_br} **dias para o BTS no Brasil!**
 
 •°•👾•°•°**ATUALIZAÇÕES**•°•°🛸
 
-*🟣 Weverse* {status_color(last_weverse_check)}
-*🎯 Acessos realizados:* {total_weverse}
-*⏳ Último rastreio há:* {minutes_since(last_weverse_check)} *min*
+**🟣 Weverse** {status_color(last_weverse_check)}
+**🎯 Acessos realizados:** {total_weverse}
+**⏳ Último rastreio há:** {minutes_since(last_weverse_check)} **min**
 
-*⚪ Redes sociais* {status_color(last_social_check)}
-*🎯 Acessos realizados:* {total_social}
-*⏳ Último rastreio há:* {minutes_since(last_social_check)} *min*
+**⚪ Redes sociais** {status_color(last_social_check)}
+**🎯 Acessos realizados:** {total_social}
+**⏳ Último rastreio há:** {minutes_since(last_social_check)} **min**
 
-*🟠 Ticketmaster* {status_color(last_ticket_check)}
-*🎯 Acessos realizados:* {total_tickets}
-*⏳ Último rastreio há:* {minutes_since(last_ticket_check)} *min*
+**🟠 Ticketmaster** {status_color(last_ticket_check)}
+**🎯 Acessos realizados:** {total_tickets}
+**⏳ Último rastreio há:** {minutes_since(last_ticket_check)} **min**
 
-*🔵 Buyticket* {status_color(last_buy_check)}
-*🎯 Acessos realizados:* {total_buy}
-*⏳ Último rastreio há:* {minutes_since(last_buy_check)} *min*"""
+**🔵 Buyticket** {status_color(last_buy_check)}
+**🎯 Acessos realizados:** {total_buy}
+**⏳ Último rastreio há:** {minutes_since(last_buy_check)} **min**"""
 
 async def update_panel():
     """Edita as mensagens existentes em vez de criar novas."""
@@ -780,86 +815,64 @@ async def test_tiktok_post(url, member_name, title, found, platform="both"):
 # =============================================================
 
 async def monitor_loop():
-    """
-    Motor principal: Gerencia o painel fixado e as varreduras.
-    """
     await bot_discord.wait_until_ready()
     
     global panel_message_id, discord_panel_msg_id
     global total_tickets, total_buy, total_weverse, total_social
     global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
 
-    try:
-        await send_boot()
-        await update_discord_panel() # Ativa o painel do Discord no boot
-        print("[SISTEMA] Paineis inicializados.")
-    except Exception as e:
-        print(f"[BOOT ERROR] {e}")
+    print("[SISTEMA] Motor Arirang iniciado.")
 
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                # Se o painel do Telegram sumiu, recria
-                if panel_message_id is None:
-                    await send_boot()
-
-                # EXECUÇÃO DOS CHECKS
-                # Cada função abaixo agora atualiza seu próprio timestamp e contador
+                # 1. Executa os Checks (Atualiza contadores e bolinhas)
                 await check_ticketmaster(session)
-                await asyncio.sleep(2)
-                
                 await check_buyticket(session)
-                await asyncio.sleep(2)
-                
                 await check_weverse(session)
-                await asyncio.sleep(2)
-                
                 await check_social(session)
 
-                # ATUALIZAÇÃO OBRIGATÓRIA DOS PAINÉIS
-                # Isso faz a bolinha piscar e os números subirem no Telegram e Discord
-                try:
-                    await update_panel()          # Atualiza Telegram
-                    await update_discord_panel()  # Atualiza Discord
-                except Exception as up_err:
-                    if "not found" in str(up_err).lower():
-                        panel_message_id = None
-                    print(f"[UPDATE ERROR] {up_err}")
+                # 2. Atualiza os Painéis (Edita se existir, cria se sumir)
+                # Esta única chamada gerencia Telegram e Discord agora.
+                await update_panel()
 
-                # Intervalo entre varreduras completas
-                # Diminuído para 20s para uma pulsação mais visível
-                await asyncio.sleep(20)
+                # 3. Delay entre ciclos
+                await asyncio.sleep(25)
 
             except Exception as e:
                 print(f"[MONITOR ERROR] {e}")
                 await asyncio.sleep(10)
-
 # =============================================================
-# 17.1 COMANDOS DE GATILHO (TELEGRAM & DISCORD)
+# 17.1 COMANDOS DE GATILHO (ISOLAMENTO DE PLATAFORMA)
 # =============================================================
 
 # No Telegram
 async def handle_commands_telegram(update, context):
     user_cmd = update.message.text.lower()
+    
     if "/teste" in user_cmd:
-        await update.message.reply_text("🚀 Iniciando sequência de testes Arirang...")
-        await run_full_test(platform="telegram")
-        await update_panel()
-        await update_discord_panel()
+        await update.message.reply_text("🚀 [TELEGRAM] Iniciando sequência de testes...")
+        # target="telegram" impede que o teste dispare alertas no Discord
+        await run_full_test(target="telegram")
+        await update_panel() 
+        
     elif "/ping" in user_cmd:
         await update.message.reply_text(f"🏓 Pong! Wootteo operando há {get_uptime()}")
 
 # No Discord (Slash Command)
-@bot_discord.tree.command(name="teste", description="Executa o teste completo de layout e roteamento")
+@bot_discord.tree.command(name="teste", description="Executa teste de layout exclusivo no Discord")
 async def teste_discord(interaction: discord.Interaction):
-    await interaction.response.send_message("🚀 Iniciando sequência de testes nos canais do Discord...", ephemeral=True)
-    await run_full_test(platform="discord")
+    # Resposta efêmera para não poluir o chat público
+    await interaction.response.send_message("🚀 [DISCORD] Iniciando sequência de testes...", ephemeral=True)
+    
+    # target="discord" impede que o teste dispare mensagens no Telegram
+    await run_full_test(target="discord")
+    
+    # Atualiza o painel do Discord com os dados mais recentes
     await update_panel()
-    await update_discord_panel()
 
 @bot_discord.tree.command(name="ping", description="Verifica a saúde do bot")
 async def ping_discord(interaction: discord.Interaction):
-    # O ephemeral=True faz apenas você ver a resposta do ping
     await interaction.response.send_message(f"🏓 Pong! Wootteo operando há {get_uptime()}", ephemeral=True)
 
 # =========================
@@ -876,48 +889,44 @@ async def fetch(session, url):
         return None
 
 # =============================================================
-# 19 CHECKS (VERSÃO FINAL: PULSAÇÃO E CONTADORES)
+# 19 CHECKS (CORRIGIDO: CONTADORES FORÇADOS)
 # =============================================================
 
 async def check_ticketmaster(session):
     global last_ticket_check, total_tickets
+    if 'TICKET_LINKS' not in globals() or not TICKET_LINKS: return
+    
+    # Atualiza o timestamp para a bolinha piscar
     last_ticket_check = time.time()
-    if 'TICKET_LINKS' not in globals(): return
+    
     for url in TICKET_LINKS:
-        html = await fetch(session, url)
-        if html:
-            total_tickets += 1
-            if is_new(url, html):
+        try:
+            # Incrementa ANTES do fetch para garantir que o acesso apareça no painel
+            total_tickets += 1 
+            html = await fetch(session, url)
+            if html and is_new(url, html):
                 found = "esgotado" not in html.lower()
                 try: await ticket_reposicao(url, url, found)
                 except: pass
+        except Exception as e:
+            print(f"[ERR TICKETMASTER] {e}")
 
 async def check_buyticket(session):
     global last_buy_check, total_buy
-    last_buy_check = time.time() # Atualiza SEMPRE que a função rodar
-    if 'BUY_LINKS' not in globals(): return
+    if 'BUY_LINKS' not in globals() or not BUY_LINKS: return
+    
+    last_buy_check = time.time()
+    
     for url in BUY_LINKS:
-        html = await fetch(session, url)
-        if html:
-            total_buy += 1 # Contador de sucesso
-            if is_new(url, html):
+        try:
+            total_buy += 1 # Incrementa o contador a cada tentativa
+            html = await fetch(session, url)
+            if html and is_new(url, html):
                 found = "esgotado" not in html.lower()
                 # try: await buy_reposicao(url, url, found)
                 # except: pass
-
-async def check_weverse(session):
-    global last_weverse_check, total_weverse
-    last_weverse_check = time.time()
-    if 'WEVERSE_LINKS' not in globals(): return
-    for url in WEVERSE_LINKS:
-        html = await fetch(session, url)
-        if html:
-            total_weverse += 1
-
-async def check_social(session):
-    global last_social_check, total_social
-    last_social_check = time.time()
-    total_social += 1
+        except Exception as e:
+            print(f"[ERR BUYTICKET] {e}")
 
 # =========================
 # 20 DISCORD: EVENTO ON_READY
