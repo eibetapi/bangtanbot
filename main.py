@@ -353,9 +353,10 @@ def format_member(member_name):
     return emoji, name 
 
 # =========================
-# 11 ROTEAMENTO DE ALERTAS (FIX: TELEGRAM SAFE)
+# 11 ROTEAMENTO DE ALERTAS (AJUSTADO)
 # =========================
-async def send_to_all(alert_type, message):
+
+async def send_alert(alert_type, message): # Nome alterado para bater com os outros blocos
     if bot_ticket is not None:
         try:
             await bot_ticket.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
@@ -364,19 +365,12 @@ async def send_to_all(alert_type, message):
 
     try:
         loop = asyncio.get_running_loop()
-        
         if alert_type in ["ticket", "reposicao", "nova_data", "revenda", "agenda"]:
             loop.create_task(send_discord(DISCORD_TICKETS_CHANNEL_ID, message))
-        
         elif alert_type in ["weverse_post", "weverse_live", "weverse_news", "weverse_media"]:
             loop.create_task(send_discord(DISCORD_WEVERSE_CHANNEL_ID, message))
-        
         elif alert_type in ["instagram_post", "instagram_reels", "instagram_stories", "instagram_live", "tiktok_post", "tiktok_live"]:
             loop.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
-        
-        else:
-            if 'DISCORD_NEWS_CHANNEL_ID' in globals():
-                loop.create_task(send_discord(DISCORD_NEWS_CHANNEL_ID, message))
     except Exception as e:
         print(f"[DISCORD ROUTING ERROR] {e}")
 
@@ -656,7 +650,6 @@ async def test_tiktok_post(url, member_name, title, found):
 🔗 {url}"""
     await send_alert("tiktok_post", msg)
 
-
 # =============================================================
 # 17 COMANDOS (GATILHO DIRETO)
 # =============================================================
@@ -664,10 +657,8 @@ async def test_tiktok_post(url, member_name, title, found):
 # --- DISCORD (SLASH COMMAND) ---
 @bot_discord.tree.command(name="teste", description="Dispara modelos de teste para as salas")
 async def discord_teste(interaction: discord.Interaction):
-    """Executa o teste e responde de forma efêmera."""
     await interaction.response.send_message("🧪 Executando modelos de teste...", ephemeral=True, delete_after=2)
-    # Chama a função de notificação que corrigimos com aspas triplas
-    await send_notification("SISTEMA", "https://arirang.com", "Teste de Comando Discord")
+    await run_full_test() # Chama a função de teste do Bloco 16
 
 # --- TELEGRAM ---
 async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -675,7 +666,8 @@ async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT
     if update.message.chat.type != "private": return
     
     if update.message.text.lower().strip() == "/teste":
-        await send_notification("SISTEMA", "https://arirang.com", "Teste de Comando Telegram")
+        await update.message.reply_text("🧪 Iniciando sequência de testes...")
+        await run_full_test() # Chama a função de teste do Bloco 16
 
 # =============================================================
 # 18 MOTOR DE MONITORAMENTO (VERSÃO FINAL CORRIGIDA)
