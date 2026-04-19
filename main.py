@@ -966,21 +966,33 @@ async def run_full_test_telegram():
     except Exception as e:
         print(f"[DEBUG] Erro Teste TG: {e}")
 
-# =============================================================
-# 17.3 MOTOR DE TESTE REAL (DISCORD)
-# =============================================================
+# =========================
+# 17.3 MOTOR DE TESTE REAL (DISCORD) - ÚNICO (CORRETO)
+# =========================
 
 async def run_full_test_discord():
     """Executa os alertas reais do Bloco 16 para o Discord"""
     try:
-        funcs = globals()
-        
-        # Dispara os alertas para as salas específicas conforme definido no Bloco 16
-        if 'ticket_reposicao' in funcs:
-            await funcs['ticket_reposicao']("TESTE DISCORD", "https://www.ticketmaster.com.br/", True)
-            
-        if 'youtube_live' in funcs:
-            await funcs['youtube_live']("https://www.youtube.com/@BTS/live")
+        # Ticket test
+        await test_ticket_reposicao(
+            "https://www.ticketmaster.com.br/",
+            "TESTE DISCORD",
+            True,
+            platform="both"
+        )
+
+        # Weverse test
+        await test_weverse_post(
+            WEVERSE_LINKS[0],
+            "bts",
+            "Update",
+            "Conteúdo Teste",
+            True,
+            platform="both"
+        )
+
+        # YouTube test
+        await test_youtube_live("https://www.youtube.com/@BTS/live")
 
     except Exception as e:
         print(f"[DEBUG] Erro Teste Discord: {e}")
