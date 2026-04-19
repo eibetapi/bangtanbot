@@ -688,23 +688,44 @@ async def run_full_test():
 # --- FUNÇÕES DE LAYOUT PARA O TESTE (AJUSTADAS) ---
 
 async def test_ticket_reposicao(url, key, found):
-    msg = f"{TEST_HEADER}\n\n🔥*ALERTA DE REPOSIÇÃO*🔥\n📅 *Data:* 28/10/2026\n🔗 *Link:* {url}\n✅ *Status:* Liberado"
+    msg = f"{TEST_HEADER}\n\n
+
+🔥*ALERTA DE REPOSIÇÃO*🔥\n
+
+📅 *Data:* 28/10/2026\n
+🔗 *Link:* {url}\n
+✅ *Status:* Liberado"
     await send_alert("reposicao", msg)
 
 async def test_agenda(data):
-    msg = f"{TEST_HEADER}\n\n💜*AGENDA NOVAS DATAS*💜\n📅 *Data:* 28/10/2026\n🏙️ *Cidade:* São Paulo\n🌎 *País:* Brasil"
+    msg = f"{TEST_HEADER}\n\n
+
+💜*AGENDA NOVAS DATAS*💜\n
+📅 *Data:* 28/10/2026\n
+🏙️ *Cidade:* São Paulo\n
+🌎 *País:* Brasil"
     await send_alert("agenda", msg)
 
 async def test_weverse_post(url, member_name, title, message_translated, found):
-    msg = f"{TEST_HEADER}\n\n🩷*WEVERSE POST*🩷\n👤 {member_name.upper()} publicou uma mensagem!\n🔗 {url}"
+    msg = f"{TEST_HEADER}\n\n
+
+🩷*WEVERSE POST*🩷\n
+👤 {member_name.upper()} publicou uma mensagem!\n
+🔗 {url}"
     await send_alert("weverse_post", msg)
 
 async def test_instagram_post(url, member_name, title, found):
-    msg = f"{TEST_HEADER}\n\n🌟*INSTAGRAM POST*🌟\n👤 {member_name} postou uma foto!\n🔗 {url}"
+    msg = f"{TEST_HEADER}\n\n
+
+🌟*INSTAGRAM POST*🌟\n
+👤 {member_name} postou uma foto!\n🔗 {url}"
     await send_alert("instagram_post", msg)
 
 async def test_tiktok_post(url, member_name, title, found):
-    msg = f"{TEST_HEADER}\n\n🎵*TIKTOK POST*🎵\n👤 {member_name.upper()} postou um vídeo!\n🔗 {url}"
+    msg = f"{TEST_HEADER}\n\n
+
+🎵*TIKTOK POST*🎵\n
+👤 {member_name.upper()} postou um vídeo!\n🔗 {url}"
     await send_alert("tiktok_post", msg)
 
 # =============================================================
@@ -785,30 +806,44 @@ async def monitor_loop():
                 print(f"[MONITOR ERROR] Falha no ciclo: {e}")
                 await asyncio.sleep(10)
 # =============================================================
-# 19 MOTOR DE MONITORAMENTO (AUTO-RECUPERAÇÃO)
+# 19 MOTOR DE MONITORAMENTO (VERSÃO CORRIGIDA)
 # =============================================================
 
 async def monitor_loop():
+    """
+    Motor principal: Garante o boot e mantém o painel 12.1 atualizado.
+    """
+    # 1. Aguarda o bot estar pronto
     await bot_discord.wait_until_ready()
     
-    # Chama o boot inicial
-    await send_boot()
-    
+    # 2. INICIALIZAÇÃO (Corrigindo o erro NameError da linha 916)
+    # Trocamos 'safe_boot' pelo nome correto que está no Bloco 12: 'send_boot'
+    try:
+        await send_boot() 
+        print("[SISTEMA] Painel Arirang inicializado com sucesso.")
+    except Exception as e:
+        print(f"[BOOT ERROR] Falha ao iniciar: {e}")
+
+    # 3. Variáveis globais para os contadores
     global total_tickets, total_buy, total_weverse, total_social
     global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
 
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                # Se o painel sumiu, recria antes de tentar atualizar
+                # Se o painel foi deletado, o Bloco 12.1 limpa o ID e aqui recriamos
                 if panel_message_id is None:
                     await send_boot()
 
-                # Ciclo de varredura
+                # --- VARREDURA E CONTAGEM ---
                 await check_ticketmaster(session)
                 total_tickets += 1
                 last_ticket_check = datetime.now()
                 
+                await check_buyticket(session)
+                total_buy += 1
+                last_buy_check = datetime.now()
+
                 await check_weverse(session)
                 total_weverse += 1
                 last_weverse_check = datetime.now()
@@ -817,13 +852,15 @@ async def monitor_loop():
                 total_social += 1
                 last_social_check = datetime.now()
 
-                # Atualiza o painel com o seu layout
+                # --- ATUALIZAÇÃO DO PAINEL (BLOCO 12.1) ---
+                # Edita o layout fixado com os novos números
                 await update_panel()
 
+                # Espera 30 segundos para o próximo ciclo
                 await asyncio.sleep(30)
 
             except Exception as e:
-                print(f"[MONITOR ERROR] {e}")
+                print(f"[MONITOR ERROR] Falha no ciclo: {e}")
                 await asyncio.sleep(10)
 
 # =========================
