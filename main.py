@@ -732,53 +732,57 @@ async def monitor_loop():
             except Exception as e:
                 print(f"[MONITOR ERROR] Falha no ciclo: {e}")
                 await asyncio.sleep(10)
-
-
 # =============================================================
-# 19  ENGINE DE ALERTA (BLOQUEIO DE CANAL INDEVIDO)
+# 19 MOTOR DE MONITORAMENTO (VERSÃO FINAL SEM ERROS)
 # =============================================================
 
-async def send_alert(alert_type, message):
-    """Envia alertas apenas para as salas específicas, protegendo a sala do painel."""
+async def monitor_loop():
+    """Motor principal que alimenta os contadores e gerencia o painel."""
     
-    # --- TRAVA DE SEGURANÇA RETROATIVA ---
-    if (datetime.now() - BOT_START_TIME).total_seconds() < 15:
-        return
-
-    # IDs dos Canais (Certifique-se que estes IDs estão corretos no seu arquivo de config)
-    # DISCORD_PANEL_CHANNEL_ID é o canal ...625 (PROIBIDO PARA ALERTAS)
+    # 1. Espera o bot do Discord conectar totalmente
+    await bot_discord.wait_until_ready()
     
-    target_id = None
+    # 2. CORREÇÃO DO ERRO: Chama send_boot em vez de safe_boot
+    try:
+        await send_boot() 
+        print("[SISTEMA] Painel Arirang inicializado.")
+    except Exception as e:
+        print(f"[BOOT ERROR] Falha ao iniciar: {e}")
 
-    # --- DEFINIÇÃO DO CANAL DE DESTINO ---
-    if "ticket" in alert_type or "reposicao" in alert_type or "revenda" in alert_type:
-        target_id = DISCORD_TICKETS_CHANNEL_ID
-    elif "weverse" in alert_type:
-        target_id = DISCORD_WEVERSE_CHANNEL_ID
-    elif "instagram" in alert_type or "tiktok" in alert_type:
-        target_id = DISCORD_SOCIAL_CHANNEL_ID
-    elif "agenda" in alert_type:
-        target_id = DISCORD_TICKETS_CHANNEL_ID
+    # 3. Garante acesso às variáveis globais para os contadores subirem
+    global total_tickets, total_buy, total_weverse, total_social
+    global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
 
-    # --- FILTRO CRÍTICO (ERRO 3) ---
-    # Se o target_id for igual ao do painel ou for nulo, o alerta é descartado
-    if target_id is None or int(target_id) == int(DISCORD_PANEL_CHANNEL_ID):
-        print(f"[AVISO] Tentativa de envio de alerta para a sala do painel bloqueada: {alert_type}")
-        return
+    async with aiohttp.ClientSession() as session:
+        while True:
+            try:
+                # --- EXECUÇÃO DOS RASTREIOS ---
+                await check_ticketmaster(session)
+                total_tickets += 1
+                last_ticket_check = datetime.now()
+                
+                await check_buyticket(session)
+                total_buy += 1
+                last_buy_check = datetime.now()
 
-    async with ALERT_LOCK:
-        try:
-            # 1. Envio para o Discord no canal correto
-            canal = bot_discord.get_channel(int(target_id))
-            if canal:
-                await canal.send(message)
+                await check_weverse(session)
+                total_weverse += 1
+                last_weverse_check = datetime.now()
 
-            # 2. Envio para o Telegram (Canal Único)
-            if bot_ticket and CHAT_ID:
-                await bot_ticket.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
-        
-        except Exception as e:
-            print(f"[ERROR SEND_ALERT] {e}")
+                await check_social(session)
+                total_social += 1
+                last_social_check = datetime.now()
+
+                # --- ATUALIZAÇÃO DO PAINEL (EDITAR) ---
+                # Atualiza os números no Telegram e Discord (borda roxa)
+                await update_panel()
+
+                # Espera 30 segundos para o próximo ciclo de busca
+                await asyncio.sleep(30)
+
+            except Exception as e:
+                print(f"[MONITOR ERROR] Falha no ciclo: {e}")
+                await asyncio.sleep(10)
 
 # =========================
 # 20 FETCH UNIVERSAL
