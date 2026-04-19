@@ -419,27 +419,30 @@ async def send_boot():
 
     panel_initialized = True
 
-
 # =============================================================
-# 13 ATUALIZAÇÃO DO PAINEL (MANTENDO APENAS O LAYOUT ARIRANG)
+# 13 PAINEL FIXADO (LAYOUT INTEGRAL - SEM OMISSÕES)
 # =============================================================
 
 async def update_panel():
     global panel_message_id, panel_chat_id, last_panel_text, discord_panel_msg_id
     global total_weverse, total_social, total_tickets, total_buy
+    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
 
     try:
-        data, city, dias = get_next_show()
+        # Puxa os dados das funções de suporte
+        data_show, city, dias = get_next_show()
+
+        # Cálculo de tempo (Garante que não apareça "None")
         w_min = minutes_since(last_weverse_check)
         s_min = minutes_since(last_social_check)
         t_min = minutes_since(last_ticket_check)
         b_min = minutes_since(last_buy_check)
 
-        # SEU LAYOUT OBRIGATÓRIO EXCLUSIVO
+        # LAYOUT COMPLETO OBRIGATÓRIO
         text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
-🎫 Data: {data}
+🎫 Data: {data_show}
 📍 Local: {city}
 🔔 Faltam {dias} dias.
 
@@ -466,26 +469,30 @@ async def update_panel():
             return
         last_panel_text = text
 
-        # Edição no Telegram
+        # --- TELEGRAM ---
         if bot_ticket and panel_message_id:
             try:
-                await bot_ticket.edit_message_text(chat_id=panel_chat_id, message_id=panel_message_id, text=text)
+                await bot_ticket.edit_message_text(
+                    chat_id=panel_chat_id,
+                    message_id=panel_message_id,
+                    text=text
+                )
             except: pass
 
-        # Edição no Discord (Apenas o Embed com seu texto)
+        # --- DISCORD (BORDA ROXA) ---
         canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
         if canal and discord_panel_msg_id:
             try:
                 msg = await canal.fetch_message(discord_panel_msg_id)
+                # Mantém a borda roxa e o conteúdo exato
                 await msg.edit(embed=discord.Embed(description=text, color=0x9b59b6))
             except:
-                # Caso a mensagem tenha sido apagada, recria no formato correto
+                # Se a mensagem sumiu, cria o painel novamente com borda roxa
                 new_msg = await canal.send(embed=discord.Embed(description=text, color=0x9b59b6))
                 discord_panel_msg_id = new_msg.id
 
     except Exception as e:
         print(f"[PAINEL ERROR] {e}")
-
 
 # =========================
 # 14 ALERTAS OFICIAIS
@@ -1054,65 +1061,51 @@ async def monitor_loop():
                 # Em caso de erro grave, espera 10 segundos antes de tentar de novo
                 await asyncio.sleep(10)
 
-# =========================
-# 21 ALERT ENGINE (REVISADO PARA O SEU ID)
-# =========================
-
-ALERT_LOCK = asyncio.Lock()
-
-async def send_discord(channel_id, message):
-    """Envia mensagens para canais específicos, garantindo o uso do ID correto."""
-    try:
-        # O Discord exige que o ID seja int. O seu ID: 1494667029150695625
-        channel = bot_discord.get_channel(int(channel_id))
-        if channel:
-            await channel.send(message)
-        else:
-            # Tenta buscar o canal se ele não estiver no cache
-            channel = await bot_discord.fetch_channel(int(channel_id))
-            if channel:
-                await channel.send(message)
-            else:
-                print(f"[DISCORD ERROR] Não localizei o canal {channel_id}.")
-    except Exception as e:
-        print(f"[DISCORD SEND ERROR] {e}")
-
-async def update_panel_discord(text):
-    """
-    Envia a atualização do painel especificamente para o seu ID 1494667029150695625.
-    """
-    try:
-        # Se você quiser que ele edite a mensagem em vez de mandar novas, 
-        # precisaríamos salvar o ID da mensagem anterior. 
-        # Por enquanto, ele enviará o status atualizado lá.
-        await send_discord(1494667029150695625, text)
-    except Exception as e:
-        print(f"[DISCORD PANEL ERROR] {e}")
+# =============================================================
+# 21 ENGINE DE ALERTA (BLOQUEIO DE CANAL INDEVIDO)
+# =============================================================
 
 async def send_alert(alert_type, message):
-    async with ALERT_LOCK:
-        # --- TELEGRAM ---
-        if bot_ticket and CHAT_ID:
-            try:
-                await bot_ticket.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
-            except:
-                pass # Silencia o Chat Not Found para não sujar o log
+    """Envia alertas apenas para as salas específicas, protegendo a sala do painel."""
+    
+    # --- TRAVA DE SEGURANÇA RETROATIVA ---
+    if (datetime.now() - BOT_START_TIME).total_seconds() < 15:
+        return
 
-        # --- DISCORD (ROTEAMENTO) ---
-        loop = asyncio.get_running_loop()
+    # IDs dos Canais (Certifique-se que estes IDs estão corretos no seu arquivo de config)
+    # DISCORD_PANEL_CHANNEL_ID é o canal ...625 (PROIBIDO PARA ALERTAS)
+    
+    target_id = None
+
+    # --- DEFINIÇÃO DO CANAL DE DESTINO ---
+    if "ticket" in alert_type or "reposicao" in alert_type or "revenda" in alert_type:
+        target_id = DISCORD_TICKETS_CHANNEL_ID
+    elif "weverse" in alert_type:
+        target_id = DISCORD_WEVERSE_CHANNEL_ID
+    elif "instagram" in alert_type or "tiktok" in alert_type:
+        target_id = DISCORD_SOCIAL_CHANNEL_ID
+    elif "agenda" in alert_type:
+        target_id = DISCORD_TICKETS_CHANNEL_ID
+
+    # --- FILTRO CRÍTICO (ERRO 3) ---
+    # Se o target_id for igual ao do painel ou for nulo, o alerta é descartado
+    if target_id is None or int(target_id) == int(DISCORD_PANEL_CHANNEL_ID):
+        print(f"[AVISO] Tentativa de envio de alerta para a sala do painel bloqueada: {alert_type}")
+        return
+
+    async with ALERT_LOCK:
+        try:
+            # 1. Envio para o Discord no canal correto
+            canal = bot_discord.get_channel(int(target_id))
+            if canal:
+                await canal.send(message)
+
+            # 2. Envio para o Telegram (Canal Único)
+            if bot_ticket and CHAT_ID:
+                await bot_ticket.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
         
-        # Roteamento baseado no tipo
-        if alert_type in ["ticket", "reposicao", "nova_data", "revenda"]:
-            loop.create_task(send_discord(DISCORD_TICKETS_CHANNEL_ID, message))
-        
-        elif alert_type in ["weverse_post", "weverse_live"]:
-            loop.create_task(send_discord(DISCORD_WEVERSE_CHANNEL_ID, message))
-            
-        elif "instagram" in alert_type or "tiktok" in alert_type:
-            loop.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
-            
-        # SEMPRE envia uma cópia resumida para o seu canal de PAINEL (ID 625)
-        loop.create_task(update_panel_discord(f"🔔 **Novo Alerta:** {alert_type}"))
+        except Exception as e:
+            print(f"[ERROR SEND_ALERT] {e}")
 
 # =========================
 # 22 FETCH UNIVERSAL
