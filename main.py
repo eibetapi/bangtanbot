@@ -366,7 +366,7 @@ name = str(member_name).upper()
 return emoji, name 
 
 # =========================
-# 10 CONTENT HASH + DETECÇÃO DE MUDANÇA (FIX)
+# 10 CONTENT HASH + DETECÇÃO DE MUDANÇA (FIX INDENTAÇÃO)
 # =========================
 
 CONTENT_HASH = {}
@@ -381,7 +381,7 @@ def is_new(url: str, html: str):
     """
     ✔ Detecta mudança real de conteúdo
     ✔ Evita spam duplicado
-    ✔ Funciona mesmo com pequenas alterações na página
+    ✔ Funciona mesmo com pequenas mudanças na página
     """
 
     if not html:
