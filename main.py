@@ -935,20 +935,23 @@ async def check_buyticket(session):
 @bot_discord.event
 async def on_ready():
     print(f"✅ Logado no Discord como {bot_discord.user}")
+    
+    # Definindo o texto com quebra de linha para ficar um embaixo do outro
+    status_formatado = "🪭 Em tournê! Ouvindo: Arirang\n🎮 Jogando: BTS Island"
+    
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening, 
-            name="Em tournê! Ouvindo: Arirang 🪭
-🎮jogando: BTS Island"  
+            name=status_formatado
         ),
         status=discord.Status.online
     )
+    
     try:
         await bot_discord.tree.sync()
         print("✅ Comandos slash sincronizados.")
     except Exception as e:
         print(f"❌ Erro na sincronização: {e}")
-
 # ==========================================
 # 21 INICIALIZAÇÃO FINAL (MAIN)
 # ==========================================
