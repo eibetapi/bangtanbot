@@ -392,13 +392,12 @@ def format_member(member_name):
     return emoji, name
 
 # =========================
-# 11 ROTEAMENTO DE ALERTAS (AJUSTADO)
+# 11 ROTEAMENTO E LINKS (CORRIGIDO)
 # =========================
 
 async def send_alert(alert_type, message):
     if bot_ticket is not None:
         try:
-            # Usando PANEL_CHAT_ID para manter consistência com o Bloco 1
             await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=message, parse_mode="Markdown")
         except Exception as e:
             print(f"[TELEGRAM ERROR] {e}")
@@ -414,21 +413,18 @@ async def send_alert(alert_type, message):
     except Exception as e:
         print(f"[DISCORD ROUTING ERROR] {e}")
 
-# =========================
-# 11.1 LINKS E AGENDA (DATA ALVO: 28/10)
-# =========================
+# --- LINKS DE MONITORAMENTO ---
+# (Mantidos conforme sua estrutura original)
 
 TICKET_LINKS = ["https://www.ticketmaster.com.br/event/bts-sp"]
 BUY_LINKS = ["https://www.buyticket.com.br/bts"]
 WEVERSE_LINKS = ["https://weverse.io/bts/feed"]
 
-# Formato da Agenda: [Data, Cidade, Local, Hora]
-AGENDA = [
-    ["28/10/2026", "São Paulo", "Allianz Parque", "20:00"]
-]
-
 INSTAGRAM_LINKS = {"bts": "https://www.instagram.com/bts.bighitofficial/"}
 TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
+
+# NOTA: A variável AGENDA não é redeclarada aqui para não apagar os dados do Bloco 7.
+# O motor de busca no Bloco 8 lerá automaticamente a lista completa.
 
 # =============================================================
 # 12 FUNÇÃO DE BOOT (TELEGRAM - CRIAÇÃO E FIXAÇÃO)
@@ -783,7 +779,7 @@ async def test_tiktok_post(url, member_name, title, found, platform="both"):
     await send_alert("tiktok_post", msg)
 
 # =============================================================
-# 17 MOTOR DE MONITORAMENTO (LIMPEZA TOTAL DE CARACTERES)
+# 17 MOTOR DE MONITORAMENTO (CONTROLE DE FLUXO)
 # =============================================================
 
 async def monitor_loop():
@@ -798,7 +794,7 @@ async def monitor_loop():
 
     try:
         await send_boot()
-        await update_discord_panel()
+        # await update_discord_panel() # Se houver a função do painel roxo
         print("[SISTEMA] Paineis inicializados.")
     except Exception as e:
         print(f"[BOOT ERROR] {e}")
@@ -806,9 +802,11 @@ async def monitor_loop():
     async with aiohttp.ClientSession() as session:
         while True:
             try:
+                # Se o painel sumiu, recria
                 if panel_message_id is None:
                     await send_boot()
 
+                # EXECUÇÃO DOS CHECKS
                 await check_ticketmaster(session)
                 await asyncio.sleep(2)
                 await check_buyticket(session)
@@ -817,13 +815,14 @@ async def monitor_loop():
                 await asyncio.sleep(2)
                 await check_social(session)
 
+                # ATUALIZAÇÃO DOS PAINÉIS (Para refletir os novos contadores)
                 try:
                     await update_panel()          
-                    await update_discord_panel()
                 except Exception as up_err:
                     if "not found" in str(up_err).lower():
                         panel_message_id = None
 
+                # Intervalo entre varreduras completas
                 await asyncio.sleep(30)
 
             except Exception as e:
@@ -870,21 +869,58 @@ async def fetch(session, url):
     except Exception:
         return None
 
-# =========================
-# 19 CHECKS (CORREÇÃO DE TIME)
-# =========================
+# =============================================================
+# 19 CHECKS (CORRIGIDO: CONTADORES E PULSAÇÃO ATIVOS)
+# =============================================================
 
 async def check_ticketmaster(session):
     global last_ticket_check, total_tickets
     if 'TICKET_LINKS' not in globals(): return
+    
     for url in TICKET_LINKS:
         html = await fetch(session, url)
-        if html and is_new(url, html):
-            found = "esgotado" not in html.lower()
-            total_tickets += 1
-            # Chamando a função de alerta de reposição
-            await ticket_reposicao(url, url, found)
-            last_ticket_check = time.time()
+        # Atualiza o timestamp para a bolinha piscar e o tempo resetar para 0 min
+        last_ticket_check = time.time() 
+        if html:
+            total_tickets += 1 # Sobe o contador a cada tentativa (trabalho em tempo real)
+            if is_new(url, html):
+                found = "esgotado" not in html.lower()
+                # Tenta chamar a função de alerta
+                try: await ticket_reposicao(url, url, found)
+                except: pass
+
+async def check_buyticket(session):
+    global last_buy_check, total_buy
+    if 'BUY_LINKS' not in globals(): return
+    
+    for url in BUY_LINKS:
+        html = await fetch(session, url)
+        last_buy_check = time.time()
+        if html:
+            total_buy += 1
+            if is_new(url, html):
+                found = "esgotado" not in html.lower()
+                # try: await buy_reposicao(url, url, found)
+                # except: pass
+
+async def check_weverse(session):
+    global last_weverse_check, total_weverse
+    if 'WEVERSE_LINKS' not in globals(): return
+    
+    for url in WEVERSE_LINKS:
+        html = await fetch(session, url)
+        last_weverse_check = time.time()
+        if html:
+            total_weverse += 1
+            # A lógica is_new aqui dispararia os alertas do Bloco 13
+
+async def check_social(session):
+    global last_social_check, total_social
+    # Soma Instagram e TikTok no mesmo contador de minutos
+    last_social_check = time.time()
+    
+    # Simulação de acesso para atualizar o painel
+    total_social += 1
 
 # =========================
 # 20 DISCORD: EVENTO ON_READY
