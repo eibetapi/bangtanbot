@@ -1111,13 +1111,15 @@ async def monitor_loop():
 async def on_ready():
     print(f"✅ Logado no Discord como {bot_discord.user}")
     
-    # Define a atividade "Ouvindo Arirang 🛸"
+    # AJUSTE AQUI: Mudando a frase de exibição
     await bot_discord.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.listening, name="Arirang 🛸"),
+        activity=discord.Activity(
+            type=discord.ActivityType.listening, 
+            name="Em tournê - ouvindo: Arirang 🪭"  
+        ),
         status=discord.Status.online
     )
 
-    # Sincroniza os comandos slash (/teste, /ping)
     try:
         synced = await bot_discord.tree.sync()
         print(f"✅ {len(synced)} comandos slash sincronizados.")
