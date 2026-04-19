@@ -1187,4 +1187,25 @@ async def monitor_loop():
             except Exception as e:
                 print(f"[MONITOR ERROR] {e}")
                 await asyncio.sleep(10)
+# =========================
+# 41 INICIALIZAÇÃO (MAIN)
+# =========================
+async def main():
+    # Inicia o monitor em segundo plano
+    asyncio.create_task(monitor_loop())
+    
+    # Inicia o bot e mantém o processo ativo (Running)
+    # Substitua DISCORD_TOKEN pela sua variável ou string
+    await bot_discord.start(DISCORD_TOKEN)
+
+# =========================
+# 42 PONTO DE ENTRADA
+# =========================
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("[SISTEMA] Encerrado manualmente")
+    except Exception as e:
+        print(f"[ERRO CRÍTICO] {e}")
 
