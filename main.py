@@ -12,15 +12,18 @@ import re
 from datetime import datetime
 
 # =========================
-# 1 DISCORD (CORRIGIDO - INSTÂNCIA ÚNICA)
+# 1 DISCORD (CORRIGIDO - INTENTS COMPLETOS)
 # =========================
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 
+# Configuração de Intents para evitar o erro de Shard e permitir status personalizado
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True          # Necessário para gerenciar permissões e alertas
+intents.presences = True        # Necessário para o status "Ouvindo Spotify/Arirang"
 
 bot_discord = commands.Bot(
     command_prefix="!",
@@ -30,6 +33,15 @@ bot_discord = commands.Bot(
 @bot_discord.event
 async def on_ready():
     print(f"[DISCORD] Conectado como {bot_discord.user}")
+    
+    # Define o status de "Ouvindo Arirang" logo no login
+    await bot_discord.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening, 
+            name="Arirang 🛸"
+        ),
+        status=discord.Status.online
+    )
 
     try:
         synced = await bot_discord.tree.sync()
@@ -42,7 +54,6 @@ async def on_ready():
 
     # 🚀 MONITOR (UMA VEZ SÓ)
     bot_discord.loop.create_task(monitor_loop())
-
 
 # =========================
 # 2 TELEGRAM + FLASK
