@@ -381,23 +381,73 @@ async def send_to_all(alert_type, message):
         print(f"[DISCORD ROUTING ERROR] {e}")
 
 # =============================================================
-# 12 FUNÇÃO DE ATUALIZAÇÃO (LEITURA REAL DOS DADOS)
+# 12 FUNÇÃO DE BOOT (CRIAÇÃO E FIXAÇÃO)
 # =============================================================
 
 panel_message_id = None
-discord_panel_msg_id = None
 panel_initialized = False
 
 async def send_boot():
-    """
-    Cria o painel inicial. Se já existir um ID, ele valida se a 
-    mensagem ainda existe antes de decidir criar uma nova.
-    """
-    global panel_message_id, discord_panel_msg_id, panel_initialized
+    """Cria o painel pela primeira vez e fixa no Telegram."""
+    global panel_message_id, panel_initialized
+    
+    # Se já existe o ID, não faz nada (evita duplicar fixados)
+    if panel_message_id is not None:
+        return
+
+    data_show, city, dias = get_next_show()
+    
+    # O seu layout obrigatório (versão inicial)
+    text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
+
+✈️ PRÓXIMAS DATAS
+🎫 Data: {data_show}
+📍 Local: {city}
+🔔 Faltam {dias} dias.
+
+•°• 👾•°• •°• •°• •°*ATUALIZAÇÕES* •°• •°• •°• •°• •°• 🛸
+
+🟣 Weverse 🟢
+   🎯 Acessos realizados: 0
+   ⏱ Último rastreio há: 0 min
+
+⚪ Redes sociais 🟢
+   🎯 Acessos realizados: 0
+   ⏱ Último rastreio há: 0 min
+
+🟠 Ticketmaster 🟢
+   🎯 Acessos realizados: 0
+   ⏱ Último rastreio há: 0 min
+
+🔵 Buyticket 🟢
+   🎯 Acessos realizados: 0
+   ⏱ Último rastreio há: 0 min"""
+
+    if bot_ticket and CHAT_ID:
+        try:
+            p_msg = await bot_ticket.send_message(chat_id=CHAT_ID, text=text)
+            panel_message_id = p_msg.message_id
+            await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=panel_message_id)
+            panel_initialized = True
+            print(f"[BOOT] Painel criado com ID: {panel_message_id}")
+        except Exception as e:
+            print(f"[ERR BOOT] {e}")
+# =============================================================
+# 12.1 FUNÇÃO DE ATUALIZAÇÃO (EDIÇÃO DOS NÚMEROS)
+# =============================================================
+
+async def update_panel():
+    """Edita o painel existente com os números atualizados dos rastreios."""
+    global panel_message_id, total_weverse, total_social, total_tickets, total_buy
+    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
+
+    if not panel_message_id:
+        return
+
     try:
         data_show, city, dias = get_next_show()
         
-        # Monta o texto lendo os valores que o monitor_loop injeta
+        # O seu layout obrigatório (versão com variáveis dinâmicas)
         text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
@@ -421,24 +471,22 @@ async def send_boot():
 
 🔵 Buyticket {status_color(last_buy_check)}
    🎯 Acessos realizados: {total_buy}
-   ⏱ Último rastreio há: {minutes_since(last_buy_check)} min
-"""
-        # EDITAR NO TELEGRAM (Não envia novo, apenas edita o ID salvo)
-        if bot_ticket and panel_message_id:
-            try:
-                await bot_ticket.edit_message_text(chat_id=panel_chat_id, message_id=panel_message_id, text=text)
-            except: pass
+   ⏱ Último rastreio há: {minutes_since(last_buy_check)} min"""
 
-        # EDITAR NO DISCORD
-        canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-        if canal and discord_panel_msg_id:
-            try:
-                msg = await canal.fetch_message(discord_panel_msg_id)
-                await msg.edit(embed=discord.Embed(description=text, color=0x9b59b6))
-            except: pass
+        # AQUI É A MÁGICA: edit_message_text em vez de send_message
+        await bot_ticket.edit_message_text(
+            chat_id=CHAT_ID, 
+            message_id=panel_message_id, 
+            text=text
+        )
 
     except Exception as e:
-        print(f"[ERRO UPDATE PANEL] {e}")
+        print(f"[ERR UPDATE] {e}")
+        # Se der erro porque a mensagem foi deletada, limpamos o ID para o Bloco 12 recriar
+        if "message to edit not found" in str(e).lower():
+            panel_message_id = None
+
+
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
@@ -737,38 +785,30 @@ async def monitor_loop():
                 print(f"[MONITOR ERROR] Falha no ciclo: {e}")
                 await asyncio.sleep(10)
 # =============================================================
-# 19 MOTOR DE MONITORAMENTO (VERSÃO FINAL SEM ERROS)
+# 19 MOTOR DE MONITORAMENTO (AUTO-RECUPERAÇÃO)
 # =============================================================
 
 async def monitor_loop():
-    """Motor principal que alimenta os contadores e gerencia o painel."""
-    
-    # 1. Espera o bot do Discord conectar totalmente
     await bot_discord.wait_until_ready()
     
-    # 2. CORREÇÃO DO ERRO: Chama send_boot em vez de safe_boot
-    try:
-        await send_boot() 
-        print("[SISTEMA] Painel Arirang inicializado.")
-    except Exception as e:
-        print(f"[BOOT ERROR] Falha ao iniciar: {e}")
-
-    # 3. Garante acesso às variáveis globais para os contadores subirem
+    # Chama o boot inicial
+    await send_boot()
+    
     global total_tickets, total_buy, total_weverse, total_social
     global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
 
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                # --- EXECUÇÃO DOS RASTREIOS ---
+                # Se o painel sumiu, recria antes de tentar atualizar
+                if panel_message_id is None:
+                    await send_boot()
+
+                # Ciclo de varredura
                 await check_ticketmaster(session)
                 total_tickets += 1
                 last_ticket_check = datetime.now()
                 
-                await check_buyticket(session)
-                total_buy += 1
-                last_buy_check = datetime.now()
-
                 await check_weverse(session)
                 total_weverse += 1
                 last_weverse_check = datetime.now()
@@ -777,15 +817,13 @@ async def monitor_loop():
                 total_social += 1
                 last_social_check = datetime.now()
 
-                # --- ATUALIZAÇÃO DO PAINEL (EDITAR) ---
-                # Atualiza os números no Telegram e Discord (borda roxa)
+                # Atualiza o painel com o seu layout
                 await update_panel()
 
-                # Espera 30 segundos para o próximo ciclo de busca
                 await asyncio.sleep(30)
 
             except Exception as e:
-                print(f"[MONITOR ERROR] Falha no ciclo: {e}")
+                print(f"[MONITOR ERROR] {e}")
                 await asyncio.sleep(10)
 
 # =========================
