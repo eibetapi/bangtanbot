@@ -1191,12 +1191,20 @@ async def monitor_loop():
 # 41 INICIALIZAÇÃO (MAIN)
 # =========================
 async def main():
-    # Inicia o monitor em segundo plano
-    asyncio.create_task(monitor_loop())
+    # 🔥 CORREÇÃO 1: Definir o Token (verifique se o nome da variável está correto)
+    # Se você usa variáveis de ambiente, use: os.getenv('DISCORD_TOKEN')
+    TOKEN = "SEU_TOKEN_AQUI" 
+
+    print("[SISTEMA] Conectando ao Discord...")
     
-    # Inicia o bot e mantém o processo ativo (Running)
-    # Substitua DISCORD_TOKEN pela sua variável ou string
-    await bot_discord.start(DISCORD_TOKEN)
+    # Criamos a tarefa do monitor, mas ele vai esperar o bot logar
+    asyncio.create_task(monitor_loop())
+
+    try:
+        # 🔥 CORREÇÃO 2: O start deve ser a última linha para manter o bot vivo
+        await bot_discord.start(TOKEN)
+    except Exception as e:
+        print(f"[ERRO CRÍTICO] Falha ao iniciar: {e}")
 
 # =========================
 # 42 PONTO DE ENTRADA
@@ -1205,7 +1213,8 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("[SISTEMA] Encerrado manualmente")
+        pass
     except Exception as e:
-        print(f"[ERRO CRÍTICO] {e}")
+        print(f"[FATAL] Erro no loop principal: {e}")
+
 
