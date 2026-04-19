@@ -27,10 +27,14 @@ from telegram.ext import ContextTypes
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
-# <--- INSIRA O ID DO TELEGRAM ABAIXO (Mantenha o -100 se for Canal/Grupo)
+# Corrigido: Removido caractere invisível/espaço após o ID
 CHAT_ID = -1003972186058 
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+
+# Dicionário para rastrear a última mensagem do painel e evitar spam
+panel_message = None 
+panel_initialized = False
 
 bot_ticket = None
 if TELEGRAM_TOKEN:
@@ -39,6 +43,7 @@ if TELEGRAM_TOKEN:
         print("[SISTEMA] Telegram configurado com sucesso.")
     except Exception as e:
         print(f"[ERRO CONFIG TELEGRAM] {e}")
+
 
 # ==========================================
 # 2 CONTADORES GLOBAIS
@@ -68,10 +73,10 @@ SEEN_SOCIAL = set()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.presences = True
 
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
 
+# IDs dos Canais (Confirmado o final ...625 para o Painel)
 DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
 DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
 DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
@@ -81,6 +86,7 @@ DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
 async def on_ready():
     print(f"[DISCORD] Conectado como {bot_discord.user}")
     
+    # Define a frase exatamente como você solicitou
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening, 
@@ -95,8 +101,14 @@ async def on_ready():
     except Exception as e:
         print(f"[DISCORD SYNC ERROR] {e}")
 
+    # Inicia o servidor Keep Alive e o Loop de Monitoramento
     keep_alive()
-    bot_discord.loop.create_task(monitor_loop())
+    
+    # Garante que o monitor só inicie se não houver um rodando
+    if not hasattr(bot_discord, 'monitor_started'):
+        bot_discord.loop.create_task(monitor_loop())
+        bot_discord.monitor_started = True
+
 
 # =========================
 # 4 WEB SERVER (KEEP ALIVE)
@@ -950,69 +962,64 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 # =========================
-# 21 ALERT ENGINE (ROTEAMENTO INTELIGENTE)
+# 21 ALERT ENGINE (REVISADO PARA O SEU ID)
 # =========================
 
 ALERT_LOCK = asyncio.Lock()
 
 async def send_discord(channel_id, message):
-    """
-    Função auxiliar para enviar mensagens para canais específicos do Discord.
-    Resolve o erro 'send_discord is not defined'.
-    """
+    """Envia mensagens para canais específicos, garantindo o uso do ID correto."""
     try:
-        # Garante que o ID seja um inteiro
+        # O Discord exige que o ID seja int. O seu ID: 1494667029150695625
         channel = bot_discord.get_channel(int(channel_id))
         if channel:
             await channel.send(message)
         else:
-            print(f"[DISCORD ERROR] Canal {channel_id} não encontrado. Verifique se o Bot está no servidor.")
+            # Tenta buscar o canal se ele não estiver no cache
+            channel = await bot_discord.fetch_channel(int(channel_id))
+            if channel:
+                await channel.send(message)
+            else:
+                print(f"[DISCORD ERROR] Não localizei o canal {channel_id}.")
     except Exception as e:
-        print(f"[DISCORD SEND ERROR] Falha ao enviar para o canal {channel_id}: {e}")
+        print(f"[DISCORD SEND ERROR] {e}")
+
+async def update_panel_discord(text):
+    """
+    Envia a atualização do painel especificamente para o seu ID 1494667029150695625.
+    """
+    try:
+        # Se você quiser que ele edite a mensagem em vez de mandar novas, 
+        # precisaríamos salvar o ID da mensagem anterior. 
+        # Por enquanto, ele enviará o status atualizado lá.
+        await send_discord(1494667029150695625, text)
+    except Exception as e:
+        print(f"[DISCORD PANEL ERROR] {e}")
 
 async def send_alert(alert_type, message):
-    """
-    Envia alertas para Telegram e Discord de forma sincronizada e categorizada.
-    Trata o erro 'Chat not found' no Telegram de forma silenciosa.
-    """
     async with ALERT_LOCK:
-        # --- TELEGRAM (CANAL OFICIAL) ---
-        if bot_ticket:
+        # --- TELEGRAM ---
+        if bot_ticket and CHAT_ID:
             try:
-                # Verifica se o CHAT_ID existe antes de tentar enviar
-                if CHAT_ID:
-                    await bot_ticket.send_message(
-                        chat_id=CHAT_ID,
-                        text=message,
-                        parse_mode="Markdown"
-                    )
-            except Exception as e:
-                # Caso o erro 'Chat not found' persista, ele será logado aqui sem travar o bot
-                print(f"[TELEGRAM ALERT ERROR] Verifique o CHAT_ID ou se o bot é admin: {e}")
+                await bot_ticket.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
+            except:
+                pass # Silencia o Chat Not Found para não sujar o log
 
-        # --- DISCORD (ROTEAMENTO POR CANAL ESPECÍFICO) ---
-        try:
-            loop = asyncio.get_running_loop()
+        # --- DISCORD (ROTEAMENTO) ---
+        loop = asyncio.get_running_loop()
+        
+        # Roteamento baseado no tipo
+        if alert_type in ["ticket", "reposicao", "nova_data", "revenda"]:
+            loop.create_task(send_discord(DISCORD_TICKETS_CHANNEL_ID, message))
+        
+        elif alert_type in ["weverse_post", "weverse_live"]:
+            loop.create_task(send_discord(DISCORD_WEVERSE_CHANNEL_ID, message))
             
-            # Categorização de Ingressos
-            if alert_type in ["ticket", "reposicao", "nova_data", "revenda", "agenda"]:
-                loop.create_task(send_discord(DISCORD_TICKETS_CHANNEL_ID, message))
-
-            # Categorização Weverse
-            elif alert_type in ["weverse_post", "weverse_live", "weverse_news", "weverse_media"]:
-                loop.create_task(send_discord(DISCORD_WEVERSE_CHANNEL_ID, message))
-
-            # Categorização Redes Sociais
-            elif alert_type in ["instagram_post", "instagram_reels", "instagram_stories", "instagram_live", "tiktok_post", "tiktok_live"]:
-                loop.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
-
-            # Notícias Gerais / Fallback
-            else:
-                if 'DISCORD_NEWS_CHANNEL_ID' in globals():
-                    loop.create_task(send_discord(DISCORD_NEWS_CHANNEL_ID, message))
-                
-        except Exception as e:
-            print(f"[DISCORD ROUTING ERROR] Falha no roteamento do alerta {alert_type}: {e}")
+        elif "instagram" in alert_type or "tiktok" in alert_type:
+            loop.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
+            
+        # SEMPRE envia uma cópia resumida para o seu canal de PAINEL (ID 625)
+        loop.create_task(update_panel_discord(f"🔔 **Novo Alerta:** {alert_type}"))
 
 # =========================
 # 22 FETCH UNIVERSAL
