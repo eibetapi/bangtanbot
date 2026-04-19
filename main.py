@@ -442,17 +442,42 @@ TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
 # 12 GESTÃO DO PAINEL (TELEGRAM & DISCORD)
 # =============================================================
 
+import os
+
+def salvar_id_telegram(msg_id):
+    """Salva o ID no disco para persistência pós-reboot"""
+    try:
+        with open("tg_panel_id.txt", "w") as f:
+            f.write(str(msg_id))
+    except Exception as e:
+        print(f"[DEBUG] Erro ao salvar ID no arquivo: {e}")
+
+def carregar_id_telegram():
+    """Recupera o ID do arquivo se ele existir"""
+    if os.path.exists("tg_panel_id.txt"):
+        try:
+            with open("tg_panel_id.txt", "r") as f:
+                conteudo = f.read().strip()
+                return int(conteudo) if conteudo else None
+        except:
+            return None
+    return None
+
 async def update_panel():
     global panel_message_id, discord_panel_msg_id
     
     data_show, city, d_prox, d_br = get_countdown_data()
-    # Geramos o texto garantindo que ele leia as globais atualizadas
     texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
-   # --- LÓGICA TELEGRAM (COM RESGATE DE ID) ---
+    # --- LÓGICA TELEGRAM (SÓ CRIA SE NÃO LOCALIZAR O RECENTE) ---
     if bot_ticket and PANEL_CHAT_ID:
+        # Se a variável está vazia (boot), tenta carregar do arquivo
+        if not panel_message_id:
+            panel_message_id = carregar_id_telegram()
+
+        tentou_editar = False
         try:
-            # Tenta editar se tiver o ID
+            # Se temos um ID (da memória ou do arquivo), tentamos editar
             if panel_message_id:
                 try:
                     await bot_ticket.edit_message_text(
@@ -461,17 +486,23 @@ async def update_panel():
                         text=texto,
                         parse_mode="Markdown"
                     )
+                    tentou_editar = True
                 except Exception as e:
-                    # Se der erro de "não encontrado", limpamos o ID para forçar a criação/busca
+                    # Se o Telegram disser que a mensagem não existe, limpamos o ID
                     if "message to edit not found" in str(e).lower():
                         panel_message_id = None
+                        if os.path.exists("tg_panel_id.txt"):
+                            os.remove("tg_panel_id.txt")
                     else:
-                        raise e # Outros erros (como flood) vão para o except geral
+                        # Outro erro (ex: rede), marcamos como tentado para não duplicar
+                        tentou_editar = True 
+                        raise e
             
-            # Se o ID for None (bot resetou), ele cria um novo apenas uma vez
-            if not panel_message_id:
+            # Só entra aqui se panel_message_id for None (não achou no arquivo ou foi deletada)
+            if not panel_message_id and not tentou_editar:
                 msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
                 panel_message_id = msg.message_id
+                salvar_id_telegram(panel_message_id) # Salva para o próximo reboot
                 try: await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
                 except: pass
 
@@ -495,7 +526,8 @@ async def update_panel():
                 else:
                     msg = await channel.send(embed=embed)
                     discord_panel_msg_id = msg.id
-            except: discord_panel_msg_id = None
+            except: 
+                discord_panel_msg_id = None
 
 def status_color(last_time):
     diff = time.time() - last_time
@@ -508,21 +540,17 @@ def minutes_since(last_time):
     return res if res >= 0 else 0
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
-    # Forçamos a leitura das globais exatas aqui
     global total_weverse, total_social, total_tickets, total_buy
     global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
-
+    
     return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
 
 
 **✈️ PRÓXIMAS DATAS**
 
   🎫 Data: **{data_show}**
-
   📍 Local: **{city}**
-
   🔔 Faltam **{d_prox}** dias.
-
   🔔 Faltam **{d_br}** dias para o BTS no Brasil!
 
 
@@ -530,30 +558,22 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 
 
   🟣 **Weverse** {status_color(last_weverse_check)}
-
   🎯 Acessos realizados: **{total_weverse}**
-
   ⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
 
 
   ⚪ **Redes sociais** {status_color(last_social_check)}
-
   🎯 Acessos realizados: **{total_social}**
-
   ⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
 
 
   🟠 **Ticketmaster** {status_color(last_ticket_check)}
-
   🎯 Acessos realizados: **{total_tickets}**
-
   ⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
 
 
   🔵 **Buyticket** {status_color(last_buy_check)}
-
   🎯 Acessos realizados: **{total_buy}**
-
   ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**"""
 
 # =========================
