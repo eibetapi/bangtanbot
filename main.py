@@ -1170,4 +1170,39 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 
+=========================
+42 START BOT (OBRIGATÓRIO)
+=========================
+if __name__ == "__main__":
 
+    keep_alive()
+
+    # =========================
+    # 43 TELEGRAM
+    # =========================
+    async def start_telegram():
+        global bot_ticket
+
+        bot_ticket = ApplicationBuilder().token(os.getenv("TELEGRAM_TOKEN")).build()
+
+        bot_ticket.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands)
+        )
+        bot_ticket.add_handler(
+            MessageHandler(filters.COMMAND, handle_commands)
+        )
+
+        await bot_ticket.initialize()
+        await bot_ticket.start()
+        await bot_ticket.updater.start_polling()
+
+    # =========================
+    # 44 RUN
+    # =========================
+    async def main():
+        await asyncio.gather(
+            start_telegram(),
+            bot_discord.start(os.getenv("DISCORD_TOKEN"))
+        )
+
+    asyncio.run(main())
