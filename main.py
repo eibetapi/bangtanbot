@@ -784,7 +784,7 @@ async def test_tiktok_post(url, member_name, title, found, platform="both"):
     await send_alert("tiktok_post", msg, platform)
 
 # =============================================================
-# 17 MOTOR DE MONITORAMENTO (VERSÃO CORRIGIDA)
+# 17 MOTOR DE MONITORAMENTO (INDENTAÇÃO CORRIGIDA)
 # =============================================================
 
 async def monitor_loop():
@@ -836,7 +836,7 @@ async def monitor_loop():
 
             except Exception as e:
                 print(f"[MONITOR ERROR] Falha no ciclo: {e}")
-                # Se o erro for de mensagem deletada, limpa o ID para o próximo ciclo criar uma nova
+                # Se deletarem a mensagem, limpa o ID para recriar no próximo ciclo
                 if "not found" in str(e).lower():
                     panel_message_id = None
                 await asyncio.sleep(10)
