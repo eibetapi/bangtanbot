@@ -443,10 +443,9 @@ async def send_boot():
             print(f"[ERR BOOT] {e}")
 
 # =============================================================
-# 12.1 ATUALIZAÇÃO DO PAINEL (CONTAGEM REAL)
+# 12.1 PAINEL DISCORD (UPDATE - LAYOUT FIDELIDADE TOTAL)
 # =============================================================
 
-# Variável para controle da mensagem no Discord
 discord_panel_msg_id = None
 
 async def update_discord_panel():
@@ -457,48 +456,40 @@ async def update_discord_panel():
 
     data_show, city, dias = get_next_show()
     
-    # Criando o Embed com a borda roxa
-    embed = discord.Embed(
-        title="🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭",
-        color=0x8A2BE2 # COR ROXA BTS
-    )
+    # Criando o Embed com a borda roxa solicitada
+    embed = discord.Embed(color=0x8A2BE2)
     
-    embed.add_field(
-        name="✈️ PRÓXIMAS DATAS",
-        value=f"🎫 Data: {data_show}\n
-                      📍 Local: {city}\n
-                      🔔 Faltam {dias} dias.\n
-                      🔔 Faltam {dias} dias para o BTS no Brasil!",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="•°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸",
-        value=f"""
-🟣 **Weverse** {status_color(last_weverse_check)}
+    # O conteúdo abaixo é um espelho exato do Bloco 12
+    # A bolinha (status_color) está colada ao nome para mudar de cor dinamicamente
+    embed.description = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
+
+✈️ PRÓXIMAS DATAS
+🎫 Data: {data_show}
+📍 Local: {city}
+🔔 Faltam {dias} dias.
+🔔 Faltam {dias} dias para o BTS no Brasil! 
+
+•°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸
+
+🟣 Weverse {status_color(last_weverse_check)}
    🎯 Acessos realizados: {total_weverse}
    ⏳ Último rastreio há: {minutes_since(last_weverse_check)} min
 
-⚪ **Redes sociais** {status_color(last_social_check)}
+⚪ Redes sociais {status_color(last_social_check)}
    🎯 Acessos realizados: {total_social}
    ⏳ Último rastreio há: {minutes_since(last_social_check)} min
 
-🟠 **Ticketmaster** {status_color(last_ticket_check)}
+🟠 Ticketmaster {status_color(last_ticket_check)}
    🎯 Acessos realizados: {total_tickets}
    ⏳ Último rastreio há: {minutes_since(last_ticket_check)} min
 
-🔵 **Buyticket** {status_color(last_buy_check)}
+🔵 Buyticket {status_color(last_buy_check)}
    🎯 Acessos realizados: {total_buy}
-   ⏳ Último rastreio há: {minutes_since(last_buy_check)} min
-""",
-        inline=False
-    )
-
-    embed.set_footer(text=f"Última atualização: {datetime.now().strftime('%H:%M:%S')}")
+   ⏳ Último rastreio há: {minutes_since(last_buy_check)} min"""
 
     try:
         if discord_panel_msg_id is None:
-            # Busca se já existe uma mensagem do bot no canal para editar em vez de criar nova
+            # Busca se já existe uma mensagem do bot para evitar duplicar
             async for message in channel.history(limit=5):
                 if message.author == bot_discord.user:
                     discord_panel_msg_id = message.id
@@ -513,7 +504,6 @@ async def update_discord_panel():
     except Exception as e:
         print(f"[DISCORD PANEL ERR] {e}")
         discord_panel_msg_id = None
-
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
