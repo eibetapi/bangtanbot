@@ -381,68 +381,39 @@ async def send_to_all(alert_type, message):
         print(f"[DISCORD ROUTING ERROR] {e}")
 
 # =============================================================
-# 12 FUNÇÃO DE BOOT (INICIALIZAÇÃO DO SISTEMA)
+# 12 FUNÇÃO DE BOOT (INICIALIZAÇÃO - SEM PAINEL GENÉRICO)
 # =============================================================
 
 async def send_boot():
-    """
-    Lança as mensagens de inicialização e configura os painéis.
-    """
-    global panel_initialized, panel_message
+    """Lança apenas o layout obrigatório no Telegram e Discord."""
+    global panel_message_id, panel_chat_id, panel_initialized, discord_panel_msg_id
     
     boot_msg = "🛸•°•Wootteo entrando em rota°•°🛸"
-    
-    # --- 1. INICIALIZAÇÃO TELEGRAM ---
-    if bot_ticket:
-        try:
-            # Envia a mensagem de Boot
-            # IMPORTANTE: Verifique se o Bot é ADMIN do canal -1003972186058
-            await bot_ticket.send_message(
-                chat_id=CHAT_ID, 
-                text=boot_msg
-            )
-            
-            # Envia o Painel que será editado futuramente (Bloco 13)
-            p_msg = await bot_ticket.send_message(
-                chat_id=CHAT_ID, 
-                text="👾 **PAINEL DE CONTROLE ARIRANG** 👾\n\nStatus: Inicializando..."
-            )
-            
-            # Tenta fixar a mensagem do painel
-            try:
-                await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=p_msg.message_id)
-            except:
-                print("[TELEGRAM] Não foi possível fixar a mensagem. Verifique permissões de Admin.")
-                
-            panel_message = p_msg
-            print("[SISTEMA] Boot enviado com sucesso ao Telegram.")
-            
-        except Exception as e:
-            print(f"[TELEGRAM FATAL ERROR] Erro ao enviar boot: {e}")
-            print(f"DICA: Verifique se o ID {CHAT_ID} está correto e se o Bot é ADMIN.")
+    # Conteúdo inicial respeitando o seu layout
+    conteudo_inicial = "🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭\n\n⌛ Sincronizando com os servidores..."
 
-    # --- 2. INICIALIZAÇÃO DISCORD (CANAL ...625) ---
+    # --- TELEGRAM ---
+    if bot_ticket and CHAT_ID:
+        try:
+            await bot_ticket.send_message(chat_id=CHAT_ID, text=boot_msg)
+            # Posta o painel real
+            p_msg = await bot_ticket.send_message(chat_id=CHAT_ID, text=conteudo_inicial)
+            panel_message_id = p_msg.message_id
+            panel_chat_id = CHAT_ID
+            # Fixa no canal
+            await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=panel_message_id)
+        except Exception as e:
+            print(f"[TELEGRAM BOOT ERROR] {e}")
+
+    # --- DISCORD ---
     try:
-        canal_painel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-        if canal_painel:
-            # Limpa mensagens antigas se quiser um canal limpo (opcional)
-            # await canal_painel.purge(limit=5) 
-            
-            await canal_painel.send(boot_msg)
-            
-            embed_painel = discord.Embed(
-                title="👾 PAINEL DE CONTROLE 👾",
-                description="Monitoramento Arirang em tempo real.",
-                color=0x9b59b6 # Roxo
-            )
-            embed_painel.add_field(name="🛰️ Status", value="🟢 Online", inline=True)
-            embed_painel.set_footer(text=f"Boot realizado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-            
-            await canal_painel.send(embed=embed_painel)
-            print("[SISTEMA] Painel iniciado no Discord.")
-        else:
-            print(f"[DISCORD ERROR] Canal de painel {DISCORD_PANEL_CHANNEL_ID} não encontrado.")
-            
+        canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+        if canal:
+            await canal.send(boot_msg)
+            # Envia o Layout Obrigatório direto no Embed Roxo (sem o título genérico)
+            embed = discord.Embed(description=conteudo_inicial, color=0x9b59b6)
+            d_msg = await canal.send(embed=embed)
+            discord_panel_msg_id = d_msg.id
     except Exception as e:
         print(f"[DISCORD BOOT ERROR] {e}")
 
@@ -450,31 +421,21 @@ async def send_boot():
 
 
 # =============================================================
-# 13 PAINEL FIXADO (TEMPO REAL + SEM SPAM) - LAYOUT ARIRANG TOUR
+# 13 ATUALIZAÇÃO DO PAINEL (MANTENDO APENAS O LAYOUT ARIRANG)
 # =============================================================
-
-# INICIALIZAÇÃO OBRIGATÓRIA
-panel_message_id = None
-panel_chat_id = None
-panel_initialized = False
-last_panel_text = None
-discord_panel_msg_id = None # Para editar no Discord também
 
 async def update_panel():
     global panel_message_id, panel_chat_id, last_panel_text, discord_panel_msg_id
     global total_weverse, total_social, total_tickets, total_buy
-    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
 
     try:
-        # Puxa os dados das funções auxiliares
         data, city, dias = get_next_show()
+        w_min = minutes_since(last_weverse_check)
+        s_min = minutes_since(last_social_check)
+        t_min = minutes_since(last_ticket_check)
+        b_min = minutes_since(last_buy_check)
 
-        weverse_min = minutes_since(last_weverse_check)
-        social_min = minutes_since(last_social_check)
-        ticket_min = minutes_since(last_ticket_check)
-        buy_min = minutes_since(last_buy_check)
-
-        # O LAYOUT OBRIGATÓRIO
+        # SEU LAYOUT OBRIGATÓRIO EXCLUSIVO
         text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
@@ -486,60 +447,45 @@ async def update_panel():
 
 🟣 Weverse {status_color(last_weverse_check)}
    🎯 Acessos realizados: {total_weverse}
-   ⏱ Último rastreio há: {weverse_min} min
+   ⏱ Último rastreio há: {w_min} min
 
 ⚪ Redes sociais {status_color(last_social_check)}
    🎯 Acessos realizados: {total_social}
-   ⏱ Último rastreio há: {social_min} min
+   ⏱ Último rastreio há: {s_min} min
 
 🟠 Ticketmaster {status_color(last_ticket_check)}
    🎯 Acessos realizados: {total_tickets}
-   ⏱ Último rastreio há: {ticket_min} min
+   ⏱ Último rastreio há: {t_min} min
 
 🔵 Buyticket {status_color(last_buy_check)}
    🎯 Acessos realizados: {total_buy}
-   ⏱ Último rastreio há: {buy_min} min
+   ⏱ Último rastreio há: {b_min} min
 """
 
-        # Verifica se algo mudou para evitar processamento desnecessário
         if text == last_panel_text:
             return
-
         last_panel_text = text
 
-        # --- ATUALIZAÇÃO TELEGRAM ---
+        # Edição no Telegram
         if bot_ticket and panel_message_id:
             try:
-                await bot_ticket.edit_message_text(
-                    chat_id=panel_chat_id if panel_chat_id else CHAT_ID,
-                    message_id=panel_message_id,
-                    text=text
-                )
-            except Exception as e:
-                print(f"[TELEGRAM PANEL ERROR] {e}")
+                await bot_ticket.edit_message_text(chat_id=panel_chat_id, message_id=panel_message_id, text=text)
+            except: pass
 
-        # --- ATUALIZAÇÃO DISCORD (ID ...625) ---
-        try:
-            canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-            if canal:
-                # Se já temos uma mensagem enviada, editamos ela para não gerar spam
-                if discord_panel_msg_id:
-                    try:
-                        msg = await canal.fetch_message(discord_panel_msg_id)
-                        await msg.edit(content=text)
-                    except:
-                        # Se a mensagem sumiu, reseta o ID para enviar uma nova
-                        discord_panel_msg_id = None
-
-                # Se não temos mensagem ou a edição falhou, envia nova
-                if not discord_panel_msg_id:
-                    new_msg = await canal.send(text)
-                    discord_panel_msg_id = new_msg.id
-        except Exception as e:
-            print(f"[DISCORD PANEL ERROR] {e}")
+        # Edição no Discord (Apenas o Embed com seu texto)
+        canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+        if canal and discord_panel_msg_id:
+            try:
+                msg = await canal.fetch_message(discord_panel_msg_id)
+                await msg.edit(embed=discord.Embed(description=text, color=0x9b59b6))
+            except:
+                # Caso a mensagem tenha sido apagada, recria no formato correto
+                new_msg = await canal.send(embed=discord.Embed(description=text, color=0x9b59b6))
+                discord_panel_msg_id = new_msg.id
 
     except Exception as e:
         print(f"[PAINEL ERROR] {e}")
+
 
 # =========================
 # 14 ALERTAS OFICIAIS
@@ -595,12 +541,22 @@ async def agenda_update(data):
 """
         await send_to_all("agenda", msg)
 
+# =========================
+# 15 ALERTAS WEVERSE (CORRIGIDO)
+# =========================
 
-# =========================
-# 15 ALERTAS WEVERSE
-# =========================
+# Memórias para evitar spam de posts e lives repetidas
+LAST_WEVERSE_POST_URL = None
+LAST_WEVERSE_LIVE_URL = None
 
 async def weverse_post(url, member_name, title, message_translated, found):
+    global LAST_WEVERSE_POST_URL
+    
+    # Trava Anti-Spam: Ignora se o link for o mesmo do último alerta
+    if url == LAST_WEVERSE_POST_URL:
+        return
+    LAST_WEVERSE_POST_URL = url
+    
     emoji = get_member_emoji(member_name)
     msg = f"""🩷*WEVERSE POST*🩷
 {emoji} {member_name.upper()} publicou uma mensagem:
@@ -608,26 +564,45 @@ async def weverse_post(url, member_name, title, message_translated, found):
 {message_translated}
 🔗 {url}
 """
-    await send_to_all("weverse_post", msg)
+    await send_alert("weverse_post", msg)
 
 async def test_weverse_live(url, member_name, found):
+    global LAST_WEVERSE_LIVE_URL
+    
+    # Trava para Lives: Evita avisar várias vezes sobre a mesma live aberta
+    if url == LAST_WEVERSE_LIVE_URL:
+        return
+    LAST_WEVERSE_LIVE_URL = url
+    
     emoji = get_member_emoji(member_name)
     msg = f"""📹*WEVERSE LIVE*📹
 {emoji} {member_name.upper()} está ao vivo!
 🔗 {url}
 """
-    await send_to_all("weverse_live", msg)
+    await send_alert("weverse_live", msg)
 
 async def test_weverse_news(url, member_name, message_translated, found):
+    global LAST_WEVERSE_POST_URL
+    
+    if url == LAST_WEVERSE_POST_URL:
+        return
+    LAST_WEVERSE_POST_URL = url
+    
     emoji = get_member_emoji(member_name)
     msg = f"""🚨*WEVERSE NEWS*🚨
 {emoji} {member_name.upper()} publicou uma notícia:
 📌 {message_translated}
 🔗 {url}
 """
-    await send_to_all("weverse_news", msg)
+    await send_alert("weverse_news", msg)
 
 async def test_weverse_media(url, member_name, title, message_translated, found):
+    global LAST_WEVERSE_POST_URL
+    
+    if url == LAST_WEVERSE_POST_URL:
+        return
+    LAST_WEVERSE_POST_URL = url
+    
     emoji = get_member_emoji(member_name)
     msg = f"""📀 WEVERSE MÍDIA📀
 {emoji} {member_name.upper()} publicou uma nova mídia!
@@ -635,35 +610,58 @@ async def test_weverse_media(url, member_name, title, message_translated, found)
 {message_translated}
 🔗 {url}
 """
-    await send_to_all("weverse_media", msg)
+    await send_alert("weverse_media", msg)
 
 # =========================
-# 16 ALERTAS INSTAGRAM
+# 16 ALERTAS INSTAGRAM (CORRIGIDO)
 # =========================
+
+# Memória para evitar repetição do último post/story
+LAST_INSTA_POST_LINK = None
+LAST_INSTA_STORY_LINK = None
 
 async def instagram_post(url, member_name, title, found):
+    global LAST_INSTA_POST_LINK
+    
+    # Trava Anti-Spam
+    if url == LAST_INSTA_POST_LINK:
+        return
+    LAST_INSTA_POST_LINK = url
+    
     emoji, name = format_member(member_name)
     msg = f"""🌟*INSTAGRAM POST*🌟
 {emoji} {name} postou uma foto!
 🔗 {url}
 """
-    await send_to_all("instagram_post", msg)
+    await send_alert("instagram_post", msg)
 
 async def instagram_reel(url, member_name, title, found):
+    global LAST_INSTA_POST_LINK # Reels e Posts compartilham a mesma trava
+    
+    if url == LAST_INSTA_POST_LINK:
+        return
+    LAST_INSTA_POST_LINK = url
+    
     emoji, name = format_member(member_name)
     msg = f"""🎬*INSTAGRAM REELS*🎬
 {emoji} {name} postou um reels!
 🔗 {url}
 """
-    await send_to_all("instagram_reels", msg)
+    await send_alert("instagram_reels", msg)
 
 async def instagram_story(url, member_name, title, found):
+    global LAST_INSTA_STORY_LINK
+    
+    if url == LAST_INSTA_STORY_LINK:
+        return
+    LAST_INSTA_STORY_LINK = url
+    
     emoji, name = format_member(member_name)
     msg = f"""🫧*INSTAGRAM STORIES*🫧
 {emoji} {name} atualizou os stories!
 🔗 {url}
 """
-    await send_to_all("instagram_stories", msg)
+    await send_alert("instagram_stories", msg)
 
 async def instagram_live(url, member_name, title, found):
     emoji, name = format_member(member_name)
@@ -671,28 +669,51 @@ async def instagram_live(url, member_name, title, found):
 {emoji} {name} está ao vivo!
 🔗 {url}
 """
-    await send_to_all("instagram_live", msg)
+    await send_alert("instagram_live", msg)
+
 
 # =========================
-# 17 ALERTAS TIKTOK
+# 17 ALERTAS TIKTOK (CORRIGIDO)
 # =========================
+
+# Memória para evitar que o mesmo post repita (Spam)
+LAST_TIKTOK_LINK = None
 
 async def tiktok_post(url, member_name, title, found):
+    global LAST_TIKTOK_LINK
+    
+    # CORREÇÃO DO LINK: Garante que o underline não seja removido
+    # O link oficial deve ser sempre respeitado
+    link_correto = "https://www.tiktok.com/@bts_official_bighit"
+    
+    # Se a URL recebida não tiver o link completo, nós montamos
+    if "video/" in url:
+        video_id = url.split("video/")[1].split("?")[0]
+        final_url = f"{link_correto}/video/{video_id}"
+    else:
+        final_url = link_correto
+
+    # TRAVA ANTI-SPAM: Só envia se o link for diferente do último
+    if final_url == LAST_TIKTOK_LINK:
+        return
+    
+    LAST_TIKTOK_LINK = final_url
     emoji = get_member_emoji(member_name)
+    
     msg = f"""🎵*TIKTOK POST*🎵
 {emoji} {member_name.upper()} postou um vídeo!
-🔗 {url}
+🔗 *Link:* {final_url}
 """
-    await send_to_all("tiktok_post", msg)
+    # Envia para o roteador oficial do Bloco 21
+    await send_alert("tiktok_post", msg)
 
 async def tiktok_live(url, member_name, title, found):
     emoji = get_member_emoji(member_name)
     msg = f"""🎥*TIKTOK LIVE*🎥
 {emoji} {member_name.upper()} está ao vivo no TikTok!
-🔗 {url}
+🔗 *Link:* https://www.tiktok.com/@bts_official_bighit/live
 """
-    await send_to_all("tiktok_live", msg)
-
+    await send_alert("tiktok_live", msg)
 
 # =============================================================
 # 18 SISTEMA DE TESTE SOB DEMANDA (/TESTE)
