@@ -283,9 +283,9 @@ AGENDA = [
     ("14/03/2027", "Manila", "Filipinas", "20:00")
 ]
 
-# =========================
-# 8 CONTROLE (VERSÃO AGENDA REAL)
-# =========================
+# =============================================================
+# 8 CONTROLE (CÁLCULO PRECISO E STATUS PULSANTE)
+# =============================================================
 boot_lock = asyncio.Lock()
 boot_initialized = False
 
@@ -300,7 +300,6 @@ def clean(v):
     return v if v and str(v).strip() else "ESGOTADO"
 
 def days_left(date_str):
-    """Calcula dias restantes comparando apenas as datas (D-Day)"""
     try:
         target = datetime.strptime(date_str, "%d/%m/%Y").date()
         today = datetime.now().date()
@@ -313,48 +312,55 @@ def minutes_since(ts):
     return int((time.time() - ts) / 60)
 
 def status_color(last_check):
-    return "🟢" if (time.time() - last_check) < 1800 else "🔴"
+    """
+    Retorna Status Pulsante: Alterna entre Verde e Azul a cada segundo.
+    Retorna Vermelho apenas se o rastreio parar por mais de 30 minutos.
+    """
+    agora = time.time()
+    if (agora - last_check) > 1800:
+        return "🔴"
+    
+    # Alterna entre Verde e Azul usando o resto da divisão dos segundos atuais
+    # Isso cria o efeito visual de que o bot está "vivo" e trabalhando
+    return "🟢" if int(agora) % 2 == 0 else "🔵"
 
 def get_countdown_data():
     """
-    Varre a AGENDA do Bloco 7 e retorna os dados corretos para o painel.
+    Varre a AGENDA e retorna o próximo show baseado na data e hora local.
+    O painel pula para a próxima data assim que o horário do show passa.
     """
-    now_date = datetime.now().date()
+    now_dt = datetime.now()
     
     prox_data = "Continua…"
     prox_local = "---"
     d_prox = 0
     d_br = 0
 
-    # 1. Encontrar o próximo show na Agenda (Geral)
     if 'AGENDA' in globals() and AGENDA:
+        # 1. Encontrar o próximo show na Agenda (Considerando Data e Hora)
         for item in AGENDA:
             try:
-                # Comparamos apenas a data para saber qual o próximo show da lista
-                data_show_dt = datetime.strptime(item[0], "%d/%m/%Y").date()
-                if data_show_dt >= now_date:
+                # item[0]=Data, item[3]=Hora (ex: "20:00")
+                data_hora_show = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
+                
+                if data_hora_show > now_dt:
                     prox_data = item[0]
                     prox_local = f"{item[1]}, {item[2]}"
-                    d_prox = (data_show_dt - now_date).days
+                    d_prox = (data_hora_show.date() - now_dt.date()).days
                     break
             except:
                 continue
 
-    # 2. Encontrar o primeiro show no BRASIL na Agenda
-    found_br = False
-    if 'AGENDA' in globals():
+        # 2. Encontrar o primeiro show no BRASIL na Agenda
         for item in AGENDA:
             if "Brasil" in item[2]:
-                data_br_dt = datetime.strptime(item[0], "%d/%m/%Y").date()
-                if data_br_dt >= now_date:
-                    d_br = (data_br_dt - now_date).days
-                    found_br = True
-                    break
+                try:
+                    data_br_dt = datetime.strptime(item[0], "%d/%m/%Y").date()
+                    if data_br_dt >= now_dt.date():
+                        d_br = (data_br_dt - now_dt.date()).days
+                        break
+                except: continue
     
-    # Se já passou ou não achou na agenda, usa a data base 28/10/2026
-    if not found_br:
-        d_br = days_left("28/10/2026")
-
     return prox_data, prox_local, d_prox, d_br
 
 # =========================
@@ -438,7 +444,7 @@ async def send_boot():
 
     data_show, city, dias = get_next_show()
     
-    text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
+    text = f"""🪭**⊙⊝⊜ARIRANG TOUR⊙⊝⊜**🪭
 
 ✈️ PRÓXIMAS DATAS
 🎫 Data: {data_show}
@@ -495,7 +501,7 @@ async def update_discord_panel():
     embed = discord.Embed(color=0x8A2BE2)
     
     # Layout mantido exatamente como o modelo original
-    embed.description = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
+    embed.description = f"""🪭**⊙⊝⊜ARIRANG TOUR⊙⊝⊜**🪭
 
 ✈️ PRÓXIMAS DATAS
 🎫 Data: {data_show}
@@ -835,7 +841,7 @@ async def monitor_loop():
                 await check_social(session)
 
                 # --- ATUALIZAÇÃO DOS PAINÉIS EM TEMPO REAL ---
-                # Registra o resultado do rastreio nos dois painéis simultaneamente
+                # Aqui o status_color vai alternar as cores (efeito pulsante)
                 try:
                     await update_panel()          # Atualiza Layout Telegram
                     await update_discord_panel()  # Atualiza Layout Discord (Borda Roxa)
@@ -866,13 +872,15 @@ async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT
         await update_panel()
         await update_discord_panel()
     elif "/ping" in user_cmd:
-        await update.message.reply_text(f"🏓 Pong! Uptime: {get_uptime()}")
+        # Usa o uptime do Bloco 8
+        await update.message.reply_text(f"🏓 Pong! Wootteo operando há {get_uptime()}")
 
 # No Discord (Slash Command)
 @bot_discord.tree.command(name="teste", description="Executa o teste completo de layout e roteamento")
 async def teste_discord(interaction: discord.Interaction):
-    await interaction.response.send_message("🚀 Iniciando sequência de testes nos canais específicos...", ephemeral=True)
-    # Chama o teste especificando a plataforma Discord
+    # Resposta efêmera para quem usou o comando
+    await interaction.response.send_message("🚀 Iniciando sequência de testes nos canais do Discord...", ephemeral=True)
+    # Chama o teste especificando a plataforma Discord (Roteamento)
     await run_full_test(platform="discord")
     # Força atualização para o registro aparecer no painel na hora
     await update_panel()
