@@ -501,21 +501,21 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 **🎫 Data:** {data_show}
 **📍 Local:** {city}
 **🔔 Faltam** {d_prox} **dias.**
-**🔔 Faltam** {d_br} **dias para o BTS no Brasil!**
+**🔔 Faltam** {d_br}** dias para o BTS no Brasil!
 
 •°•👾•°•°**ATUALIZAÇÕES**•°•°🛸
 
 **🟣 Weverse** {status_color(last_weverse_check)}
 **🎯 Acessos realizados:** {total_weverse}
-**⏳ Último rastreio há:** {minutes_since(last_weverse_check)} **min**
+**⏳ Último rastreio há:** {minutes_since(last_weverse_check)} min
 
 **⚪ Redes sociais** {status_color(last_social_check)}
 **🎯 Acessos realizados:** {total_social}
-**⏳ Último rastreio há:** {minutes_since(last_social_check)} **min**
+**⏳ Último rastreio há:** {minutes_since(last_social_check)} min
 
 **🟠 Ticketmaster** {status_color(last_ticket_check)}
 **🎯 Acessos realizados:** {total_tickets}
-**⏳ Último rastreio há:** {minutes_since(last_ticket_check)} **min**
+**⏳ Último rastreio há:** {minutes_since(last_ticket_check)} min
 
 **🔵 Buyticket** {status_color(last_buy_check)}
 **🎯 Acessos realizados:** {total_buy}
@@ -856,38 +856,54 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 # =============================================================
-# 17.1 COMANDOS DE GATILHO (CONTROLE DE RESPOSTA)
+# 17.1 COMANDOS DE GATILHO (TELEGRAM & DISCORD)
 # =============================================================
 
-# No Telegram
+# --- TELEGRAM ---
 async def handle_commands_telegram(update, context):
     user_cmd = update.message.text.lower()
     
     if "/teste" in user_cmd:
-        await update.message.reply_text("🚀 [TELEGRAM] Iniciando teste de layout e roteamento...")
-        # target="telegram" garante que a resposta de alerta de teste fique só aqui
+        await update.message.reply_text("🚀 [TELEGRAM] Iniciando sequência de testes...")
         await run_full_test(target="telegram")
-        # Força uma atualização visual imediata do painel
         await update_panel() 
         
     elif "/ping" in user_cmd:
         await update.message.reply_text(f"🏓 Pong! Wootteo operando há {get_uptime()}")
 
-# No Discord (Slash Command)
+    elif "/comandos" in user_cmd:
+        msg_ajuda = (
+            "🤖 **Comandos Disponíveis (Telegram):**\n\n"
+            "🔹 `/ping` - Verifica se o bot está online e o tempo de atividade.\n"
+            "🔹 `/teste` - Executa um teste de alerta e atualiza o painel.\n"
+            "🔹 `/comandos` - Lista os comandos disponíveis."
+        )
+        await update.message.reply_text(msg_ajuda, parse_mode="Markdown")
+
+# --- DISCORD (Slash Commands) ---
+
 @bot_discord.tree.command(name="teste", description="Executa o teste de layout exclusivo no Discord")
 async def teste_discord(interaction: discord.Interaction):
-    # Resposta rápida para evitar erro de timeout no Discord
-    await interaction.response.send_message("🚀 [DISCORD] Iniciando sequência de testes...", ephemeral=True)
-    
-    # target="discord" garante que a resposta de alerta de teste fique só nos canais do Discord
+    # Agora visível para todos no canal
+    await interaction.response.send_message("🚀 [DISCORD] Iniciando sequência de testes nos canais...")
     await run_full_test(target="discord")
-    
-    # Força atualização visual do painel no Discord
     await update_panel()
 
 @bot_discord.tree.command(name="ping", description="Verifica a saúde do bot")
 async def ping_discord(interaction: discord.Interaction):
-    await interaction.response.send_message(f"🏓 Pong! Wootteo operando há {get_uptime()}", ephemeral=True)
+    # Agora visível para todos no canal
+    await interaction.response.send_message(f"🏓 Pong! Wootteo operando há {get_uptime()}")
+
+@bot_discord.tree.command(name="comandos", description="Exibe a lista de comandos do bot")
+async def comandos_discord(interaction: discord.Interaction):
+    msg_ajuda = (
+        "🤖 **Comandos Disponíveis (Discord):**\n\n"
+        "🔹 `/ping` - Verifica a saúde e uptime do bot.\n"
+        "🔹 `/teste` - Testa o envio de alertas nos canais sociais.\n"
+        "🔹 `/comandos` - Exibe esta lista de ajuda."
+    )
+    # Enviado para o canal de forma pública
+    await interaction.response.send_message(msg_ajuda)
 
 # =========================
 # 18 FETCH UNIVERSAL
