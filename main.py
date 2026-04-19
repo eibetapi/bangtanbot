@@ -1190,31 +1190,42 @@ async def monitor_loop():
 # =========================
 # 41 INICIALIZAÇÃO (MAIN)
 # =========================
-async def main():
-    # 🔥 CORREÇÃO 1: Definir o Token (verifique se o nome da variável está correto)
-    # Se você usa variáveis de ambiente, use: os.getenv('DISCORD_TOKEN')
-    TOKEN = "SEU_TOKEN_AQUI" 
+import os
+import signal
 
-    print("[SISTEMA] Conectando ao Discord...")
+async def main():
+    # Pega o token das variáveis de ambiente
+    TOKEN = os.getenv('DISCORD_TOKEN')
     
-    # Criamos a tarefa do monitor, mas ele vai esperar o bot logar
-    asyncio.create_task(monitor_loop())
+    # Criamos a tarefa do monitor
+    monitor_task = asyncio.create_task(monitor_loop())
 
     try:
-        # 🔥 CORREÇÃO 2: O start deve ser a última linha para manter o bot vivo
+        print("[SISTEMA] Iniciando Bot Arirang Tour...")
+        # O start mantém o bot rodando
         await bot_discord.start(TOKEN)
     except Exception as e:
-        print(f"[ERRO CRÍTICO] Falha ao iniciar: {e}")
+        print(f"[ERRO NO START] {e}")
+    finally:
+        # ✅ CORREÇÃO: Garante que o monitor e o bot fechem tudo ao sair
+        if not bot_discord.is_closed():
+            await bot_discord.close()
+        
+        monitor_task.cancel()
+        print("[SISTEMA] Conexões encerradas com segurança.")
 
 # =========================
 # 42 PONTO DE ENTRADA
 # =========================
 if __name__ == "__main__":
     try:
+        # Usamos o novo padrão do Python para rodar o loop principal
         asyncio.run(main())
     except KeyboardInterrupt:
+        # Silencia o erro de fechar manual (Ctrl+C)
         pass
     except Exception as e:
-        print(f"[FATAL] Erro no loop principal: {e}")
+        print(f"[FATAL] Ocorreu um erro inesperado: {e}")
+
 
 
