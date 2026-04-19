@@ -597,62 +597,65 @@ async def run_full_test():
     """Executa a sequência de testes enviando para os canais específicos."""
     t_link = "https://www.ticketmaster.com.br/arirang-test"
     
-    # 1. Testes de Tickets (Vão para a sala de Tickets)
+    # 1. Testes de Tickets
     await test_ticket_reposicao(t_link, "28/10/2026", True)
     await asyncio.sleep(1)
     await test_agenda({"date": "28/10/2026", "city": "São Paulo", "country": "Brasil"})
     
-    # 2. Testes de Weverse (Vão para a sala de Weverse)
+    # 2. Testes de Weverse
     await asyncio.sleep(1)
     await test_weverse_post(t_link, "bts", "Update", "Conteúdo Teste", True)
     
-    # 3. Testes de Redes Sociais (Vão para a sala Social)
+    # 3. Testes de Redes Sociais
     await asyncio.sleep(1)
     await test_instagram_post(t_link, "bts", "post", True)
     await test_tiktok_post("https://www.tiktok.com/@bts_official_bighit", "bts", "video", True)
 
-# --- FUNÇÕES DE LAYOUT PARA O TESTE (AJUSTADAS) ---
+# --- FUNÇÕES DE LAYOUT PARA O TESTE (CORRIGIDAS COM ASPAS TRIPLAS) ---
 
 async def test_ticket_reposicao(url, key, found):
-    msg = f"{TEST_HEADER}\n\n
+    # CORREÇÃO: f""" permite pular linhas sem quebrar o código
+    msg = f"""{TEST_HEADER}
 
-🔥*ALERTA DE REPOSIÇÃO*🔥\n
-
-📅 *Data:* 28/10/2026\n
-🔗 *Link:* {url}\n
-✅ *Status:* Liberado"
+🔥*ALERTA DE REPOSIÇÃO*🔥
+📅 *Data:* 28/10/2026
+🔗 *Link:* {url}
+✅ *Status:* Liberado"""
     await send_alert("reposicao", msg)
 
 async def test_agenda(data):
-    msg = f"{TEST_HEADER}\n\n
+    msg = f"""{TEST_HEADER}
 
-💜*AGENDA NOVAS DATAS*💜\n
-📅 *Data:* 28/10/2026\n
-🏙️ *Cidade:* São Paulo\n
-🌎 *País:* Brasil"
+💜*AGENDA NOVAS DATAS*💜
+📅 *Data:* 28/10/2026
+🏙️ *Cidade:* São Paulo
+🌎 *País:* Brasil"""
     await send_alert("agenda", msg)
 
 async def test_weverse_post(url, member_name, title, message_translated, found):
-    msg = f"{TEST_HEADER}\n\n
+    msg = f"""{TEST_HEADER}
 
-🩷*WEVERSE POST*🩷\n
-👤 {member_name.upper()} publicou uma mensagem!\n
-🔗 {url}"
+🩷*WEVERSE POST*🩷
+👤 {member_name.upper()} publicou uma mensagem!
+🔗 {url}"""
     await send_alert("weverse_post", msg)
 
 async def test_instagram_post(url, member_name, title, found):
-    msg = f"{TEST_HEADER}\n\n
+    msg = f"""{TEST_HEADER}
 
-🌟*INSTAGRAM POST*🌟\n
-👤 {member_name} postou uma foto!\n🔗 {url}"
+🌟*INSTAGRAM POST*🌟
+👤 {member_name} postou uma foto!
+🔗 {url}"""
     await send_alert("instagram_post", msg)
 
 async def test_tiktok_post(url, member_name, title, found):
-    msg = f"{TEST_HEADER}\n\n
+    msg = f"""{TEST_HEADER}
 
-🎵*TIKTOK POST*🎵\n
-👤 {member_name.upper()} postou um vídeo!\n🔗 {url}"
+🎵*TIKTOK POST*🎵
+👤 {member_name.upper()} postou um vídeo!
+🔗 {url}"""
     await send_alert("tiktok_post", msg)
+
 
 # =============================================================
 # 17 COMANDOS (GATILHO DIRETO)
