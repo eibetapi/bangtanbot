@@ -4,51 +4,81 @@
 
 import asyncio
 import time
-import requests
 import hashlib
-from bs4 import BeautifulSoup
 import os
 import re
 from datetime import datetime
+from threading import Thread
+
+import discord
+from discord.ext import commands
+from discord import app_commands
+import aiohttp
+from bs4 import BeautifulSoup
+from flask import Flask
+from telegram import Bot
 
 # ==========================================
-# DEFINIÇÃO DE CONTADORES GLOBAIS (AQUI!)
+# 1 CONFIGURAÇÃO DE CREDENCIAIS & TELEGRAM
+# ==========================================
+
+# Recupera as chaves do Railway
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+CHAT_ID = -1003972186058  # Seu ID fixo
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+
+# Inicializa o Telegram com proteção contra erro NoneType
+bot_ticket = None
+if TELEGRAM_TOKEN:
+    try:
+        bot_ticket = Bot(token=TELEGRAM_TOKEN)
+        print("[SISTEMA] Telegram configurado com sucesso.")
+    except Exception as e:
+        print(f"[ERRO CONFIG TELEGRAM] {e}")
+
+# ==========================================
+# 2 CONTADORES GLOBAIS (AJUSTADOS)
 # ==========================================
 total_tickets = 0
 total_buy = 0
 total_weverse = 0
 total_social = 0
 
-# Timestamps para o painel não bugar
-last_ticket_check = 0
-last_buy_check = 0
-last_weverse_check = 0
-last_social_check = 0
+last_ticket_check = time.time()
+last_buy_check = time.time()
+last_weverse_check = time.time()
+last_social_check = time.time()
+
+start_time = time.time()
+
+# Cache de monitoramento
+CONTENT_HASH = {}
+SEEN_TICKET = set()
+SEEN_BUY = set()
+SEEN_WEVERSE = set()
+SEEN_SOCIAL = set()
 
 # =========================
-# 1 DISCORD (CORRIGIDO - INTENTS COMPLETOS)
+# 3 DISCORD SETUP
 # =========================
 
-import discord
-from discord.ext import commands
-from discord import app_commands
-
-# Configuração de Intents para evitar o erro de Shard e permitir status personalizado
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True          # Necessário para gerenciar permissões e alertas
-intents.presences = True        # Necessário para o status "Ouvindo Spotify/Arirang"
+intents.members = True
+intents.presences = True
 
-bot_discord = commands.Bot(
-    command_prefix="!",
-    intents=intents
-)
+bot_discord = commands.Bot(command_prefix="!", intents=intents)
+
+# IDs dos Canais
+DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
+DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
+DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
+DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
 
 @bot_discord.event
 async def on_ready():
     print(f"[DISCORD] Conectado como {bot_discord.user}")
     
-    # Define o status de "Ouvindo Arirang" logo no login
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening, 
@@ -63,113 +93,45 @@ async def on_ready():
     except Exception as e:
         print(f"[DISCORD SYNC ERROR] {e}")
 
-    # 🚀 BOOT ÚNICO (ANTI DUPLICAÇÃO)
-    await safe_boot()
-
-    # 🚀 MONITOR (UMA VEZ SÓ)
+    # Inicia o servidor web interno para o Railway não desligar
+    keep_alive()
+    
+    # Inicia o monitoramento
     bot_discord.loop.create_task(monitor_loop())
 
 # =========================
-# 2 TELEGRAM + FLASK
-# =========================
-
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
-from flask import Flask
-from threading import Thread
-
-# =========================
-# 3 KEEP ALIVE
+# 4 WEB SERVER (KEEP ALIVE)
 # =========================
 
 app_web = Flask(__name__)
 
 @app_web.route('/')
 def home():
-    return "Bots rodando"
+    return "Bots Arirang ativos"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
-    app_web.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False,
-        use_reloader=False
-    )
-
+    app_web.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 def keep_alive():
     if not getattr(keep_alive, "_running", False):
         Thread(target=run_web, daemon=True).start()
         keep_alive._running = True
 
-
 # =========================
-# 4 CONFIG
+# FUNÇÕES DE UTILIDADE
 # =========================
-
-CHAT_ID = -1003972186058
-
-start_time = time.time()
-
-bot_ticket = None
-
-panel_message_id = None
-panel_chat_id = CHAT_ID
-panel_initialized = False
-
-discord_panel_message_id = None
-
-DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
-DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
-DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
-DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
-
-check_ticket = 0
-check_buy = 0
-check_weverse = 0
-check_social = 0
-
-last_ticket_check = time.time()
-last_buy_check = time.time()
-last_weverse_check = time.time()
-last_social_check = time.time()
-
-SEEN_TICKET = set()
-SEEN_BUY = set()
-SEEN_WEVERSE = set()
-SEEN_SOCIAL = set()
-
-CONTENT_HASH = {}
 
 def make_hash(data: str):
-    return hashlib.sha256(
-        data.encode("utf-8", errors="ignore")
-    ).hexdigest()
-
+    return hashlib.sha256(data.encode("utf-8", errors="ignore")).hexdigest()
 
 def is_new(url: str, html: str):
-    """
-    ✔ Detecta mudança real de conteúdo
-    ✔ Evita spam duplicado
-    ✔ Funciona mesmo se página mudar levemente
-    """
-    if not html:
-        return False
-
+    if not html: return False
     new_hash = make_hash(html)
     old_hash = CONTENT_HASH.get(url)
-
-    # primeira vez vendo essa URL
-    if old_hash is None:
-        CONTENT_HASH[url] = new_hash
-        return True
-
-    # mudou conteúdo
     if old_hash != new_hash:
         CONTENT_HASH[url] = new_hash
         return True
-
     return False
 
 # =========================
@@ -1187,42 +1149,32 @@ async def monitor_loop():
             except Exception as e:
                 print(f"[MONITOR ERROR] {e}")
                 await asyncio.sleep(10)
-# =========================
-# 41 INICIALIZAÇÃO (MAIN)
-# =========================
-import os
-import signal
+@bot_discord.event
+async def on_ready():
+    print(f"✅ Logado como {bot_discord.user}")
+    
+    # Status de Ouvindo Arirang
+    await bot_discord.change_presence(
+        activity=discord.Activity(type=discord.ActivityType.listening, name="Arirang 🛸"),
+        status=discord.Status.online
+    )
+
+    # Sincroniza comandos / para o bot responder ao /teste
+    try:
+        synced = await bot_discord.tree.sync()
+        print(f"✅ {len(synced)} comandos slash sincronizados.")
+    except Exception as e:
+        print(f"❌ Erro na sincronização: {e}")
 
 async def main():
-    # Pega o token das variáveis de ambiente
-    TOKEN = os.getenv('DISCORD_TOKEN')
+    # Inicia o monitor loop em paralelo
+    asyncio.create_task(monitor_loop())
     
-    # Criamos a tarefa do monitor
-    monitor_task = asyncio.create_task(monitor_loop())
-
     try:
-        print("[SISTEMA] Iniciando Bot Arirang Tour...")
-        # O start mantém o bot rodando
-        await bot_discord.start(TOKEN)
+        await bot_discord.start(os.getenv('DISCORD_TOKEN'))
     except Exception as e:
-        print(f"[ERRO NO START] {e}")
-    finally:
-        # ✅ CORREÇÃO: Garante que o monitor e o bot fechem tudo ao sair
-        if not bot_discord.is_closed():
-            await bot_discord.close()
-        
-        monitor_task.cancel()
-        print("[SISTEMA] Conexões encerradas com segurança.")
+        print(f"[FATAL] Não foi possível iniciar o bot: {e}")
 
-# =========================
-# 42 PONTO DE ENTRADA
-# =========================
 if __name__ == "__main__":
-    try:
-        # Usamos o novo padrão do Python para rodar o loop principal
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        # Silencia o erro de fechar manual (Ctrl+C)
-        pass
-    except Exception as e:
-        print(f"[FATAL] Ocorreu um erro inesperado: {e}")
+    asyncio.run(main())
+
