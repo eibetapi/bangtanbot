@@ -1057,53 +1057,65 @@ async def monitor_loop():
         # intervalo seguro (evita flood + CPU alta)
         await asyncio.sleep(15)
 
- # =============================================================
-# 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL
+# =============================================================
+# 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL (CORRIGIDA)
 # =============================================================
 
 async def main():
-    # 1. Inicia o servidor Keep Alive (Flask/Web)
+
+    # =========================
+    # 21.1 KEEP ALIVE (FLASK)
+    # =========================
     keep_alive()
-    
-    # 2. Configurações do Telegram
+
+    # =========================
+    # 21.2 CONFIGURAÇÃO TELEGRAM
+    # =========================
     if TELEGRAM_TOKEN:
         from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-        
-        # Construção da Application
+
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-        
-        # Registro de Handlers
+
         application.add_handler(CommandHandler("ping", handle_commands_telegram))
         application.add_handler(CommandHandler("teste", handle_commands_telegram))
         application.add_handler(CommandHandler("comandos", handle_commands_telegram))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram))
-        
-        # Inicialização correta para evitar Conflict
+        application.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram)
+        )
+
         await application.initialize()
         await application.start()
-        
-        # O drop_pending_updates=True limpa mensagens antigas que causariam crash no boot
         await application.updater.start_polling(drop_pending_updates=True)
+
         print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
-    # 3. Inicia o Motor de Monitoramento (Loop do Bloco 17)
+    # =========================
+    # 21.3 MONITORAMENTO BOT LOOP
+    # =========================
     asyncio.create_task(monitor_loop())
     print("[SISTEMA] Motor de monitoramento Arirang iniciado.")
 
-    # 4. Inicia o Discord (Mantendo o loop vivo)
+    # =========================
+    # 21.4 DISCORD STARTUP
+    # =========================
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
+
         if token:
             print("[DISCORD] Tentando login...")
-            # Usamos o start() em vez de run() dentro do main async
             await bot_discord.start(token)
         else:
             print("[ERRO] Token do Discord não encontrado.")
+
     except Exception as e:
         print(f"[FATAL] Erro ao conectar ao Discord: {e}")
 
+
+# =========================
+# MAIN ENTRYPOINT
+# =========================
+
 if __name__ == "__main__":
-    # Padrão recomendado para rodar múltiplos bots assíncronos
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(main())
