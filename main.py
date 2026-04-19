@@ -784,39 +784,32 @@ async def test_tiktok_post(url, member_name, title, found, platform="both"):
     await send_alert("tiktok_post", msg, platform)
 
 # =============================================================
-# 17 MOTOR DE MONITORAMENTO (LIMPO DE CARACTERES DO DOCS)
+# 17 MOTOR DE MONITORAMENTO (LIMPEZA TOTAL DE CARACTERES)
 # =============================================================
 
 async def monitor_loop():
     """
     Motor principal: Gerencia o painel fixado e as varreduras.
     """
-    # 1. Aguarda o bot estar pronto
     await bot_discord.wait_until_ready()
     
-    # 2. Declaracao de Globais
     global panel_message_id, discord_panel_msg_id
     global total_tickets, total_buy, total_weverse, total_social
     global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
 
-    # 3. Inicializacao dos Paineis
     try:
         await send_boot()
         await update_discord_panel()
-        print("[SISTEMA] Paineis Arirang inicializados com sucesso.")
+        print("[SISTEMA] Paineis inicializados.")
     except Exception as e:
-        print(f"[BOOT ERROR] Falha ao iniciar: {e}")
+        print(f"[BOOT ERROR] {e}")
 
-    # 4. Loop Infinito de Varredura
     async with aiohttp.ClientSession() as session:
-        print("[MONITOR] Loop de varredura iniciado.")
         while True:
             try:
-                # Se o post foi deletado, o ID estara None e ele recria
                 if panel_message_id is None:
                     await send_boot()
 
-                # --- VARREDURA ---
                 await check_ticketmaster(session)
                 await asyncio.sleep(2)
                 await check_buyticket(session)
@@ -825,19 +818,17 @@ async def monitor_loop():
                 await asyncio.sleep(2)
                 await check_social(session)
 
-                # --- ATUALIZACAO DOS PAINEIS ---
                 try:
                     await update_panel()          
                     await update_discord_panel()
                 except Exception as up_err:
                     if "not found" in str(up_err).lower():
                         panel_message_id = None
-                    print(f"[UPDATE ERROR] {up_err}")
 
                 await asyncio.sleep(30)
 
             except Exception as e:
-                print(f"[MONITOR ERROR] Falha no ciclo: {e}")
+                print(f"[MONITOR ERROR] {e}")
                 await asyncio.sleep(10)
 
 # =============================================================
@@ -957,5 +948,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         print("\n[DESLIGANDO] Motores Arirang parados com sucesso. Até logo, Wootteo! 🛸")
-
-
