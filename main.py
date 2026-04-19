@@ -1035,39 +1035,55 @@ async def on_ready():
         activity=discord.Activity(type=discord.ActivityType.listening, name=status_formatado),
         status=discord.Status.online
     )
-    try: await bot_discord.tree.sync()
-    except Exception as e: print(f"❌ Erro na sincronização: {e}")
+    try:
+        await bot_discord.tree.sync()
+    except Exception as e:
+        print(f"❌ Erro na sincronização Discord: {e}")
 
 # ==========================================
 # 21 INICIALIZAÇÃO FINAL (MAIN)
 # ==========================================
 
 async def main():
+    # 1. Inicia o servidor Keep Alive
     keep_alive()
     
-    if bot_ticket:
-        from telegram.ext import MessageHandler, CommandHandler, filters
+    # 2. Configurações do Telegram
+    if TELEGRAM_TOKEN:
+        from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
+        
+        # CRIAMOS A APPLICATION AQUI PARA EVITAR O NAMEERROR
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        
+        # Registra os comandos no Telegram
         application.add_handler(CommandHandler("ping", handle_commands_telegram))
         application.add_handler(CommandHandler("teste", handle_commands_telegram))
         application.add_handler(CommandHandler("comandos", handle_commands_telegram))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram))
         
+        # Inicia o motor do Telegram
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
-        print("[SISTEMA] Telegram operativo.")
+        print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
+    # 3. Inicia o Motor de Monitoramento em segundo plano
     asyncio.create_task(monitor_loop())
+    print("[SISTEMA] Motor de monitoramento Arirang iniciado.")
 
+    # 4. Inicia o Discord (Bloqueante)
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
         if token:
+            print("[DISCORD] Tentando login...")
             await bot_discord.start(token)
+        else:
+            print("[ERRO] Token do Discord não encontrado.")
     except Exception as e:
-        print(f"[FATAL] Erro Discord: {e}")
+        print(f"[FATAL] Erro ao conectar ao Discord: {e}")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        pass
+        print("\n[DESLIGANDO] Motores Arirang parados.")
