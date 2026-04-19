@@ -938,7 +938,8 @@ async def on_ready():
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening, 
-            name="Em tournê! Ouvindo: Arirang 🪭"  
+            name="Em tournê! Ouvindo: Arirang 🪭
+           🎮jogando: BTS Island"  
         ),
         status=discord.Status.online
     )
