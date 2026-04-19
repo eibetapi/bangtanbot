@@ -381,126 +381,63 @@ async def send_to_all(alert_type, message):
         print(f"[DISCORD ROUTING ERROR] {e}")
 
 # =============================================================
-# 12 FUNÇÃO DE BOOT (ENTREGA IMEDIATA DO PAINEL COMPLETO)
+# 12 FUNÇÃO DE ATUALIZAÇÃO (LEITURA REAL DOS DADOS)
 # =============================================================
 
-async def send_boot():
-    """Lança o painel oficial completo no Telegram e Discord sem textos de espera."""
-    global panel_message_id, panel_chat_id, panel_initialized, discord_panel_msg_id
-    
-    # 1. Coleta os dados reais imediatamente para o primeiro post
-    data_show, city, dias = get_next_show()
-    
-    # 2. Monta o seu LAYOUT OBRIGATÓRIO INTEGRAL (Exatamente como solicitado)
-    layout_final = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
+async def update_panel():
+    # Puxa todas as variáveis para dentro da função
+    global panel_message_id, panel_chat_id, discord_panel_msg_id
+    global total_weverse, total_social, total_tickets, total_buy
+    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
+
+    try:
+        data_show, city, dias = get_next_show()
+        
+        # Monta o texto lendo os valores que o monitor_loop injeta
+        text = f"""🪭⊙⊝⊜ARIRANG TOUR⊙⊝⊜🪭
 
 ✈️ PRÓXIMAS DATAS
 🎫 Data: {data_show}
 📍 Local: {city}
 🔔 Faltam {dias} dias.
 
-•°• 👾•°• •°•°*ATUALIZAÇÕES* •°• •°• •°• 🛸
+•°• 👾•°• •°• •°• •°*ATUALIZAÇÕES* •°• •°• •°• •°• •°• 🛸
 
 🟣 Weverse {status_color(last_weverse_check)}
    🎯 Acessos realizados: {total_weverse}
-  ⏳ Último rastreio há: {minutes_since(last_weverse_check)} min
+   ⏱ Último rastreio há: {minutes_since(last_weverse_check)} min
 
 ⚪ Redes sociais {status_color(last_social_check)}
    🎯 Acessos realizados: {total_social}
-   ⏳Último rastreio há: {minutes_since(last_social_check)} min
+   ⏱ Último rastreio há: {minutes_since(last_social_check)} min
 
 🟠 Ticketmaster {status_color(last_ticket_check)}
    🎯 Acessos realizados: {total_tickets}
-   ⏳ Último rastreio há: {minutes_since(last_ticket_check)} min
+   ⏱ Último rastreio há: {minutes_since(last_ticket_check)} min
 
 🔵 Buyticket {status_color(last_buy_check)}
    🎯 Acessos realizados: {total_buy}
-   ⏳ Último rastreio há: {minutes_since(last_buy_check)} min
+   ⏱ Último rastreio há: {minutes_since(last_buy_check)} min
 """
+        # EDITAR NO TELEGRAM (Não envia novo, apenas edita o ID salvo)
+        if bot_ticket and panel_message_id:
+            try:
+                await bot_ticket.edit_message_text(chat_id=panel_chat_id, message_id=panel_message_id, text=text)
+            except: pass
 
-    # --- ENVIO TELEGRAM (Posta e Fixa) ---
-    if bot_ticket and CHAT_ID:
-        try:
-            # Envia direto o painel completo (sem boot_msg)
-            p_msg = await bot_ticket.send_message(chat_id=CHAT_ID, text=layout_final)
-            panel_message_id = p_msg.message_id
-            panel_chat_id = CHAT_ID
-            
-            # Fixa o painel no canal automaticamente
-            await bot_ticket.pin_chat_message(chat_id=CHAT_ID, message_id=panel_message_id)
-        except Exception as e:
-            print(f"[TELEGRAM BOOT ERROR] {e}")
-
-    # --- ENVIO DISCORD (Borda Roxa Direta) ---
-    try:
+        # EDITAR NO DISCORD
         canal = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-        if canal:
-            # Envia o painel dentro do Embed Roxo sem mensagens de texto fora dele
-            embed = discord.Embed(description=layout_final, color=0x9b59b6)
-            d_msg = await canal.send(embed=embed)
-            discord_panel_msg_id = d_msg.id
+        if canal and discord_panel_msg_id:
+            try:
+                msg = await canal.fetch_message(discord_panel_msg_id)
+                await msg.edit(embed=discord.Embed(description=text, color=0x9b59b6))
+            except: pass
+
     except Exception as e:
-        print(f"[DISCORD BOOT ERROR] {e}")
-
-    panel_initialized = True
-
+        print(f"[ERRO UPDATE PANEL] {e}")
 
 # =========================
-# 13 ALERTAS OFICIAIS
-# =========================
-
-async def ticket_reposicao(url, key, found):
-    if any(x in str(key) for x in ["28/10", "30/10", "31/10"]):
-        msg = f"""🔥*ALERTA DE REPOSIÇÃO*🔥
-📅 *Data:* {clean(key)}
-🔗 *Link:* {url}
-📍 *Setor:* ESGOTADO
-🎫 *Categoria:* ESGOTADO
-🛡️ *Tipo:* ESGOTADO
-✅ *Status:* {resolve_status(found)}
-"""
-        await send_to_all("reposicao", msg)
-
-async def ticket_nova_data(url, key, found):
-    if any(x in str(key) for x in ["28/10", "30/10", "31/10"]) or "Brasil" in str(key):
-        msg = f"""🎁*ALERTA DE NOVA DATA*🎁
-📅 *Data:* {clean(key)}
-🔗 *Link:* {url}
-📍 *Setor:* ESGOTADO
-🎫 *Categoria:* ESGOTADO
-🛡️ *Tipo:* ESGOTADO
-📊 *Quantidade:* ESGOTADO
-✅ *Status:* {resolve_status(found)}
-"""
-        await send_to_all("nova_data", msg)
-
-async def buy_revenda(url, key, found):
-    if any(x in str(key) for x in ["28/10", "30/10", "31/10"]):
-        msg = f"""🔵*REVENDA BUY*🔵
-📅 *Data:* {clean(key)}
-🔗 *Link:* {url}
-📍 *Setor:* ESGOTADO
-💰 *Valor:* ESGOTADO
-🎫 *Categoria:* ESGOTADO
-🛡️ *Tipo:* ESGOTADO
-✅ *Status:* {resolve_status(found)}
-"""
-        await send_to_all("revenda", msg)
-
-async def agenda_update(data):
-    country = str(data.get('country', ''))
-    city = str(data.get('city', ''))
-    if "Brasil" in country or "Paulo" in city or "Brasil" in str(data):
-        msg = f"""💜*AGENDA NOVAS DATAS*💜
-📅 *Data:* {clean(data.get('date'))}
-🏙️ *Cidade:* {clean(data.get('city'))}
-🌎 *País:* {clean(data.get('country'))}
-⚠️*Mais informações em breve!*
-"""
-        await send_to_all("agenda", msg)
-
-# =========================
-# 14 ALERTAS WEVERSE (CORRIGIDO)
+# 13 ALERTAS WEVERSE (CORRIGIDO)
 # =========================
 
 # Memórias para evitar spam de posts e lives repetidas
@@ -571,7 +508,7 @@ async def test_weverse_media(url, member_name, title, message_translated, found)
     await send_alert("weverse_media", msg)
 
 # =========================
-# 15 ALERTAS INSTAGRAM (CORRIGIDO)
+# 14 ALERTAS INSTAGRAM (CORRIGIDO)
 # =========================
 
 # Memória para evitar repetição do último post/story
@@ -629,9 +566,8 @@ async def instagram_live(url, member_name, title, found):
 """
     await send_alert("instagram_live", msg)
 
-
 # =========================
-# 16 ALERTAS TIKTOK (CORRIGIDO)
+# 15 ALERTAS TIKTOK (CORRIGIDO)
 # =========================
 
 # Memória para evitar que o mesmo post repita (Spam)
@@ -674,7 +610,7 @@ async def tiktok_live(url, member_name, title, found):
     await send_alert("tiktok_live", msg)
 
 # =============================================================
-# 17 SISTEMA DE TESTE (ROTEADO PARA AS SALAS CERTAS)
+# 16 SISTEMA DE TESTE (ROTEADO PARA AS SALAS CERTAS)
 # =============================================================
 
 TEST_HEADER = "⚠️ TESTE ⚠️"
@@ -719,9 +655,8 @@ async def test_tiktok_post(url, member_name, title, found):
     msg = f"{TEST_HEADER}\n\n🎵*TIKTOK POST*🎵\n👤 {member_name.upper()} postou um vídeo!\n🔗 {url}"
     await send_alert("tiktok_post", msg)
 
-
 # =============================================================
-# 18 COMANDOS (GATILHO DIRETO)
+# 17 COMANDOS (GATILHO DIRETO)
 # =============================================================
 
 # --- DISCORD (SLASH COMMAND) ---
@@ -741,66 +676,51 @@ async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT
         await run_full_test()
 
 # =============================================================
-# 19 SAFE BOOT E MOTOR DE MONITORAMENTO (CONTADORES LIGADOS)
+# 18 MOTOR DE MONITORAMENTO (SOMA E ATUALIZA)
 # =============================================================
 
-async def safe_boot():
-    global panel_initialized
-    if panel_initialized:
-        return
-    try:
-        await send_boot() # Dispara o painel oficial (Bloco 12)
-        panel_initialized = True
-    except Exception as e:
-        print(f"[SAFE_BOOT ERROR] {e}")
-
 async def monitor_loop():
-    """Motor principal que alimenta os contadores do painel."""
     await bot_discord.wait_until_ready()
-    await safe_boot()
+    await send_boot() # Garante que a mensagem existe
     
-    # Declaramos as globais para conseguir atualizar os números
-    global total_tickets, total_buy, total_weverse, total_social
-    global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
+    # IMPORTANTE: Declarar globais para que a soma saia daqui e chegue no painel
+    global total_weverse, total_social, total_tickets, total_buy
+    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
 
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                # 1. Ticketmaster
-                await check_ticketmaster(session)
-                total_tickets += 1
-                last_ticket_check = datetime.now()
-                await asyncio.sleep(2)
-
-                # 2. BuyTicket
-                await check_buyticket(session)
-                total_buy += 1
-                last_buy_check = datetime.now()
-                await asyncio.sleep(2)
-
-                # 3. Weverse
+                # 1. Rastreio Weverse
                 await check_weverse(session)
                 total_weverse += 1
                 last_weverse_check = datetime.now()
-                await asyncio.sleep(2)
-
-                # 4. Redes Sociais
+                
+                # 2. Rastreio Redes Sociais
                 await check_social(session)
                 total_social += 1
                 last_social_check = datetime.now()
 
-                # --- AÇÃO CRÍTICA: Atualiza o Painel com os novos números ---
+                # 3. Rastreio Ticketmaster
+                await check_ticketmaster(session)
+                total_tickets += 1
+                last_ticket_check = datetime.now()
+
+                # 4. Rastreio BuyTicket
+                await check_buyticket(session)
+                total_buy += 1
+                last_buy_check = datetime.now()
+
+                # --- AGORA CHAMA A ATUALIZAÇÃO ---
                 await update_panel() 
 
-                # Intervalo entre rodadas completas
-                await asyncio.sleep(30)
+                await asyncio.sleep(30) # Espera 30s para o próximo ciclo
 
             except Exception as e:
                 print(f"[MONITOR ERROR] {e}")
                 await asyncio.sleep(10)
 
 # =============================================================
-# 20 ENGINE DE ALERTA (BLOQUEIO DE CANAL INDEVIDO)
+# 19  ENGINE DE ALERTA (BLOQUEIO DE CANAL INDEVIDO)
 # =============================================================
 
 async def send_alert(alert_type, message):
@@ -846,7 +766,7 @@ async def send_alert(alert_type, message):
             print(f"[ERROR SEND_ALERT] {e}")
 
 # =========================
-# 21 FETCH UNIVERSAL
+# 20 FETCH UNIVERSAL
 # =========================
 
 async def fetch(session, url):
@@ -861,7 +781,7 @@ async def fetch(session, url):
         return None
 
 # =========================
-# 22 CHECKS (MONITORAMENTO ATIVO)
+# 21 CHECKS (MONITORAMENTO ATIVO)
 # =========================
 
 async def check_ticketmaster(session):
@@ -922,7 +842,7 @@ async def check_social(session):
             last_social_check = time.time()
             await update_panel()
 # =========================
-# 23 LOOP PRINCIPAL (MOTOR)
+# 22 LOOP PRINCIPAL (MOTOR)
 # =========================
 
 async def monitor_loop():
@@ -954,7 +874,7 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 # =========================
-# 24 DISCORD: EVENTO ON_READY
+# 23 DISCORD: EVENTO ON_READY
 # =========================
 
 @bot_discord.event
@@ -977,7 +897,7 @@ async def on_ready():
         print(f"❌ Erro na sincronização: {e}")
 
 # =========================
-# 25 INICIALIZAÇÃO FINAL (MAIN)
+# 24 INICIALIZAÇÃO FINAL (MAIN)
 # =========================
 
 async def main():
