@@ -366,7 +366,7 @@ name = str(member_name).upper()
 return emoji, name 
 
 # =========================
-# 10 CONTENT HASH + DETECÇÃO DE MUDANÇA (FIX INDENTAÇÃO)
+# 10 CONTENT HASH + DETECÇÃO DE MUDANÇA (FIX DEFINITIVO)
 # =========================
 
 CONTENT_HASH = {}
@@ -381,7 +381,7 @@ def is_new(url: str, html: str):
     """
     ✔ Detecta mudança real de conteúdo
     ✔ Evita spam duplicado
-    ✔ Funciona mesmo com pequenas mudanças na página
+    ✔ Funciona de forma estável
     """
 
     if not html:
@@ -390,18 +390,15 @@ def is_new(url: str, html: str):
     new_hash = make_hash(html)
     old_hash = CONTENT_HASH.get(url)
 
-    # primeira vez vendo essa URL
     if old_hash is None:
         CONTENT_HASH[url] = new_hash
         return True
 
-    # conteúdo mudou
     if old_hash != new_hash:
         CONTENT_HASH[url] = new_hash
         return True
 
     return False
-
 
     # =========================
     # 11 TELEGRAM (SEMPRE PRIMEIRO)
