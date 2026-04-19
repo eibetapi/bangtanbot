@@ -276,24 +276,25 @@ async def get_session():
 # =========================
 
 MEMBER_EMOJI = {
-"rm": "🐨",
-"jin": "🐹",
-"suga": "🐱",
-"jhope": "🐿️",
-"jimin": "🐥",
-"v": "🐻",
-"jungkook": "🐰",
-"bts": "💜",
-"wootteo": "🛸"
+    "rm": "🐨",
+    "jin": "🐹",
+    "suga": "🐱",
+    "jhope": "🐿️",
+    "jimin": "🐥",
+    "v": "🐻",
+    "jungkook": "🐰",
+    "bts": "💜",
+    "wootteo": "🛸"
 }
 
 def get_member_emoji(member_name):
-return MEMBER_EMOJI.get(str(member_name).lower(), "💜")
+    return MEMBER_EMOJI.get(str(member_name).lower(), "💜")
 
 def format_member(member_name):
-emoji = get_member_emoji(member_name)
-name = str(member_name).upper()
-return emoji, name 
+    emoji = get_member_emoji(member_name)
+    name = str(member_name).upper()
+    return emoji, name
+
 
 # =========================
 # 10 DISCORD + TELEGRAM ROUTER (CORRIGIDO)
