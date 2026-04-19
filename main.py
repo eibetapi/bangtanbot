@@ -366,7 +366,7 @@ name = str(member_name).upper()
 return emoji, name 
 
 # =========================
-# 10 DISCORD + TELEGRAM ROUTER (LIMPO)
+# 10 DISCORD + TELEGRAM ROUTER (FIX TOTAL)
 # =========================
 
 CONTENT_HASH = {}
@@ -432,7 +432,6 @@ async def send_discord(channel_id, message):
             return await channel.send(message)
     except Exception:
         return None
-
 
     # =========================
     # 11 TELEGRAM (SEMPRE PRIMEIRO)
