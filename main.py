@@ -211,6 +211,10 @@ X_LINKS = [
     "https://x.com/BTS_twt"
 ]
 
+YOUTUBE_LINKS = [
+    "https://www.youtube.com/@BTS",
+]
+
 def get_next_show():
     """Calcula dias para 28/10/2026"""
     data_alvo = datetime(2026, 10, 28)
@@ -435,13 +439,13 @@ TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
 # O motor de busca no Bloco 8 lerá automaticamente a lista completa.
 
 # =============================================================
-# 12 & 12.1 GESTÃO DO PAINEL (TELEGRAM & DISCORD)
+# 12 GESTÃO DO PAINEL (TELEGRAM & DISCORD)
 # =============================================================
 
 async def update_panel():
     """
     Função mestra: Tenta editar os painéis existentes. 
-    Só cria novos se os IDs forem perdidos ou as mensagens deletadas.
+    Se não encontrar o ID, busca no histórico antes de criar um novo.
     """
     global panel_message_id, discord_panel_msg_id
     
@@ -450,51 +454,68 @@ async def update_panel():
 
     # --- LÓGICA TELEGRAM ---
     if bot_ticket and PANEL_CHAT_ID:
-        if panel_message_id:
-            try:
-                # Tenta APENAS editar
+        try:
+            # Busca automática se o ID for perdido
+            if not panel_message_id:
+                async for message in bot_ticket.get_chat_history(PANEL_CHAT_ID, limit=5):
+                    if message.from_user.id == bot_ticket.id:
+                        panel_message_id = message.message_id
+                        break
+
+            if panel_message_id:
                 await bot_ticket.edit_message_text(
                     chat_id=PANEL_CHAT_ID,
                     message_id=panel_message_id,
                     text=texto,
                     parse_mode="Markdown"
                 )
-            except Exception as e:
-                # Se cair aqui, é porque a mensagem foi deletada ou o ID é inválido
-                print(f"[AVISO] Painel TG não encontrado, criando novo... {e}")
-                panel_message_id = None
-        
-        # Se o ID está vazio (porque falhou acima ou é o boot), cria um novo
-        if panel_message_id is None:
-            try:
+            else:
                 msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown")
                 panel_message_id = msg.message_id
                 await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
-            except Exception as e:
-                print(f"[ERR TG CREATE] {e}")
+        except Exception as e:
+            print(f"[DEBUG] Erro Telegram: {e}")
+            if "not found" in str(e).lower(): panel_message_id = None
 
-    # --- LÓGICA DISCORD ---
+    # --- LÓGICA DISCORD (EMBED ROXO / SEM PIN) ---
     if DISCORD_PANEL_CHANNEL_ID:
         channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
         if channel:
-            if discord_panel_msg_id:
-                try:
+            embed = discord.Embed(description=texto, color=0x8A2BE2) # Borda Roxa
+            try:
+                # Busca automática se o ID for perdido
+                if not discord_panel_msg_id:
+                    async for message in channel.history(limit=5):
+                        if message.author == bot_discord.user:
+                            discord_panel_msg_id = message.id
+                            break
+
+                if discord_panel_msg_id:
                     msg = await channel.fetch_message(discord_panel_msg_id)
-                    await msg.edit(content=texto)
-                except Exception:
-                    discord_panel_msg_id = None
-            
-            if discord_panel_msg_id is None:
-                try:
-                    msg = await channel.send(content=texto)
+                    await msg.edit(content=None, embed=embed)
+                else:
+                    msg = await channel.send(embed=embed)
                     discord_panel_msg_id = msg.id
-                    try: await msg.pin()
-                    except: pass
-                except Exception as e:
-                    print(f"[ERR DC CREATE] {e}")
+            except Exception as e:
+                print(f"[DEBUG] Erro Discord: {e}")
+                discord_panel_msg_id = None
+
+def status_color(last_time):
+    """
+    Sistema de Semáforo:
+    🟢 < 40s (Acabou de atualizar / Piscando)
+    🟡 < 120s (Em espera para o próximo ciclo)
+    🔴 > 120s (Erro ou atraso no rastreio)
+    """
+    diff = time.time() - last_time
+    if diff < 40: return "🟢"
+    if diff < 120: return "🟡"
+    return "🔴"
+
+def minutes_since(last_time):
+    return int((time.time() - last_time) / 60)
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
-    """Padrão visual em NEGRITO para evitar itálico no Discord."""
     return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
 
 **✈️ PRÓXIMAS DATAS**
@@ -506,65 +527,21 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 •°•👾•°•° **ATUALIZAÇÕES** •°•°🛸
 
   🟣 **Weverse** {status_color(last_weverse_check)}
-  🎯 Acessos realizados:** {total_weverse}
-  ⏳ Último rastreio há:** {minutes_since(last_weverse_check)} min
+  🎯 Acessos realizados: **{total_weverse}**
+  ⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
 
   ⚪ **Redes sociais** {status_color(last_social_check)}
-  🎯 Acessos realizados:** {total_social}
-  ⏳ Último rastreio há:** {minutes_since(last_social_check)} min
+  🎯 Acessos realizados: **{total_social}**
+  ⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
 
   🟠 **Ticketmaster** {status_color(last_ticket_check)}
-  🎯 Acessos realizados:** {total_tickets}
-  ⏳ Último rastreio há:** {minutes_since(last_ticket_check)} min
+  🎯 Acessos realizados: **{total_tickets}**
+  ⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
 
   🔵 **Buyticket** {status_color(last_buy_check)}
-  🎯 Acessos realizados:** {total_buy}
-  ⏳ Último rastreio há:** {minutes_since(last_buy_check)} **min**"""
+  🎯 Acessos realizados: **{total_buy}**
+  ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**"""
 
-async def update_panel():
-    """Edita as mensagens existentes em vez de criar novas."""
-    global panel_message_id, discord_panel_msg_id
-    
-    data_show, city, d_prox, d_br = get_countdown_data()
-    texto = gerar_texto_painel(data_show, city, d_prox, d_br)
-
-    # --- EDITAR TELEGRAM ---
-    if panel_message_id and bot_ticket:
-        try:
-            await bot_ticket.edit_message_text(
-                chat_id=PANEL_CHAT_ID,
-                message_id=panel_message_id,
-                text=texto,
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            print(f"[DEBUG] Erro ao editar Telegram: {e}")
-            # Se a mensagem foi deletada, resetamos para o send_boot criar outra
-            if "message to edit not found" in str(e).lower():
-                panel_message_id = None
-
-    # --- EDITAR DISCORD ---
-    await update_discord_panel(texto)
-
-async def update_discord_panel(conteudo):
-    global discord_panel_msg_id
-    if not DISCORD_PANEL_CHANNEL_ID: return
-    
-    channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-    if not channel: return
-
-    try:
-        if discord_panel_msg_id is None:
-            msg = await channel.send(content=conteudo)
-            discord_panel_msg_id = msg.id
-            try: await msg.pin()
-            except: pass
-        else:
-            msg = await channel.fetch_message(discord_panel_msg_id)
-            await msg.edit(content=conteudo)
-    except Exception as e:
-        print(f"[ERR DISCORD] {e}")
-        discord_panel_msg_id = None
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
@@ -1012,7 +989,7 @@ async def check_weverse(session):
             total_weverse += 1
             html = await fetch(session, url)
             if html and is_new(url, html):
-                # Aqui você pode chamar a função de alerta do Weverse
+                # Logica Weverse (Ex: weverse_post)
                 pass
         except Exception as e:
             print(f"[ERR WEVERSE] {e}")
@@ -1028,34 +1005,35 @@ async def check_social(session):
             total_social += 1
             html = await fetch(session, url)
             if html and is_new(url, html):
-                # Logica de disparo de alerta social
+                # Aqui dispara as funções tiktok_post, instagram_post, etc
                 pass
         except Exception as e:
             print(f"[ERR SOCIAL] {e}")
 
 async def check_youtube(session):
-    """Monitoramento de Vídeos e Lives no Canal Oficial"""
-    global last_youtube_check, total_youtube
+    """Monitoramento de Vídeos e Lives integrado ao módulo de Redes Sociais"""
+    global last_social_check, total_social
     youtube_url = "https://www.youtube.com/@BTS"
     
-    last_youtube_check = time.time()
+    # Atualiza o timestamp social para o painel piscar em verde/amarelo
+    last_social_check = time.time()
+    
     try:
-        total_youtube += 1
-        # Busca a aba de vídeos para detectar novidades e lives
+        total_social += 1
         html = await fetch(session, f"{youtube_url}/videos")
         
         if html:
-            # Detecta se há uma live acontecendo
+            # Identificação de Live
             is_live = '{"text":"AO VIVO"}' in html or '"style":"LIVE"' in html or "watch?v=" in html and "live" in html.lower()
             
             if is_live:
-                # Dispara alerta de LIVE se for novidade
                 if is_new(youtube_url + "/live", "LIVE"):
-                    await enviar_alerta_social(f"🚨 **LIVE NO YOUTUBE!**\n\nO canal do BTS está ao vivo agora!\n🔗 {youtube_url}/live")
+                    await youtube_live(youtube_url)
             
+            # Identificação de Vídeo Novo
             elif is_new(youtube_url, html):
-                # Dispara alerta de VÍDEO NOVO
-                await enviar_alerta_social(f"🔴 **VÍDEO NOVO NO YOUTUBE**\n\nConteúdo novo disponível no canal @BTS!\n🔗 {youtube_url}")
+                # Tenta capturar o link do vídeo mais recente se possível, ou usa o da aba vídeos
+                await youtube_post(youtube_url, youtube_url)
                 
     except Exception as e:
         print(f"[ERR YOUTUBE] {e}")
