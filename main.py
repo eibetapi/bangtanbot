@@ -24,18 +24,23 @@ from telegram.ext import ContextTypes
 # ==========================================
 # 1 CONFIGURAÇÃO DE CREDENCIAIS & TELEGRAM
 # ==========================================
-
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-
-# Corrigido: Removido caractere invisível/espaço após o ID
-CHAT_ID = -1003920883053 
-
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Dicionário para rastrear a última mensagem do painel e evitar spam
-panel_message = None 
+PANEL_CHAT_ID = -1003920883053
+
+# Variáveis de Controle de Persistência
+panel_message_id = None      
+discord_panel_msg_id = None  
 panel_initialized = False
 
+# IDs dos Canais do Discord (DEFINIDOS AQUI)
+DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
+DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
+DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
+DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
+
+# Inicialização do Bot Telegram
 bot_ticket = None
 if TELEGRAM_TOKEN:
     try:
@@ -75,17 +80,11 @@ intents.members = True
 
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
 
-# IDs dos Canais (Confirmado o final ...625 para o Painel)
-DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
-DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
-DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
-DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
-
 @bot_discord.event
 async def on_ready():
     print(f"[DISCORD] Conectado como {bot_discord.user}")
     
-    # Define a frase exatamente como você solicitou
+    # Define a presença do bot
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening, 
@@ -94,13 +93,14 @@ async def on_ready():
         status=discord.Status.online
     )
 
+    # Sincroniza comandos slash
     try:
         synced = await bot_discord.tree.sync()
         print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
     except Exception as e:
         print(f"[DISCORD SYNC ERROR] {e}")
 
-    # Inicia o servidor Keep Alive e o Loop de Monitoramento
+    # Inicia o servidor Keep Alive
     keep_alive()
     
     # Garante que o monitor só inicie se não houver um rodando
@@ -434,55 +434,50 @@ TIKTOK_LINKS = {"bts": "https://www.tiktok.com/@bts_official_bighit"}
 # 12 FUNÇÃO DE BOOT (TELEGRAM - CRIAÇÃO E FIXAÇÃO)
 # =============================================================
 
-panel_message_id = None
-panel_initialized = False
-
 async def send_boot():
     global panel_message_id, panel_initialized
-    # Importante: Variáveis globais para o contador não zerar no boot
-    global total_tickets, total_buy, total_weverse, total_social
-    global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
     
+    # Se já existe um ID na memória, não cria um novo para não duplicar fixados
     if panel_message_id is not None:
         return
 
-    # Usando a função unificada de agenda
     data_show, city, d_prox, d_br = get_countdown_data()
-    
-    # Negrito com '*' para compatibilidade total no Telegram
-    text = f"""🪭⊙⊝⊜*ARIRANG TOUR*⊙⊝⊜🪭
+    texto = f"""🪭 *⊙⊝⊜ARIRANG TOUR⊙⊝⊜* 🪭
 
 *✈️ PRÓXIMAS DATAS*
 *🎫 Data:* {data_show}
 *📍 Local:* {city}
 *🔔 Faltam* {d_prox} *dias.*
-*🔔 Faltam* {d_br} *dias para o BTS no Brasil!* 
+*🔔 Faltam* {d_br} *dias para o BTS no Brasil!*
 
-*•°• 👾•°• °•°ATUALIZAÇÕES°•° •°•🛸*
+•°• 👾•°• °•°*ATUALIZAÇÕES*•°• °•°🛸
 
 *🟣 Weverse* {status_color(last_weverse_check)}
 *🎯 Acessos realizados:* {total_weverse}
-*⏳ Último rastreio há:* {minutes_since(last_weverse_check)} min
+*⏳ Último rastreio há:* {minutes_since(last_weverse_check)} *min*
 
 *⚪ Redes sociais* {status_color(last_social_check)}
 *🎯 Acessos realizados:* {total_social}
-*⏳ Último rastreio há:* {minutes_since(last_social_check)} min
+*⏳ Último rastreio há:* {minutes_since(last_social_check)} *min*
 
 *🟠 Ticketmaster* {status_color(last_ticket_check)}
 *🎯 Acessos realizados:* {total_tickets}
-*⏳ Último rastreio há:* {minutes_since(last_ticket_check)} min
+*⏳ Último rastreio há:* {minutes_since(last_ticket_check)} *min*
 
 *🔵 Buyticket* {status_color(last_buy_check)}
 *🎯 Acessos realizados:* {total_buy}
-*⏳ Último rastreio há:* {minutes_since(last_buy_check)} min"""
+*⏳ Último rastreio há:* {minutes_since(last_buy_check)} *min*"""
 
-    if bot_ticket and PANEL_CHAT_ID: # Certifique-se que PANEL_CHAT_ID está correto
+if bot_ticket and PANEL_CHAT_ID:
         try:
+            # Envia a mensagem inicial
             p_msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=text, parse_mode="Markdown")
             panel_message_id = p_msg.message_id
+            
+            # FIXA a mensagem (Isso sobrepõe fixados anteriores no topo)
             await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
             panel_initialized = True
-            print("[SISTEMA] Painel Telegram criado e fixado.")
+            print(f"[SISTEMA] Novo Painel Telegram fixado: {panel_message_id}")
         except Exception as e:
             print(f"[ERR BOOT TELEGRAM] {e}")
 
@@ -490,23 +485,14 @@ async def send_boot():
 # 12.1 PAINEL DISCORD (UPDATE - FIX CONTADORES)
 # =============================================================
 
-discord_panel_msg_id = None
-
-async def update_discord_panel():
-    global discord_panel_msg_id
-    # CRÍTICO: Sem isso o contador trava em 0
-    global total_tickets, total_buy, total_weverse, total_social
-    global last_ticket_check, last_buy_check, last_weverse_check, last_social_check
-    
-    channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-    if not channel: return
+async def update_panel():
+    global panel_message_id, PANEL_CHAT_ID
+    if not panel_message_id: return
 
     data_show, city, d_prox, d_br = get_countdown_data()
     
     embed = discord.Embed(color=0x8A2BE2)
-    
-    # Layout padronizado com o Telegram, usando negrito em tudo que é fixo
-    embed.description = f"""🪭⊙⊝⊜**ARIRANG TOUR**⊙⊝⊜🪭
+    embed.description = f"""🪭 **⊙⊝⊜ARIRANG TOUR⊙⊝⊜** 🪭
 
 **✈️ PRÓXIMAS DATAS**
 **🎫 Data:** {data_show}
@@ -514,40 +500,36 @@ async def update_discord_panel():
 **🔔 Faltam** {d_prox} **dias.**
 **🔔 Faltam** {d_br} **dias para o BTS no Brasil!**
 
- **•°• 👾•°• °•°ATUALIZAÇÕES°•° •°•🛸**
+•°• 👾•°• °•°**ATUALIZAÇÕES**•°• °•°🛸
 
 **🟣 Weverse** {status_color(last_weverse_check)}
 **🎯 Acessos realizados:** {total_weverse}
-**⏳ Último rastreio há:** {minutes_since(last_weverse_check)} min
+**⏳ Último rastreio há:** {minutes_since(last_weverse_check)} **min**
 
 **⚪ Redes sociais** {status_color(last_social_check)}
 **🎯 Acessos realizados:** {total_social}
-**⏳ Último rastreio há:** {minutes_since(last_social_check)} min
+**⏳ Último rastreio há:** {minutes_since(last_social_check)} **min**
 
 **🟠 Ticketmaster** {status_color(last_ticket_check)}
 **🎯 Acessos realizados:** {total_tickets}
-**⏳ Último rastreio há:** {minutes_since(last_ticket_check)} min
+**⏳ Último rastreio há:** {minutes_since(last_ticket_check)} **min**
 
 **🔵 Buyticket** {status_color(last_buy_check)}
 **🎯 Acessos realizados:** {total_buy}
-**⏳ Último rastreio há:** {minutes_since(last_buy_check)} min"""
+**⏳ Último rastreio há:** {minutes_since(last_buy_check)} **min**"""
 
-    try:
-        if discord_panel_msg_id is None:
-            async for message in channel.history(limit=10):
-                if message.author == bot_discord.user and message.embeds:
-                    discord_panel_msg_id = message.id
-                    await message.edit(embed=embed)
-                    return
-            
-            msg = await channel.send(embed=embed)
-            discord_panel_msg_id = msg.id
-        else:
-            msg = await channel.fetch_message(discord_panel_msg_id)
-            await msg.edit(embed=embed)
+ try:
+        await bot_ticket.edit_message_text(
+            chat_id=PANEL_CHAT_ID,
+            message_id=panel_message_id,
+            text=texto,
+            parse_mode="Markdown"
+        )
     except Exception as e:
-        print(f"[DISCORD PANEL ERR] {e}")
-        discord_panel_msg_id = None
+        # Se a mensagem foi deletada, o ID morre aqui
+        if "message to edit not found" in str(e).lower():
+            print("[AVISO] Mensagem fixada deletada. Resetando ID...")
+            panel_message_id = None
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
@@ -941,38 +923,44 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Erro na sincronização: {e}")
 
-# =========================
+# ==========================================
 # 21 INICIALIZAÇÃO FINAL (MAIN)
-# =========================
+# ==========================================
 
 async def main():
-    # 1. Inicia o monitor em segundo plano
-    asyncio.create_task(monitor_loop())
+    # 1. Inicia o servidor Keep Alive (Flask) para evitar que a hospedagem hiberne
+    keep_alive()
     
-    # 2. Configura Telegram
-    if 'application' in globals():
-        from telegram.ext import CommandHandler
-        application.add_handler(CommandHandler("teste", handle_commands_telegram))
-        application.add_handler(CommandHandler("ping", handle_commands_telegram))
-        
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-        print("[SISTEMA] Telegram operativo.")
+    # 2. Configurações iniciais do Telegram
+    # O monitor_loop usará o bot_ticket configurado no Bloco 1
+    if bot_ticket:
+        print("[SISTEMA] Telegram operativo e aguardando varredura.")
 
-    # 3. Inicia o Discord
+    # 3. Inicia o Motor de Monitoramento em segundo plano
+    # O monitor_loop() contém a lógica de:
+    # - Criar/Fixar o painel (send_boot)
+    # - Editar o painel existente (update_panel)
+    # - Recriar o painel se ele for deletado
+    asyncio.create_task(monitor_loop())
+    print("[SISTEMA] Motor de monitoramento Arirang iniciado.")
+
+    # 4. Inicia o Discord
+    # O bot.start() é uma função bloqueante, ela mantém o código rodando
     try:
-        token = os.getenv('DISCORD_TOKEN') or (DISCORD_TOKEN if 'DISCORD_TOKEN' in globals() else None)
+        token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
         if token:
+            print("[DISCORD] Tentando login...")
             await bot_discord.start(token)
         else:
-            print("[ERRO] Token do Discord não encontrado!")
+            print("[ERRO] Token do Discord não encontrado no ambiente (.env) ou no Bloco 1.")
     except Exception as e:
-        print(f"[FATAL] Erro ao iniciar bot: {e}")
+        print(f"[FATAL] Erro ao conectar ao Discord: {e}")
 
 if __name__ == "__main__":
     try:
+        # Ponto de entrada oficial para rodar a aplicação assíncrona
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        print("\n🛸 Desligando motores...")  
+        print("\n[DESLIGANDO] Motores Arirang parados com sucesso. Até logo, Wootteo! 🛸")
+
 
