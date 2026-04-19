@@ -784,7 +784,7 @@ async def test_tiktok_post(url, member_name, title, found, platform="both"):
     await send_alert("tiktok_post", msg, platform)
 
 # =============================================================
-# 17 MOTOR DE MONITORAMENTO (VERSÃO FINAL SEM ERROS)
+# 17 MOTOR DE MONITORAMENTO (ESTRUTURA INTEGRADA)
 # =============================================================
 
 async def monitor_loop():
@@ -850,7 +850,7 @@ async def monitor_loop():
 # =============================================================
 
 # No Telegram
-async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_commands_telegram(update, context):
     user_cmd = update.message.text.lower()
     if "/teste" in user_cmd:
         await update.message.reply_text("🚀 Iniciando sequência de testes Arirang...")
@@ -964,4 +964,3 @@ if __name__ == "__main__":
         print("\n[DESLIGANDO] Motores Arirang parados com sucesso. Até logo, Wootteo! 🛸")
 
 
-  
