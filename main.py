@@ -1224,28 +1224,23 @@ async def teste(interaction: discord.Interaction):
 
 
 # =========================
-# TELEGRAM START
+# TELEGRAM START (CORRIGIDO PARA ASYNC)
 # =========================
 
-if TELEGRAM_TOKEN:
+async def run_telegram_async():
+    if TELEGRAM_TOKEN:
+        from telegram.ext import ApplicationBuilder, CommandHandler
+        
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    from telegram import Bot
-    from telegram.ext import ApplicationBuilder, CommandHandler
-    from threading import Thread
+        application.add_handler(CommandHandler("ping", handle_commands_telegram))
+        application.add_handler(CommandHandler("teste", handle_commands_telegram))
+        application.add_handler(CommandHandler("comandos", handle_commands_telegram))
 
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-    application.add_handler(CommandHandler("ping", handle_commands_telegram))
-    application.add_handler(CommandHandler("teste", handle_commands_telegram))
-    application.add_handler(CommandHandler("comandos", handle_commands_telegram))
-
-    def run_telegram():
-        application.run_polling(
-            drop_pending_updates=True,
-            close_loop=False
-        )
-
-    Thread(target=run_telegram, daemon=True).start()
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        print("[SISTEMA] Telegram configurado com sucesso.")
 
 
 # =========================
@@ -1456,6 +1451,31 @@ def safe_increment(counter_name):
 
     elif counter_name == "social":
         total_social += 1
+
+
+# =========================
+# FINAL EXECUTION ENGINE
+# =========================
+
+async def main():
+    # Inicia o Flask
+    keep_alive()
+
+    # Inicia o Telegram (Async)
+    await run_telegram_async()
+
+    # Inicia o Monitor Loop em segundo plano
+    asyncio.create_task(monitor_loop())
+
+    # Inicia o Discord (Bloqueante)
+    async with bot_discord:
+        await bot_discord.start(DISCORD_TOKEN)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("[SISTEMA] Encerrando...")
 
 # =========================
 # 19 DISCORD ON_READY + SYNC (FIX DEFINITIVO)
