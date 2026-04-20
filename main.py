@@ -375,42 +375,29 @@ def format_member(member_name):
     name = str(member_name).upper()
     return emoji, name
 
+
 # =========================
-# 11 ROTEAMENTO E ENVIO (CORRIGIDO)
+# TEST MODE (CHECKLIST)
 # =========================
-
-import discord
-import asyncio
-
-# -------------------------
-# DISCORD SEND FIX REAL
-# -------------------------
-async def send_discord(channel_id, message):
-    try:
-        if not bot_discord:
-            return
-
-        channel = bot_discord.get_channel(channel_id)
-
-        # fallback caso cache não tenha o canal
-        if channel is None:
-            channel = await bot_discord.fetch_channel(channel_id)
-
-        if channel:
-            await channel.send(content=message)
-
-    except Exception as e:
-        print(f"[DISCORD SEND ERROR] {e}")
+TEST_MODE = False
 
 
-# -------------------------
-# TELEGRAM + DISCORD ROUTER
-# -------------------------
+# =========================
+# DISCORD SEND (ÚNICO E CORRIGIDO)
+# =========================
+async def send_discord(channel_id, content=None, embed=None):
+    channel = bot_discord.get_channel(channel_id)
+    if channel:
+        await channel.send(content=content, embed=embed)
+
+
+# =========================
+# ALERT ROUTER (SEM TELEGRAM NO TESTE)
+# =========================
 async def send_alert(alert_type, message):
-    # =========================
-    # TELEGRAM (sempre primeiro)
-    # =========================
-    if bot_ticket is not None:
+
+    # TELEGRAM BLOQUEADO NO TESTE
+    if bot_ticket is not None and not TEST_MODE:
         try:
             await bot_ticket.send_message(
                 chat_id=PANEL_CHAT_ID,
@@ -420,40 +407,73 @@ async def send_alert(alert_type, message):
         except Exception as e:
             print(f"[TELEGRAM ERROR] {e}")
 
-    # =========================
     # DISCORD ROUTING
-    # =========================
     try:
         if alert_type in ["ticket", "reposicao", "nova_data", "revenda", "agenda"]:
-            asyncio.create_task(
-                send_discord(DISCORD_TICKETS_CHANNEL_ID, message)
-            )
+            asyncio.create_task(send_discord(DISCORD_TICKETS_CHANNEL_ID, message))
 
         elif alert_type in ["weverse_post", "weverse_live", "weverse_news", "weverse_media"]:
-            asyncio.create_task(
-                send_discord(DISCORD_WEVERSE_CHANNEL_ID, message)
-            )
+            asyncio.create_task(send_discord(DISCORD_WEVERSE_CHANNEL_ID, message))
 
         elif alert_type in [
-            "instagram_post",
-            "instagram_reels",
-            "instagram_stories",
-            "instagram_live",
-            "tiktok_post",
-            "tiktok_live"
+            "instagram_post","instagram_reels","instagram_stories","instagram_live",
+            "tiktok_post","tiktok_live"
         ]:
-            asyncio.create_task(
-                send_discord(DISCORD_SOCIAL_CHANNEL_ID, message)
-            )
+            asyncio.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
 
         elif alert_type in ["youtube_post", "youtube_live"]:
-            # se quiser depois separa canal, por enquanto social
-            asyncio.create_task(
-                send_discord(DISCORD_SOCIAL_CHANNEL_ID, message)
-            )
+            asyncio.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
 
     except Exception as e:
         print(f"[DISCORD ROUTING ERROR] {e}")
+
+
+# =========================
+# /ping
+# =========================
+@bot_discord.tree.command(name="ping", description="Verifica status do bot")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message("🏓 Pong! Bot ativo.", ephemeral=True)
+
+
+# =========================
+# /comandos
+# =========================
+@bot_discord.tree.command(name="comandos", description="Lista comandos disponíveis")
+async def comandos(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "/ping\n/comandos\n/teste",
+        ephemeral=True
+    )
+
+
+# =========================
+# /teste (SEM TELEGRAM + ISOLADO)
+# =========================
+@bot_discord.tree.command(name="teste", description="Dispara alertas reais do sistema")
+async def teste(interaction: discord.Interaction):
+
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        global TEST_MODE
+        TEST_MODE = True
+
+        await run_full_test_discord()
+
+        TEST_MODE = False
+
+        await interaction.followup.send(
+            "✅ Teste executado com sucesso.",
+            ephemeral=True
+        )
+
+    except Exception as e:
+        TEST_MODE = False
+        await interaction.followup.send(
+            f"❌ Erro no teste: {e}",
+            ephemeral=True
+        )
 
 # =============================================================
 # 12 GESTÃO DO PAINEL (FIXO E ÚNICO)
