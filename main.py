@@ -456,75 +456,86 @@ async def send_alert(alert_type, message):
 # 12 GESTÃO DO PAINEL (FIXO E ÚNICO)
 # =============================================================
 
-async def update_panel(): 
-global panel_message_id, discord_panel_msg_id 
+async def update_panel():
+    global panel_message_id, discord_panel_msg_id
 
-data_show, city, d_prox, d_br = 
-get_countdown_data() 
+    data_show, city, d_prox, d_br = get_countdown_data()
 
-# Puxa o texto formatado da função abaixo 
-texto = gerar_texto_painel(data_show, city, d_prox, d_br) 
+    # Puxa o texto formatado da função abaixo
+    texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
-# --- TELEGRAM: BUSCA O MAIS RECENTE NO CANAL SE NÃO TIVER ID --- # 
+    # --- TELEGRAM: BUSCA O MAIS RECENTE NO CANAL SE NÃO TIVER ID ---
+    if bot_ticket and PANEL_CHAT_ID:
+        try:
+            if not panel_message_id:
+                panel_message_id = carregar_id_telegram()
 
-if bot_ticket and PANEL_CHAT_ID: 
-try: 
-if 
-not panel_message_id: 
-panel_message_id = carregar_id_telegram() 
+            if panel_message_id:
+                try:
+                    await bot_ticket.edit_message_text(
+                        chat_id=PANEL_CHAT_ID,
+                        message_id=panel_message_id,
+                        text=texto,
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    if "message to edit not found" in str(e).lower():
+                        panel_message_id = None
 
-if panel_message_id: 
-try: 
-await 
-bot_ticket.edit_message_text( 
-chat_id=PANEL_CHAT_ID, message_id=panel_message_id, 
-text=texto, 
-parse_mode="Markdown" 
-) 
-except Exception as e: 
-if "message to edit not found" in str(e).lower(): 
-panel_message_id = None 
+            if not panel_message_id:
+                try:
+                    await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
+                except:
+                    pass
 
-if not panel_message_id: 
-try: await 
-bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID) 
-except: pass 
-msg = await 
-bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto, parse_mode="Markdown") 
-panel_message_id = msg.message_id 
-salvar_id_telegram(panel_message_id) 
-try: await 
-bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id) 
-except: pass 
-except Exception as e: 
-print(f"[DEBUG] Falha update TG: {e}") 
+                msg = await bot_ticket.send_message(
+                    chat_id=PANEL_CHAT_ID,
+                    text=texto,
+                    parse_mode="Markdown"
+                )
 
-# --- DISCORD --- #
+                panel_message_id = msg.message_id
+                salvar_id_telegram(panel_message_id)
 
-if DISCORD_PANEL_CHANNEL_ID: 
-channel = 
-bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID) 
-if channel: 
-embed = discord.Embed(description=texto, color=0x8A2BE2) 
-try: 
-if not discord_panel_msg_id: 
-async for message in 
-channel.history(limit=10): 
+                try:
+                    await bot_ticket.pin_chat_message(
+                        chat_id=PANEL_CHAT_ID,
+                        message_id=panel_message_id
+                    )
+                except:
+                    pass
 
-if message.author == bot_discord.user: 
-discord_panel_msg_id = message.id 
-break 
+        except Exception as e:
+            print(f"[DEBUG] Falha update TG: {e}")
 
-if discord_panel_msg_id: 
-msg = await 
-channel.fetch_message(discord_panel_msg_id) 
-await msg.edit(content=None, embed=embed) 
-else: 
-msg = await channel.send(embed=embed) 
-discord_panel_msg_id = msg.id 
-except: pass 
+    # --- DISCORD ---
+    if DISCORD_PANEL_CHANNEL_ID:
+        channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
-def gerar_texto_painel(data_show, city, d_prox, d_br): global total_weverse, total_social, total_tickets, total_buy global last_weverse_check, last_social_check, last_ticket_check, last_buy_check    
+        if channel:
+            embed = discord.Embed(description=texto, color=0x8A2BE2)
+
+            try:
+                if not discord_panel_msg_id:
+                    async for message in channel.history(limit=10):
+                        if message.author == bot_discord.user:
+                            discord_panel_msg_id = message.id
+                            break
+
+                if discord_panel_msg_id:
+                    msg = await channel.fetch_message(discord_panel_msg_id)
+                    await msg.edit(content=None, embed=embed)
+                else:
+                    msg = await channel.send(embed=embed)
+                    discord_panel_msg_id = msg.id
+
+            except Exception as e:
+                print(f"[DEBUG] Falha update Discord: {e}")
+
+
+def gerar_texto_painel(data_show, city, d_prox, d_br):
+    global total_weverse, total_social, total_tickets, total_buy
+    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check 
 
     return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
 
