@@ -1128,20 +1128,31 @@ intents.guilds = True
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
 
 # =========================
-# MONITOR LOOP (CORE ENGINE)
+# MONITOR LOOP (CORE ENGINE - FIX)
 # =========================
+
 async def monitor_loop():
-    await bot_discord.wait_until_ready()
-    print("[SISTEMA] Monitor ativo...")
+    # Aguarda o bot logar de fato antes de prosseguir
+    print("[SISTEMA] Aguardando conexão com Discord para iniciar monitoramento...")
+    while not bot_discord.is_ready():
+        await asyncio.sleep(2)
+    
+    print("[SISTEMA] Conexão estabelecida! Monitor Arirang ativo.")
 
     async with aiohttp.ClientSession() as session:
         while True:
             try:
+                # Se o bot cair por algum motivo, ele pausa o loop até voltar
+                if not bot_discord.is_ready():
+                    await asyncio.sleep(5)
+                    continue
+
                 await check_ticketmaster(session)
                 await check_buyticket(session)
                 await check_weverse(session)
                 await check_social(session)
                 await update_panel()
+                
                 await asyncio.sleep(25)
             except Exception as e:
                 print(f"[MONITOR ERROR] {e}")
