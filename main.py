@@ -1046,6 +1046,16 @@ async def test_youtube_live(url="https://www.youtube.com/@BTS/live", platform="b
 # =============================================================
 
 # =========================
+# BOT DISCORD (FIX CRÍTICO)
+# =========================
+intents = discord.Intents.default()
+intents.message_content = True
+intents.guilds = True
+
+bot_discord = commands.Bot(command_prefix="!", intents=intents)
+
+
+# =========================
 # MONITOR PRINCIPAL
 # =========================
 async def monitor_loop():
@@ -1103,13 +1113,14 @@ async def handle_commands_telegram(update, context):
 
 
 # =========================
-# COMANDO DISCORD (APENAS 1 CAMADA)
+# DISCORD SLASH COMMAND (/teste)
 # =========================
 @bot_discord.tree.command(
     name="teste",
     description="Dispara alertas reais do sistema"
 )
 async def teste_discord(interaction: discord.Interaction):
+
     await interaction.response.defer(ephemeral=True)
 
     try:
