@@ -501,10 +501,13 @@ def salvar_id_telegram(message_id):
 async def update_panel():
     global panel_message_id, discord_panel_msg_id
 
+    # Obtém os dados variáveis (datas e cidades)
     data_show, city, d_prox, d_br = get_countdown_data()
 
+    # Gera o texto formatado com o contador de uptime incluso
     texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
+    # --- ATUALIZAÇÃO TELEGRAM ---
     if bot_ticket and PANEL_CHAT_ID:
         try:
             if not panel_message_id:
@@ -533,9 +536,7 @@ async def update_panel():
                     text=texto,
                     parse_mode="Markdown"
                 )
-
                 panel_message_id = msg.message_id
-
                 salvar_id_telegram(panel_message_id)
 
                 try:
@@ -549,10 +550,11 @@ async def update_panel():
         except Exception as e:
             print(f"[DEBUG] Falha update TG: {e}")
 
+    # --- ATUALIZAÇÃO DISCORD ---
     if DISCORD_PANEL_CHANNEL_ID:
         channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
         if channel:
+            # No Discord, enviamos como Embed para ficar visualmente melhor
             embed = discord.Embed(description=texto, color=0x8A2BE2)
 
             try:
@@ -568,9 +570,8 @@ async def update_panel():
                 else:
                     msg = await channel.send(embed=embed)
                     discord_panel_msg_id = msg.id
-
-            except:
-                pass
+            except Exception as e:
+                print(f"[DEBUG] Falha update Discord: {e}")
 
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
@@ -588,7 +589,7 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
   🩷 Faltam **{d_br}** dias para o BTS no Brasil!
 
 
-•°•👾•°•° **ATUALIZAÇÕES** •°•°🛸
+•°•👾.  * .  *  .🌙  **ATUALIZAÇÕES**  .  *    💫 *  . *  •°•°🛸
 
 
   🟣 **Weverse** {status_color(last_weverse_check)}
@@ -609,6 +610,8 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
   🔵 **Buyticket** {status_color(last_buy_check)}
   🎯 Acessos realizados: **{total_buy}**
   ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**"""
+
+•°•👾. * . * .Wootteo em rota há: **{get_uptime()}**  * . * . ☄️. * * . 🌍* . . * 💫 * . * . •°•°🛸"""
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
@@ -1382,18 +1385,14 @@ async def handle_commands_telegram(update, context):
     elif user_cmd.startswith("/comandos"):
         await update.message.reply_text("/ping, /teste, /comandos")
 
-# =============================================================
+# =========================
 # 21 INICIALIZAÇÃO FINAL (MAIN) - TELEGRAM + DISCORD FIX
-# =============================================================
+# =========================
 
 async def main():
 
-    # 1. Keep Alive
     keep_alive()
 
-    # =========================================================
-    # TELEGRAM FIX DEFINITIVO (SEM CONFLITO EVENT LOOP)
-    # =========================================================
     if TELEGRAM_TOKEN:
 
         from telegram.ext import (
@@ -1405,7 +1404,6 @@ async def main():
 
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-        # Handlers únicos (evita duplicação de resposta)
         application.add_handler(CommandHandler("ping", handle_commands_telegram))
         application.add_handler(CommandHandler("teste", handle_commands_telegram))
         application.add_handler(CommandHandler("comandos", handle_commands_telegram))
@@ -1416,7 +1414,6 @@ async def main():
 
         print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
-        # ✔ CORRETO: rodar polling em thread (evita RuntimeError loop já rodando)
         from threading import Thread
 
         def run_telegram():
@@ -1424,20 +1421,15 @@ async def main():
 
         Thread(target=run_telegram, daemon=True).start()
 
-    # =========================================================
-    # MONITOR PRINCIPAL
-    # =========================================================
     asyncio.create_task(monitor_loop())
     print("[SISTEMA] Motor de monitoramento iniciado.")
 
-    # =========================================================
-    # DISCORD START (ASSÍNCRONO SEGURO)
-    # =========================================================
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
 
         if token:
-            asyncio.create_task(start_discord())
+            loop = asyncio.get_running_loop()
+            loop.create_task(start_discord())
         else:
             print("[ERRO] Token Discord não encontrado.")
 
@@ -1445,23 +1437,17 @@ async def main():
         print(f"[FATAL] Erro Discord: {e}")
 
 
-# =============================================================
+# =========================
 # 22 DISCORD ULTRA SAFE (ANTI DUPLICAÇÃO + START LIMPO)
-# =============================================================
+# =========================
 
 import discord
 from discord import app_commands
 
-# -------------------------
-# FLAG GLOBAL DE REGISTRO
-# -------------------------
 if not hasattr(bot_discord, "COMMANDS_LOADED"):
     bot_discord.COMMANDS_LOADED = False
 
 
-# =============================================================
-# REGISTRO ÚNICO DE COMANDOS
-# =============================================================
 async def register_discord_commands():
 
     if bot_discord.COMMANDS_LOADED:
@@ -1469,9 +1455,11 @@ async def register_discord_commands():
 
     print("[DISCORD] Registrando comandos uma única vez...")
 
-    # =========================
-    # /teste (ÚNICO E DEFINITIVO)
-    # =========================
+    existing = bot_discord.tree.get_command("teste")
+    if existing:
+        bot_discord.COMMANDS_LOADED = True
+        return
+
     @bot_discord.tree.command(
         name="teste",
         description="Dispara alertas reais do sistema"
@@ -1488,10 +1476,9 @@ async def register_discord_commands():
             embed = discord.Embed(
                 title="🧪 TESTE ARIRANG SYSTEM",
                 description="Execução completa de alertas simulados",
-                color=0x8A2BE2  # roxo
+                color=0x8A2BE2
             )
 
-            # canais corretos
             canais = [
                 DISCORD_TICKETS_CHANNEL_ID,
                 DISCORD_WEVERSE_CHANNEL_ID,
@@ -1518,9 +1505,6 @@ async def register_discord_commands():
     print("[DISCORD] Comandos registrados com sucesso.")
 
 
-# =============================================================
-# ON_READY (SYNC SEGURO + SEM DUPLICAÇÃO)
-# =============================================================
 @bot_discord.event
 async def on_ready():
 
@@ -1536,7 +1520,6 @@ async def on_ready():
 
     try:
         await register_discord_commands()
-
         synced = await bot_discord.tree.sync()
         print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
 
@@ -1544,9 +1527,6 @@ async def on_ready():
         print(f"[DISCORD ERROR SYNC] {e}")
 
 
-# =============================================================
-# START SEGURO DO DISCORD (SEM DUPLO START)
-# =============================================================
 async def start_discord():
 
     token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
@@ -1558,11 +1538,3 @@ async def start_discord():
     print("[DISCORD] Iniciando bot...")
 
     await bot_discord.start(token)
-
-
-# =============================================================
-# MAIN FIX (IMPORTANTE)
-# =============================================================
-# SUBSTITUIR qualquer start antigo por isso:
-
-asyncio.create_task(start_discord())
