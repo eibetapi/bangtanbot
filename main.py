@@ -86,36 +86,42 @@ SEEN_WEVERSE = set()
 SEEN_SOCIAL = set()
 
 # =========================
-# 3 DISCORD SETUP
+# 3 DISCORD SETUP (CLEAN FIX)
 # =========================
+
+import discord
+from discord.ext import commands
+from discord import app_commands
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
 intents.guilds = True
+intents.members = True
 
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
 
+# Controle interno anti-duplicação de comandos
+if not hasattr(bot_discord, "COMMANDS_LOADED"):
+    bot_discord.COMMANDS_LOADED = False
 
+
+# =========================
+# EVENTO ON_READY BASE (SEM SYNC AQUI)
+# =========================
 @bot_discord.event
 async def on_ready():
-
     print(f"✅ Logado no Discord como {bot_discord.user}")
 
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
-            name="Em tournê - ouvindo: Arirang 🪭"
+            name="Em tournê - Arirang 🪭"
         ),
         status=discord.Status.online
     )
 
-    try:
-        synced = await bot_discord.tree.sync()
-        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
-    except Exception as e:
-        print(f"[DISCORD SYNC ERROR] {e}")
-
+    # NÃO faz sync aqui pra evitar duplicação
+    # sync será controlado no bloco 22 (novo)
 # =========================
 # 4 WEB SERVER (KEEP ALIVE)
 # =========================
@@ -589,7 +595,7 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
   🩷 Faltam **{d_br}** dias para o BTS no Brasil!
 
 
-•°•👾.  * .  *  .🌙  **ATUALIZAÇÕES**  .  *    💫 *  . *  •°•°🛸
+•°•👾.  * .🌙  **ATUALIZAÇÕES**  .💫 *  . *  •°•°🛸
 
 
   🟣 **Weverse** {status_color(last_weverse_check)}
@@ -980,11 +986,11 @@ async def run_full_test(platform="both"):
 async def test_ticket_reposicao(url, key, found, platform="both"):
     msg = f"""
 {TEST_HEADER}
+
 🔥*ALERTA DE REPOSIÇÃO*🔥
 
 📅 *Data:* 28/10/2026
-🔗 *Link:* {url}
-
+🔗 *Link:* https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-28-10
 ✅ *Status:* Liberado
 """
 
@@ -994,11 +1000,13 @@ async def test_ticket_reposicao(url, key, found, platform="both"):
 async def test_agenda(data, platform="both"):
     msg = f"""
 {TEST_HEADER}
+
 💜*AGENDA NOVAS DATAS*💜
 
 📅 *Data:* 28/10/2026
 🏙️ *Cidade:* São Paulo
 🌎 *País:* Brasil
+🔗 *Link:* https://ibighit.com/en/bts/tour/
 """
 
     await send_alert("agenda", msg)
@@ -1007,11 +1015,11 @@ async def test_agenda(data, platform="both"):
 async def test_weverse_post(url, member_name, title, message_translated, found, platform="both"):
     msg = f"""
 {TEST_HEADER}
+
 🩷*WEVERSE POST*🩷
 
-👤 {member_name.upper()} publicou uma mensagem!
-
-🔗 {url}
+👤 BTS publicou uma mensagem!
+🔗 *Link:* https://weverse.io/bts/artist
 """
 
     await send_alert("weverse_post", msg)
@@ -1021,10 +1029,8 @@ async def test_instagram_post(url, member_name, title, found, platform="both"):
     msg = f"""
 {TEST_HEADER}
 🌟*INSTAGRAM POST*🌟
-
-👤 {member_name} postou uma foto!
-
-🔗 {url}
+👤 BTS postou uma foto!
+🔗 *Link:* https://www.instagram.com/bts.bighitofficial/
 """
 
     await send_alert("instagram_post", msg)
@@ -1033,11 +1039,11 @@ async def test_instagram_post(url, member_name, title, found, platform="both"):
 async def test_tiktok_post(url, member_name, title, found, platform="both"):
     msg = f"""
 {TEST_HEADER}
+
 🎵*TIKTOK POST*🎵
 
 👤 {member_name.upper()} postou um vídeo!
-
-🔗 {url}
+🔗 *Link:* https://www.tiktok.com/@bts_official_bighit
 """
 
     await send_alert("tiktok_post", msg)
@@ -1046,13 +1052,11 @@ async def test_tiktok_post(url, member_name, title, found, platform="both"):
 async def test_youtube_post(url="https://www.youtube.com/@BTS", platform="both"):
     msg = f"""
 {TEST_HEADER}
+
 🎞️*YOUTUBE POST*🎞️
 
 💜 **BTS** postou um vídeo novo!
-
-🔗 *Link:* {url}
-
-✅ *Status:* Teste de Alerta
+🔗 *Link:* https://www.youtube.com/@BTS
 """
 
     await send_alert("youtube_post", msg)
@@ -1061,13 +1065,11 @@ async def test_youtube_post(url="https://www.youtube.com/@BTS", platform="both")
 async def test_youtube_live(url="https://www.youtube.com/@BTS/live", platform="both"):
     msg = f"""
 {TEST_HEADER}
+
 📹*YOUTUBE LIVE*📹
 
 🚨 **BTS** está ao vivo agora no YouTube!
-
-🔗 *Link:* {url}
-
-✅ *Status:* Teste de Live
+🔗 *Link:* https://www.youtube.com/@BTS/streams
 """
 
     await send_alert("youtube_live", msg)
@@ -1349,45 +1351,32 @@ async def enviar_alerta_social(mensagem):
             pass
 
 # =========================
-# 20 DISCORD: EVENTO ON_READY
+# 20 DISCORD ON_READY + SYNC (CLEAN FIX)
 # =========================
 
 @bot_discord.event
 async def on_ready():
+
     print(f"✅ Logado no Discord como {bot_discord.user}")
-    status_formatado = "🪭 Em tournê! Ouvindo: Arirang"
+
     await bot_discord.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.listening, name=status_formatado),
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name="Em tournê - Arirang 🪭"
+        ),
         status=discord.Status.online
     )
+
     try:
-        await bot_discord.tree.sync()
+        # garante registro único antes do sync
+        if hasattr(bot_discord, "COMMANDS_LOADED") and not bot_discord.COMMANDS_LOADED:
+            await register_discord_commands()
+
+        synced = await bot_discord.tree.sync()
+        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
+
     except Exception as e:
-        print(f"❌ Erro na sincronização Discord: {e}")
-
-#  === AJUSTE COMANDOS === # 
-
-async def handle_commands_telegram(update, context):
-
-    if not update.message or not update.message.text:
-        return
-
-    user_cmd = update.message.text.lower().strip()
-
-    # /ping
-    if user_cmd.startswith("/ping"):
-        await update.message.reply_text(
-            f"🏓 Pong! Wootteo operando há {get_uptime()}"
-        )
-
-    # /teste
-    elif user_cmd.startswith("/teste"):
-        await update.message.reply_text("⚠️ Teste executado com sucesso!")
-        await run_full_test_telegram()
-
-    # /comandos
-    elif user_cmd.startswith("/comandos"):
-        await update.message.reply_text("/ping, /teste, /comandos")
+        print(f"[DISCORD ERROR SYNC] {e}")
 
 # =========================
 # 21 INICIALIZAÇÃO FINAL (MAIN) - TELEGRAM + DISCORD FIX
@@ -1447,89 +1436,78 @@ async def main():
 
 
 # =========================
-# 22 DISCORD ULTRA SAFE (CORRIGIDO DEFINITIVO)
+# 22 DISCORD COMMAND REGISTRY (ANTI DUPLICAÇÃO + TESTE FIX)
 # =========================
 
-# ⚠️ IMPORTANTE: NÃO DUPLICAR on_ready
-# (fica APENAS UM evento no arquivo inteiro)
+import discord
+from discord import app_commands
 
+# =========================
+# FLAG GLOBAL
+# =========================
 if not hasattr(bot_discord, "COMMANDS_LOADED"):
     bot_discord.COMMANDS_LOADED = False
 
 
+# =========================
+# REGISTRO ÚNICO DE COMANDOS
+# =========================
 async def register_discord_commands():
 
     if bot_discord.COMMANDS_LOADED:
         return
 
-    if bot_discord.tree.get_command("teste"):
+    # evita duplicação de tree já existente
+    if bot_discord.tree.get_command("ping") or bot_discord.tree.get_command("teste"):
         bot_discord.COMMANDS_LOADED = True
         return
 
-    @bot_discord.tree.command(
-        name="teste",
-        description="Dispara alertas reais do sistema"
-    )
+
+    # =========================
+    # /ping
+    # =========================
+    @bot_discord.tree.command(name="ping", description="Verifica status do bot")
+    async def ping(interaction: discord.Interaction):
+        await interaction.response.send_message(
+            "🏓 Pong! Bot ativo.",
+            ephemeral=True
+        )
+
+
+    # =========================
+    # /comandos
+    # =========================
+    @bot_discord.tree.command(name="comandos", description="Lista comandos disponíveis")
+    async def comandos(interaction: discord.Interaction):
+        await interaction.response.send_message(
+            "/ping\n/comandos\n/teste",
+            ephemeral=True
+        )
+
+
+    # =========================
+    # /teste (EXECUTA APENAS BLOCO 16 - SEM DUPLICAR ALERTAS)
+    # =========================
+    @bot_discord.tree.command(name="teste", description="Executa todos os alertas de teste")
     async def teste(interaction: discord.Interaction):
 
         await interaction.response.defer(ephemeral=True)
 
         try:
+            # EXECUÇÃO ÚNICA DO FLUXO COMPLETO DE TESTE
             await run_full_test_discord()
 
-            embed = discord.Embed(
-                title="🧪 TESTE ARIRANG SYSTEM",
-                description="Execução completa de alertas simulados",
-                color=0x8A2BE2
+            await interaction.followup.send(
+                "✅ Teste executado com sucesso.",
+                ephemeral=True
             )
 
-            canais = [
-                DISCORD_TICKETS_CHANNEL_ID,
-                DISCORD_WEVERSE_CHANNEL_ID,
-                DISCORD_SOCIAL_CHANNEL_ID
-            ]
-
-            for cid in canais:
-                channel = interaction.guild.get_channel(cid)
-                if channel:
-                    await channel.send(embed=embed)
-
-            await interaction.followup.send("✅ Teste executado com sucesso.", ephemeral=True)
-
         except Exception as e:
-            await interaction.followup.send(f"❌ Erro no teste: {e}", ephemeral=True)
+            await interaction.followup.send(
+                f"❌ Erro no teste: {e}",
+                ephemeral=True
+            )
+
 
     bot_discord.COMMANDS_LOADED = True
     print("[DISCORD] Comandos registrados com sucesso.")
-
-
-# =========================
-# ON READY (ÚNICO E LIMPO)
-# =========================
-@bot_discord.event
-async def on_ready():
-
-    print(f"✅ Logado no Discord como {bot_discord.user}")
-
-    await bot_discord.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.listening,
-            name="Em tournê - Arirang 🪭"
-        ),
-        status=discord.Status.online
-    )
-
-    try:
-        await register_discord_commands()
-        synced = await bot_discord.tree.sync()
-        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
-
-    except Exception as e:
-        print(f"[DISCORD ERROR SYNC] {e}")
-
-# =========================
-# START FIX FINAL (OBRIGATÓRIO)
-# =========================
-
-if __name__ == "__main__":
-    asyncio.run(main())
