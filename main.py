@@ -609,9 +609,13 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 
   🔵 **Buyticket** {status_color(last_buy_check)}
   🎯 Acessos realizados: **{total_buy}**
-  ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**"""
+  ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**
+"""
 
-•°•👾. * . * .Wootteo em rota há: **{get_uptime()}**  * . * . ☄️. * * . 🌍* . . * 💫 * . * . •°•°🛸"""
+texto = f"""
+•°•👾 Wootteo em rota há: **{get_uptime()}** ☄️🌍💫
+•°•°🛸
+"""
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
