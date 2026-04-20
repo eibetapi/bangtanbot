@@ -375,11 +375,41 @@ def format_member(member_name):
     name = str(member_name).upper()
     return emoji, name
 
+# =========================
+# 11 ROTEAMENTO E ENVIO (CORRIGIDO)
+# =========================
 
-# =========================
-# 11 ROTEAMENTO E LINKS (CORRIGIDO)
-# =========================
+import discord
+import asyncio
+
+# -------------------------
+# DISCORD SEND FIX REAL
+# -------------------------
+async def send_discord(channel_id, message):
+    try:
+        if not bot_discord:
+            return
+
+        channel = bot_discord.get_channel(channel_id)
+
+        # fallback caso cache não tenha o canal
+        if channel is None:
+            channel = await bot_discord.fetch_channel(channel_id)
+
+        if channel:
+            await channel.send(content=message)
+
+    except Exception as e:
+        print(f"[DISCORD SEND ERROR] {e}")
+
+
+# -------------------------
+# TELEGRAM + DISCORD ROUTER
+# -------------------------
 async def send_alert(alert_type, message):
+    # =========================
+    # TELEGRAM (sempre primeiro)
+    # =========================
     if bot_ticket is not None:
         try:
             await bot_ticket.send_message(
@@ -390,14 +420,19 @@ async def send_alert(alert_type, message):
         except Exception as e:
             print(f"[TELEGRAM ERROR] {e}")
 
+    # =========================
+    # DISCORD ROUTING
+    # =========================
     try:
-        loop = asyncio.get_running_loop()
-
         if alert_type in ["ticket", "reposicao", "nova_data", "revenda", "agenda"]:
-            loop.create_task(send_discord(DISCORD_TICKETS_CHANNEL_ID, message))
+            asyncio.create_task(
+                send_discord(DISCORD_TICKETS_CHANNEL_ID, message)
+            )
 
         elif alert_type in ["weverse_post", "weverse_live", "weverse_news", "weverse_media"]:
-            loop.create_task(send_discord(DISCORD_WEVERSE_CHANNEL_ID, message))
+            asyncio.create_task(
+                send_discord(DISCORD_WEVERSE_CHANNEL_ID, message)
+            )
 
         elif alert_type in [
             "instagram_post",
@@ -407,49 +442,18 @@ async def send_alert(alert_type, message):
             "tiktok_post",
             "tiktok_live"
         ]:
-            loop.create_task(send_discord(DISCORD_SOCIAL_CHANNEL_ID, message))
+            asyncio.create_task(
+                send_discord(DISCORD_SOCIAL_CHANNEL_ID, message)
+            )
+
+        elif alert_type in ["youtube_post", "youtube_live"]:
+            # se quiser depois separa canal, por enquanto social
+            asyncio.create_task(
+                send_discord(DISCORD_SOCIAL_CHANNEL_ID, message)
+            )
 
     except Exception as e:
         print(f"[DISCORD ROUTING ERROR] {e}")
-
-
-# --- LINKS DE MONITORAMENTO ---
-TICKET_LINKS = [
-    "https://www.ticketmaster.com.br/event/bts-sp"
-]
-
-BUY_LINKS = [
-    "https://www.buyticket.com.br/bts"
-]
-
-WEVERSE_LINKS = [
-    "https://weverse.io/bts/feed"
-]
-
-INSTAGRAM_LINKS = {
-    "bts": "https://www.instagram.com/bts.bighitofficial/"
-}
-
-TIKTOK_LINKS = {
-    "bts": "https://www.tiktok.com/@bts_official_bighit"
-}
-
-
-# === PERSISTÊNCIA TELEGRAM === #
-
-def carregar_id_telegram():
-    try:
-        with open("panel_id.txt", "r") as f:
-            return int(f.read().strip())
-    except:
-        return None
-
-def salvar_id_telegram(message_id):
-    try:
-        with open("panel_id.txt", "w") as f:
-            f.write(str(message_id))
-    except:
-        pass
 
 # =============================================================
 # 12 GESTÃO DO PAINEL (FIXO E ÚNICO)
@@ -894,14 +898,22 @@ async def youtube_live(url):
 # =============================================================
 # 16 SISTEMA DE TESTE (ROTEADO PARA AS SALAS CERTAS)
 # =============================================================
+
 TEST_HEADER = "⚠️ TESTE ⚠️"
+EMBED_COLOR = 0x8A2BE2
 
-async def run_full_test(platform="both"):
-    """
-    Executa a sequência de testes enviando para os canais específicos.
-    """
 
-    await test_ticket_reposicao(TICKET_LINKS[0], "28/10/2026", True, platform)
+# =========================
+# DISCORD ROUTER PRINCIPAL
+# =========================
+async def run_full_test_discord():
+    print("[TESTE DC] Executando...")
+
+    await test_ticket_reposicao(
+        TICKET_LINKS[0],
+        "28/10/2026",
+        True
+    )
 
     await asyncio.sleep(1)
 
@@ -910,8 +922,7 @@ async def run_full_test(platform="both"):
             "date": "28/10/2026",
             "city": "São Paulo",
             "country": "Brasil"
-        },
-        platform
+        }
     )
 
     await asyncio.sleep(1)
@@ -921,8 +932,7 @@ async def run_full_test(platform="both"):
         "bts",
         "Update",
         "Conteúdo Teste",
-        True,
-        platform
+        True
     )
 
     await asyncio.sleep(1)
@@ -931,115 +941,238 @@ async def run_full_test(platform="both"):
         INSTAGRAM_LINKS["bts"],
         "bts",
         "post",
-        True,
-        platform
+        True
     )
+
+    await asyncio.sleep(1)
 
     await test_tiktok_post(
         TIKTOK_LINKS["bts"],
         "bts",
         "video",
-        True,
-        platform
+        True
     )
 
+    await asyncio.sleep(1)
+
+    await test_youtube_post()
+
+    await asyncio.sleep(1)
+
+    await test_youtube_live()
+
+    print("[TESTE DC] Finalizado.")
+
+
+# =========================
+# FUNÇÃO EMBED PADRÃO
+# =========================
+def make_embed(title, description):
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=EMBED_COLOR
+    )
+    return embed
+
+
+# =========================
+# DISCORD SEND (ROTEAMENTO REAL)
+# =========================
+async def send_discord(channel_id, embed):
+    channel = bot_discord.get_channel(channel_id)
+    if channel:
+        await channel.send(embed=embed)
+
+# =========================
+# COMANDOS DISCORD (FIXOS)
+# =========================
+
+@bot_discord.tree.command(name="ping", description="Verifica status do bot")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "🏓 Pong! Bot ativo.",
+        ephemeral=True
+    )
+
+
+@bot_discord.tree.command(name="comandos", description="Lista comandos disponíveis")
+async def comandos(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "/ping\n/comandos\n/teste",
+        ephemeral=True
+    )
+
+
+@bot_discord.tree.command(name="teste", description="Dispara alertas reais do sistema")
+async def teste(interaction: discord.Interaction):
+
+    await interaction.response.defer(ephemeral=True)
+
     try:
-        await update_panel()
-        await update_discord_panel()
-    except:
-        pass
+        await run_full_test_discord()
+
+        await interaction.followup.send(
+            "✅ Teste executado com sucesso.",
+            ephemeral=True
+        )
+
+    except Exception as e:
+        await interaction.followup.send(
+            f"❌ Erro no teste: {e}",
+            ephemeral=True
+        )
+# =========================
+# COMANDOS DISCORD (FIXOS)
+# =========================
+
+@bot_discord.tree.command(name="ping", description="Verifica status do bot")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "🏓 Pong! Bot ativo.",
+        ephemeral=True
+    )
 
 
-async def test_ticket_reposicao(url, key, found, platform="both"):
-    msg = f"""
-{TEST_HEADER}
+@bot_discord.tree.command(name="comandos", description="Lista comandos disponíveis")
+async def comandos(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "/ping\n/comandos\n/teste",
+        ephemeral=True
+    )
 
-🔥*ALERTA DE REPOSIÇÃO*🔥
 
-📅 *Data:* 28/10/2026
-🔗 *Link:* https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-28-10
-✅ *Status:* Liberado
+@bot_discord.tree.command(name="teste", description="Dispara alertas reais do sistema")
+async def teste(interaction: discord.Interaction):
+
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        await run_full_test_discord()
+
+        await interaction.followup.send(
+            "✅ Teste executado com sucesso.",
+            ephemeral=True
+        )
+
+    except Exception as e:
+        await interaction.followup.send(
+            f"❌ Erro no teste: {e}",
+            ephemeral=True
+        )
+# =========================
+# 1 - TICKET (TICKETS CHANNEL)
+# =========================
+async def test_ticket_reposicao(url, key, found):
+    embed = make_embed(
+        "🔥 ALERTA DE REPOSIÇÃO 🔥",
+        f"""
+📅 Data: 28/10/2026  
+🔗 Link: https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-28-10  
+✅ Status: Liberado  
 """
+    )
 
-    await send_alert("reposicao", msg)
+    await send_discord(DISCORD_TICKETS_CHANNEL_ID, embed)
+    await send_alert("reposicao", "TESTE REPOSIÇÃO")
 
 
-async def test_agenda(data, platform="both"):
-    msg = f"""
-{TEST_HEADER}
-
-💜*AGENDA NOVAS DATAS*💜
-
-📅 *Data:* 28/10/2026
-🏙️ *Cidade:* São Paulo
-🌎 *País:* Brasil
-🔗 *Link:* https://ibighit.com/en/bts/tour/
+# =========================
+# 2 - AGENDA (TICKETS CHANNEL)
+# =========================
+async def test_agenda(data):
+    embed = make_embed(
+        "💜 AGENDA NOVAS DATAS 💜",
+        f"""
+📅 Data: 28/10/2026  
+🏙️ Cidade: São Paulo  
+🌎 País: Brasil  
+🔗 Link: https://ibighit.com/en/bts/tour/  
 """
+    )
 
-    await send_alert("agenda", msg)
+    await send_discord(DISCORD_TICKETS_CHANNEL_ID, embed)
+    await send_alert("agenda", "TESTE AGENDA")
 
 
-async def test_weverse_post(url, member_name, title, message_translated, found, platform="both"):
-    msg = f"""
-{TEST_HEADER}
-
-🩷*WEVERSE POST*🩷
-
-👤 BTS publicou uma mensagem!
-🔗 *Link:* https://weverse.io/bts/artist
+# =========================
+# 3 - WEVERSE (WEVERSE CHANNEL)
+# =========================
+async def test_weverse_post(url, member_name, title, message_translated, found):
+    embed = make_embed(
+        "🩷 WEVERSE POST 🩷",
+        f"""
+👤 BTS publicou uma mensagem  
+🔗 Link: https://weverse.io/bts/artist  
 """
+    )
 
-    await send_alert("weverse_post", msg)
+    await send_discord(DISCORD_WEVERSE_CHANNEL_ID, embed)
+    await send_alert("weverse_post", "TESTE WEVERSE")
 
 
-async def test_instagram_post(url, member_name, title, found, platform="both"):
-    msg = f"""
-{TEST_HEADER}
-🌟*INSTAGRAM POST*🌟
-👤 BTS postou uma foto!
-🔗 *Link:* https://www.instagram.com/bts.bighitofficial/
+# =========================
+# 4 - INSTAGRAM (SOCIAL CHANNEL)
+# =========================
+async def test_instagram_post(url, member_name, title, found):
+    embed = make_embed(
+        "🌟 INSTAGRAM POST 🌟",
+        f"""
+👤 BTS postou uma foto  
+🔗 Link: https://www.instagram.com/bts.bighitofficial/  
 """
+    )
 
-    await send_alert("instagram_post", msg)
+    await send_discord(DISCORD_SOCIAL_CHANNEL_ID, embed)
+    await send_alert("instagram_post", "TESTE INSTAGRAM")
 
 
-async def test_tiktok_post(url, member_name, title, found, platform="both"):
-    msg = f"""
-{TEST_HEADER}
-
-🎵*TIKTOK POST*🎵
-
-👤 {member_name.upper()} postou um vídeo!
-🔗 *Link:* https://www.tiktok.com/@bts_official_bighit
+# =========================
+# 5 - TIKTOK (SOCIAL CHANNEL)
+# =========================
+async def test_tiktok_post(url, member_name, title, found):
+    embed = make_embed(
+        "🎵 TIKTOK POST 🎵",
+        f"""
+👤 {member_name.upper()} postou um vídeo  
+🔗 Link: https://www.tiktok.com/@bts_official_bighit  
 """
+    )
 
-    await send_alert("tiktok_post", msg)
+    await send_discord(DISCORD_SOCIAL_CHANNEL_ID, embed)
+    await send_alert("tiktok_post", "TESTE TIKTOK")
 
 
-async def test_youtube_post(url="https://www.youtube.com/@BTS", platform="both"):
-    msg = f"""
-{TEST_HEADER}
-
-🎞️*YOUTUBE POST*🎞️
-
-💜 **BTS** postou um vídeo novo!
-🔗 *Link:* https://www.youtube.com/@BTS
+# =========================
+# 6 - YOUTUBE POST (SOCIAL CHANNEL)
+# =========================
+async def test_youtube_post(url="https://www.youtube.com/@BTS"):
+    embed = make_embed(
+        "🎞️ YOUTUBE POST 🎞️",
+        f"""
+💜 BTS postou um vídeo novo  
+🔗 Link: https://www.youtube.com/@BTS  
 """
+    )
 
-    await send_alert("youtube_post", msg)
+    await send_discord(DISCORD_SOCIAL_CHANNEL_ID, embed)
+    await send_alert("youtube_post", "TESTE YOUTUBE POST")
 
 
-async def test_youtube_live(url="https://www.youtube.com/@BTS/live", platform="both"):
-    msg = f"""
-{TEST_HEADER}
-
-📹*YOUTUBE LIVE*📹
-
-🚨 **BTS** está ao vivo agora no YouTube!
-🔗 *Link:* https://www.youtube.com/@BTS/streams
+# =========================
+# 7 - YOUTUBE LIVE (SOCIAL CHANNEL)
+# =========================
+async def test_youtube_live(url="https://www.youtube.com/@BTS/live"):
+    embed = make_embed(
+        "📹 YOUTUBE LIVE 📹",
+        f"""
+🚨 BTS está ao vivo agora no YouTube  
+🔗 Link: https://www.youtube.com/@BTS/streams  
 """
+    )
 
-    await send_alert("youtube_live", msg)
+    await send_discord(DISCORD_SOCIAL_CHANNEL_ID, embed)
+    await send_alert("youtube_live", "TESTE YOUTUBE LIVE")
 
 # =============================================================
 # 17 MOTOR DE MONITORAMENTO + COMANDOS + TESTE (UNIFICADO)
@@ -1321,14 +1454,14 @@ async def enviar_alerta_social(mensagem):
             pass
 
 # =========================
-# 20 DISCORD ON_READY + SYNC (CLEAN FIX)
+# 20 DISCORD ON_READY + SYNC (FIX DEFINITIVO)
 # =========================
 
 @bot_discord.event
 async def on_ready():
-
     print(f"✅ Logado no Discord como {bot_discord.user}")
 
+    # presença do bot
     await bot_discord.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
@@ -1338,12 +1471,18 @@ async def on_ready():
     )
 
     try:
-        # garante registro único antes do sync
-        if hasattr(bot_discord, "COMMANDS_LOADED") and not bot_discord.COMMANDS_LOADED:
+        # 🔥 GARANTE QUE OS COMANDOS EXISTEM ANTES DO SYNC
+        if not getattr(bot_discord, "COMMANDS_LOADED", False):
             await register_discord_commands()
 
+        # 🔥 SYNC FORÇADO GLOBAL
         synced = await bot_discord.tree.sync()
-        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
+
+        print(f"🔄 Slash commands sincronizados: {len(synced)} comandos")
+
+        # debug útil
+        for cmd in synced:
+            print(f" - /{cmd.name}")
 
     except Exception as e:
         print(f"[DISCORD ERROR SYNC] {e}")
