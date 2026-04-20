@@ -1179,56 +1179,57 @@ async def on_ready():
         print(f"❌ Erro na sincronização Discord: {e}")
 
 # ===============================
-# 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL 
+# 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL
 # ===============================
 
-async def main(): 
+async def main():
 
-# 1. Inicia o servidor Keep Alive 
-(Flask/Web) keep_alive() 
+    # 1. Inicia o servidor Keep Alive (Flask/Web)
+    keep_alive()
 
-# 2. Configurações do Telegram  
-if TELEGRAM_TOKEN: f
-rom telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters 
+    # 2. Configurações do Telegram
+    if TELEGRAM_TOKEN:
+        from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
-# Construção da Application 
-application = ApplicationBuilder().token(TELEGRAM_TOKEN).build() 
+        # Construção da Application
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-# Registro de Handlers
-application.add_handler(CommandHandler("ping", handle_commands_telegram)) 
-application.add_handler(CommandHandler("teste", handle_commands_telegram)) 
-application.add_handler(CommandHandler("comandos", handle_commands_telegram)) 
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram)) 
+        # Registro de Handlers
+        application.add_handler(CommandHandler("ping", handle_commands_telegram))
+        application.add_handler(CommandHandler("teste", handle_commands_telegram))
+        application.add_handler(CommandHandler("comandos", handle_commands_telegram))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram))
 
-# Inicialização correta para evitar Conflict await application.initialize() await application.start() 
+        # Inicialização correta
+        await application.initialize()
+        await application.start()
 
-# O drop_pending_updates=True limpa mensagens antigas que causariam crash no boot 
-await
-application.updater.start_polling(drop_pending_updates=True) 
-print("[SISTEMA] Telegram operativo e ouvindo comandos.") 
+        # Limpa mensagens antigas que causam conflito
+        await application.bot.delete_webhook(drop_pending_updates=True)
 
-# 3. Inicia o Motor de Monitoramento (Loop do Bloco 17) 
-asyncio.create_task(monitor_loop()) 
-print("[SISTEMA] Motor de monitoramento Arirang iniciado.") 
+        print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
-# 4. Inicia o Discord (Mantendo o loop vivo) 
-try: 
-token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN 
-if token: 
-print("[DISCORD] Tentando login...") 
+    # 3. Inicia o Motor de Monitoramento
+    asyncio.create_task(monitor_loop())
+    print("[SISTEMA] Motor de monitoramento Arirang iniciado.")
 
-# Usamos o start() em vez de run() dentro do main 
-async 
-await bot_discord.start(token) 
-else: 
-print("[ERRO] Token do Discord não encontrado.") 
-except Exception as e: print(f"[FATAL] Erro ao conectar ao Discord: {e}") 
+    # 4. Inicia o Discord
+    try:
+        token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
 
-if __name__ == "__main__": 
+        if token:
+            print("[DISCORD] Tentando login...")
+            await bot_discord.start(token)
+        else:
+            print("[ERRO] Token do Discord não encontrado.")
 
-# Padrão recomendado para rodar múltiplos bots assíncronos 
-try: 
-loop = asyncio.get_event_loop() 
-loop.run_until_complete(main()) 
-except (KeyboardInterrupt, SystemExit): 
-print("\n[DESLIGANDO] Motores Arirang parados.")
+    except Exception as e:
+        print(f"[FATAL] Erro ao conectar ao Discord: {e}")
+
+
+if __name__ == "__main__":
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("\n[DESLIGANDO] Motores Arirang parados.")
