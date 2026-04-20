@@ -1404,7 +1404,6 @@ async def main():
     else:
         print("[ERRO] Token Discord não encontrado.")
 
-
 # =========================
 # 22 DISCORD COMMAND REGISTRY (CORRIGIDO)
 # =========================
@@ -1419,7 +1418,9 @@ async def register_discord_commands():
         return
 
 
+    # =========================
     # /ping
+    # =========================
     @bot_discord.tree.command(name="ping", description="Verifica status do bot")
     async def ping(interaction: discord.Interaction):
         await interaction.response.send_message(
@@ -1428,7 +1429,9 @@ async def register_discord_commands():
         )
 
 
+    # =========================
     # /comandos
+    # =========================
     @bot_discord.tree.command(name="comandos", description="Lista comandos disponíveis")
     async def comandos(interaction: discord.Interaction):
         await interaction.response.send_message(
@@ -1437,25 +1440,30 @@ async def register_discord_commands():
         )
 
 
-    # /teste (ÚNICO E CORRETO)
+    # =========================
+    # /teste (CORRIGIDO - SEM COMPLETED)
+    # =========================
     @bot_discord.tree.command(name="teste", description="Executa todos os alertas de teste")
     async def teste(interaction: discord.Interaction):
 
         await interaction.response.defer(ephemeral=True)
 
-        try:
-            await run_full_test_discord()
+        async def runner():
+            try:
+                await run_full_test_discord()
 
-            await interaction.followup.send(
-                "✅ Teste executado com sucesso.",
-                ephemeral=True
-            )
+                await interaction.followup.send(
+                    "✅ Teste executado com sucesso.",
+                    ephemeral=True
+                )
 
-        except Exception as e:
-            await interaction.followup.send(
-                f"❌ Erro no teste: {e}",
-                ephemeral=True
-            )
+            except Exception as e:
+                await interaction.followup.send(
+                    f"❌ Erro no teste: {e}",
+                    ephemeral=True
+                )
+
+        asyncio.create_task(runner())
 
 
     bot_discord.COMMANDS_LOADED = True
