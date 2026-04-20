@@ -484,6 +484,23 @@ TIKTOK_LINKS = {
     "bts": "https://www.tiktok.com/@bts_official_bighit"
 }
 
+
+# === PERSISTÊNCIA TELEGRAM === #
+
+def carregar_id_telegram():
+    try:
+        with open("panel_id.txt", "r") as f:
+            return int(f.read().strip())
+    except:
+        return None
+
+def salvar_id_telegram(message_id):
+    try:
+        with open("panel_id.txt", "w") as f:
+            f.write(str(message_id))
+    except:
+        pass
+
 # =============================================================
 # 12 GESTÃO DO PAINEL (FIXO E ÚNICO)
 # =============================================================
