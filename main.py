@@ -11,10 +11,8 @@ from datetime import datetime
 from threading import Thread
 
 import discord
-from discord.ext 
-import commands
-from discord 
-import app_commands
+from discord.ext import commands
+from discord import app_commands
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -1057,8 +1055,6 @@ async def monitor_loop():
     """
     await bot_discord.wait_until_ready()
 
-    global panel_message_id, discord_panel_msg_id
-
     print("[SISTEMA] Motor Arirang operando. Aguardando ciclos...")
 
     async with aiohttp.ClientSession() as session:
@@ -1068,6 +1064,8 @@ async def monitor_loop():
                 await check_buyticket(session)
                 await check_weverse(session)
                 await check_social(session)
+
+                # painel atualizado UMA vez por ciclo
                 await update_panel()
 
                 await asyncio.sleep(25)
@@ -1086,17 +1084,11 @@ async def handle_commands_telegram(update, context):
 
     cmd = update.message.text.lower()
 
-    # -------------------------
-    # /ping
-    # -------------------------
     if "/ping" in cmd:
         await update.message.reply_text(
             f"🏓 Pong! Wootteo operando há {get_uptime()}"
         )
 
-    # -------------------------
-    # /teste (REAL)
-    # -------------------------
     elif "/teste" in cmd:
         try:
             await run_full_test_telegram()
@@ -1104,9 +1096,6 @@ async def handle_commands_telegram(update, context):
         except Exception as e:
             await update.message.reply_text(f"❌ Erro no teste: {e}")
 
-    # -------------------------
-    # /comandos
-    # -------------------------
     elif "/comandos" in cmd:
         await update.message.reply_text(
             "/ping\n/teste\n/comandos"
@@ -1114,7 +1103,7 @@ async def handle_commands_telegram(update, context):
 
 
 # =========================
-# COMANDO DISCORD
+# COMANDO DISCORD (APENAS 1 CAMADA)
 # =========================
 @bot_discord.tree.command(
     name="teste",
@@ -1126,81 +1115,82 @@ async def teste_discord(interaction: discord.Interaction):
     try:
         await run_full_test_discord()
         await update_panel()
-        await interaction.delete_original_response()
+
+        await interaction.followup.send(
+            "✅ Teste executado com sucesso.",
+            ephemeral=True
+        )
 
     except Exception as e:
-        print(f"[ERRO TESTE DISCORD] {e}")
+        await interaction.followup.send(
+            f"❌ Erro no teste: {e}",
+            ephemeral=True
+        )
 
 
 # =========================
-# TESTE REAL TELEGRAM
+# TESTE TELEGRAM (REAL)
 # =========================
 async def run_full_test_telegram():
     try:
-        print("[TESTE TG] Executando alertas reais...")
+        print("[TESTE TG] Executando...")
 
-        if "test_ticket_reposicao" in globals():
-            await test_ticket_reposicao(
-                "TESTE",
-                "https://www.ticketmaster.com.br/",
-                True
-            )
+        await test_ticket_reposicao(
+            "TESTE",
+            "https://www.ticketmaster.com.br/",
+            True
+        )
 
-        if "test_weverse_post" in globals():
-            await test_weverse_post(
-                "https://weverse.io/bts/feed",
-                "bts",
-                "Update",
-                "Teste real",
-                True
-            )
+        await test_weverse_post(
+            "https://weverse.io/bts/feed",
+            "bts",
+            "Update",
+            "Teste real",
+            True
+        )
 
-        if "test_instagram_post" in globals():
-            await test_instagram_post(
-                "https://instagram.com",
-                "bts",
-                "post",
-                True
-            )
+        await test_instagram_post(
+            "https://instagram.com",
+            "bts",
+            "post",
+            True
+        )
 
-        if "test_tiktok_post" in globals():
-            await test_tiktok_post(
-                "https://tiktok.com",
-                "bts",
-                "video",
-                True
-            )
+        await test_tiktok_post(
+            "https://tiktok.com",
+            "bts",
+            "video",
+            True
+        )
 
-        print("[TESTE TG] Finalizado com sucesso.")
+        print("[TESTE TG] Finalizado.")
 
     except Exception as e:
         print(f"[DEBUG TG] {e}")
 
 
 # =========================
-# TESTE REAL DISCORD
+# TESTE DISCORD (REAL)
 # =========================
 async def run_full_test_discord():
     try:
-        print("[TESTE DC] Executando alertas reais...")
+        print("[TESTE DC] Executando...")
 
-        if "test_ticket_reposicao" in globals():
-            await test_ticket_reposicao(
-                "TESTE DISCORD",
-                "https://www.ticketmaster.com.br/",
-                True
-            )
+        await test_ticket_reposicao(
+            "TESTE DISCORD",
+            "https://www.ticketmaster.com.br/",
+            True
+        )
 
-        if "test_weverse_post" in globals():
-            await test_weverse_post(
-                "https://weverse.io/bts/feed",
-                "bts",
-                "Update",
-                "Teste Discord",
-                True
-            )
+        await test_weverse_post(
+            "https://weverse.io/bts/feed",
+            "bts",
+            "Update",
+            "Teste Discord",
+            True
+        )
 
-        print("[TESTE DC] Finalizado com sucesso.")
+        print("[TESTE DC] Finalizado.")
 
     except Exception as e:
         print(f"[DEBUG DC] {e}")
