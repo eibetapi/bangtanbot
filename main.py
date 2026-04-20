@@ -1526,3 +1526,10 @@ async def on_ready():
 
     except Exception as e:
         print(f"[DISCORD ERROR SYNC] {e}")
+
+# =========================
+# START FIX FINAL (OBRIGATÓRIO)
+# =========================
+
+if __name__ == "__main__":
+    asyncio.run(main())
