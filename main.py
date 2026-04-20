@@ -1446,70 +1446,123 @@ async def main():
 
 
 # =============================================================
-# 22 DISCORD FIX DEFINITIVO + START LIMPO
+# 22 DISCORD ULTRA SAFE (ANTI DUPLICAÇÃO + START LIMPO)
 # =============================================================
 
-async def start_discord():
-    try:
-        token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
+import discord
+from discord import app_commands
 
-        if not token:
-            print("[ERRO] Token Discord não encontrado.")
-            return
+# -------------------------
+# FLAG GLOBAL DE REGISTRO
+# -------------------------
+if not hasattr(bot_discord, "COMMANDS_LOADED"):
+    bot_discord.COMMANDS_LOADED = False
 
-        print("[DISCORD] Login iniciado...")
 
-        # Sync de slash commands (garante funcionamento do /teste)
+# =============================================================
+# REGISTRO ÚNICO DE COMANDOS
+# =============================================================
+async def register_discord_commands():
+
+    if bot_discord.COMMANDS_LOADED:
+        return
+
+    print("[DISCORD] Registrando comandos uma única vez...")
+
+    # =========================
+    # /teste (ÚNICO E DEFINITIVO)
+    # =========================
+    @bot_discord.tree.command(
+        name="teste",
+        description="Dispara alertas reais do sistema"
+    )
+    async def teste(interaction: discord.Interaction):
+
+        await interaction.response.defer(ephemeral=True)
+
         try:
-            synced = await bot_discord.tree.sync()
-            print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
+            await run_full_test_discord()
+
+            guild = interaction.guild
+
+            embed = discord.Embed(
+                title="🧪 TESTE ARIRANG SYSTEM",
+                description="Execução completa de alertas simulados",
+                color=0x8A2BE2  # roxo
+            )
+
+            # canais corretos
+            canais = [
+                DISCORD_TICKETS_CHANNEL_ID,
+                DISCORD_WEVERSE_CHANNEL_ID,
+                DISCORD_SOCIAL_CHANNEL_ID
+            ]
+
+            for cid in canais:
+                channel = guild.get_channel(cid)
+                if channel:
+                    await channel.send(embed=embed)
+
+            await interaction.followup.send(
+                "✅ Teste executado com sucesso.",
+                ephemeral=True
+            )
+
         except Exception as e:
-            print(f"[DISCORD SYNC ERROR] {e}")
+            await interaction.followup.send(
+                f"❌ Erro no teste: {e}",
+                ephemeral=True
+            )
 
-        await bot_discord.start(token)
-
-    except Exception as e:
-        print(f"[FATAL DISCORD] {e}")
+    bot_discord.COMMANDS_LOADED = True
+    print("[DISCORD] Comandos registrados com sucesso.")
 
 
 # =============================================================
-# /TESTE DISCORD (MULTI-CANAL + EMBED ROXO)
+# ON_READY (SYNC SEGURO + SEM DUPLICAÇÃO)
 # =============================================================
+@bot_discord.event
+async def on_ready():
 
-@bot_discord.tree.command(
-    name="teste",
-    description="Dispara alertas reais do sistema"
-)
-async def teste_discord(interaction: discord.Interaction):
+    print(f"✅ Logado no Discord como {bot_discord.user}")
 
-    await interaction.response.defer(ephemeral=True)
+    await bot_discord.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name="Em tournê - Arirang 🪭"
+        ),
+        status=discord.Status.online
+    )
 
     try:
-        await run_full_test_discord()
+        await register_discord_commands()
 
-        guild = interaction.guild
-
-        # canais fixos
-        weverse = guild.get_channel(DISCORD_WEVERSE_CHANNEL_ID)
-        tickets = guild.get_channel(DISCORD_TICKETS_CHANNEL_ID)
-        social = guild.get_channel(DISCORD_SOCIAL_CHANNEL_ID)
-
-        embed = discord.Embed(
-            title="🧪 TESTE SISTEMA ARIRANG",
-            description="Execução de alertas simulados do sistema",
-            color=0x8A2BE2  # roxo fixo
-        )
-
-        if weverse:
-            await weverse.send(embed=embed)
-
-        if tickets:
-            await tickets.send(embed=embed)
-
-        if social:
-            await social.send(embed=embed)
-
-        await interaction.followup.send("✅ Teste executado com sucesso.", ephemeral=True)
+        synced = await bot_discord.tree.sync()
+        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
 
     except Exception as e:
-        await interaction.followup.send(f"❌ Erro no teste: {e}", ephemeral=True)
+        print(f"[DISCORD ERROR SYNC] {e}")
+
+
+# =============================================================
+# START SEGURO DO DISCORD (SEM DUPLO START)
+# =============================================================
+async def start_discord():
+
+    token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
+
+    if not token:
+        print("[ERRO] Token Discord não encontrado.")
+        return
+
+    print("[DISCORD] Iniciando bot...")
+
+    await bot_discord.start(token)
+
+
+# =============================================================
+# MAIN FIX (IMPORTANTE)
+# =============================================================
+# SUBSTITUIR qualquer start antigo por isso:
+
+asyncio.create_task(start_discord())
