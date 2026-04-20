@@ -1333,11 +1333,11 @@ async def run_telegram_async():
 if not hasattr(bot_discord, "COMMANDS_LOADED"):
     bot_discord.COMMANDS_LOADED = True
 
-# =========================
-# 18 CHECK SYSTEM + AUXILIARES (COMPLETO)
+## =========================
+# 18 CHECK SYSTEM + AUXILIARES (COMPLETO & ESTÁVEL)
 # =========================
 
-# === FUNÇÃO FETCH (CORREÇÃO DO ERRO 'fetch' is not defined) === #
+# === FUNÇÃO FETCH === #
 async def fetch(session, url):
     try:
         async with session.get(url, timeout=15) as response:
@@ -1401,7 +1401,6 @@ async def check_buyticket(session):
             html = await fetch(session, url)
             if html and is_new(url, html):
                 total_buy += 1
-                pass
         except Exception as e:
             print(f"[ERR BUY] {e}")
 
@@ -1417,7 +1416,6 @@ async def check_weverse(session):
             html = await fetch(session, url)
             if html and is_new(url, html):
                 total_weverse += 1
-                pass
         except Exception as e:
             print(f"[ERR WEVERSE] {e}")
 
@@ -1478,7 +1476,7 @@ def safe_increment(counter_name):
     elif counter_name == "weverse": total_weverse += 1
     elif counter_name == "social": total_social += 1
 
-# === MOTOR DE EXECUÇÃO FINAL (RAILWAY STABLE) === #
+# === MOTOR DE EXECUÇÃO FINAL (RAILWAY DEFINITIVE) === #
 async def main():
     print("🛸 [SISTEMA] WOOTTEO EM PREPARAÇÃO PARA DECOLAGEM...")
     
@@ -1491,22 +1489,24 @@ async def main():
 
     # 2. Inicia Telegram (Comandos e Funções)
     await run_telegram_async()
-    print("✅ [TELEGRAM] Wootteo conectado.")
+    print("✅ [TELEGRAM] Wootteo aguardando comandos.")
 
     # 3. Dispara as Tarefas de Fundo (Monitoramento)
-    asyncio.create_task(monitor_loop())
-    asyncio.create_task(watchdog_monitor())
-    asyncio.create_task(health_watcher())
+    # Usamos o loop atual para garantir que as tasks fiquem penduradas corretamente
+    loop = asyncio.get_running_loop()
+    loop.create_task(monitor_loop())
+    loop.create_task(watchdog_monitor())
+    loop.create_task(health_watcher())
     print("✅ [MONITOR] Ciclos Arirang ativados.")
 
     # 4. Inicia Discord (Mantém o processo principal vivo)
     try:
         print("✅ [DISCORD] Wootteo tentando login...")
-        async with bot_discord:
-            await bot_discord.start(DISCORD_TOKEN)
+        # Usamos await bot_discord.start em vez de async with para maior estabilidade no Railway
+        await bot_discord.start(DISCORD_TOKEN)
     except Exception as e:
-        print(f"❌ [DISCORD ERROR] {e}")
-        # Se o Discord cair, mantém o script rodando pelo Telegram
+        print(f"❌ [ERRO CRÍTICO] Falha no motor principal: {e}")
+        # Fallback para o container não fechar se o Discord cair
         while True:
             await asyncio.sleep(3600)
 
@@ -1514,8 +1514,9 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        print("\n🛑 [SISTEMA] Wootteo encerrado.")
-
+        print("\n🛑 [SISTEMA] Wootteo retornando para a base.")
+    except Exception as e:
+        print(f"💥 [LOG DE ERRO FINAL]: {e}")
 
 # =========================
 # 19 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL
