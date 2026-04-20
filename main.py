@@ -409,7 +409,7 @@ def format_member(member_name):
     return emoji, name
 
 # =========================
-# 11 ROTEAMENTO E ALERTAS (COMPLETO)
+# 11 ROTEAMENTO E ALERTAS (COMPLETO E CORRIGIDO)
 # =========================
 
 async def send_discord(channel_id, message):
@@ -452,7 +452,6 @@ async def send_alert(alert_type, message):
 
     except Exception as e:
         print(f"[DISCORD ROUTING ERROR] {e}")
-
 # =============================================================
 # 12 GESTÃO DO PAINEL (FIXO E ÚNICO)
 # =============================================================
