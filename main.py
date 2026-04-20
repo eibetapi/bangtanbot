@@ -58,7 +58,8 @@ if TELEGRAM_TOKEN:
 # Contadores de acesso (🎯 Acessos realizados) 
 
 total_tickets = 0 
-total_buy = 0 total_weverse = 0 
+total_buy = 0 
+total_weverse = 0 
 total_social = 0 
 
 # Timestamps dos últimos rastreios (⏳ Último rastreio há...) 
