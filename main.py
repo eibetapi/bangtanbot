@@ -1383,15 +1383,17 @@ async def handle_commands_telegram(update, context):
         await update.message.reply_text("/ping, /teste, /comandos")
 
 # =============================================================
-# 21 INICIALIZAÇÃO FINAL (MAIN) - TELEGRAM FIX CORRIGIDO
+# 21 INICIALIZAÇÃO FINAL (MAIN) - TELEGRAM + DISCORD FIX
 # =============================================================
 
 async def main():
 
-    # 1. Inicia o servidor Keep Alive
+    # 1. Keep Alive
     keep_alive()
 
-    # 2. TELEGRAM (CORREÇÃO DEFINITIVA DO CONFLITO getUpdates)
+    # =========================================================
+    # TELEGRAM FIX DEFINITIVO (SEM CONFLITO EVENT LOOP)
+    # =========================================================
     if TELEGRAM_TOKEN:
 
         from telegram.ext import (
@@ -1403,87 +1405,66 @@ async def main():
 
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-        # Handlers
+        # Handlers únicos (evita duplicação de resposta)
         application.add_handler(CommandHandler("ping", handle_commands_telegram))
         application.add_handler(CommandHandler("teste", handle_commands_telegram))
         application.add_handler(CommandHandler("comandos", handle_commands_telegram))
+
         application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_commands_telegram)
         )
 
         print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
-        # Inicialização correta (PTB v20+)
-        await application.initialize()
-        await application.start()
+        # ✔ CORRETO: rodar polling em thread (evita RuntimeError loop já rodando)
+        from threading import Thread
 
-        # ❌ IMPORTANTE: NÃO usar updater.start_polling (causa o conflito)
-        # ❌ NÃO usar bot.initialize duplicado
-
-        # ✅ polling correto (modo moderno seguro)
-        asyncio.create_task(
+        def run_telegram():
             application.run_polling(drop_pending_updates=True)
-        )
 
-    # 3. MONITOR PRINCIPAL
+        Thread(target=run_telegram, daemon=True).start()
+
+    # =========================================================
+    # MONITOR PRINCIPAL
+    # =========================================================
     asyncio.create_task(monitor_loop())
-    print("[SISTEMA] Motor de monitoramento Arirang iniciado.")
+    print("[SISTEMA] Motor de monitoramento iniciado.")
 
-    # 4. DISCORD
+    # =========================================================
+    # DISCORD START (ASSÍNCRONO SEGURO)
+    # =========================================================
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
 
         if token:
-            print("[DISCORD] Tentando login...")
-            await bot_discord.start(token)
+            asyncio.create_task(start_discord())
         else:
-            print("[ERRO] Token do Discord não encontrado.")
+            print("[ERRO] Token Discord não encontrado.")
 
     except Exception as e:
-        print(f"[FATAL] Erro ao conectar ao Discord: {e}")
+        print(f"[FATAL] Erro Discord: {e}")
 
 
 # =============================================================
-# EXECUÇÃO
+# 22 DISCORD FIX DEFINITIVO + START LIMPO
 # =============================================================
-
-if __name__ == "__main__":
-
-    try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-
-    except (KeyboardInterrupt, SystemExit):
-        print("\n[DESLIGANDO] Motores Arirang parados.")
-# =========================
-# 22 DISCORD FIX DEFINITIVO (COMANDOS + START ESTÁVEL)
-# =========================
 
 async def start_discord():
-    """
-    Inicializa o Discord de forma segura SEM conflito de event loop
-    e sem duplicar execução do bot.
-    """
-
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
 
         if not token:
-            print("[ERRO] Token do Discord não encontrado.")
+            print("[ERRO] Token Discord não encontrado.")
             return
 
-        print("[DISCORD] Preparando inicialização...")
+        print("[DISCORD] Login iniciado...")
 
-        # Sync dos slash commands ANTES de iniciar conexão
+        # Sync de slash commands (garante funcionamento do /teste)
         try:
             synced = await bot_discord.tree.sync()
             print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
         except Exception as e:
             print(f"[DISCORD SYNC ERROR] {e}")
-
-        # IMPORTANTE:
-        # NÃO rodar dentro de create_task se já existe loop controlando execução
-        # Aqui deixamos apenas START controlado pelo main loop
 
         await bot_discord.start(token)
 
@@ -1491,34 +1472,44 @@ async def start_discord():
         print(f"[FATAL DISCORD] {e}")
 
 
-# =========================
-# FIX NO MAIN (SUBSTITUI O START DIRETO DO DISCORD)
-# =========================
+# =============================================================
+# /TESTE DISCORD (MULTI-CANAL + EMBED ROXO)
+# =============================================================
 
-# ❌ REMOVER ISSO DO main():
-# await bot_discord.start(token)
+@bot_discord.tree.command(
+    name="teste",
+    description="Dispara alertas reais do sistema"
+)
+async def teste_discord(interaction: discord.Interaction):
 
-# ❌ NÃO usar create_task direto se main já controla loop inteiro
+    await interaction.response.defer(ephemeral=True)
 
-# =========================
-# INICIALIZAÇÃO SEGURA FINAL
-# =========================
+    try:
+        await run_full_test_discord()
 
-async def start_bots():
-    """
-    Controlador único de inicialização (evita loop duplicado)
-    """
+        guild = interaction.guild
 
-    tasks = []
+        # canais fixos
+        weverse = guild.get_channel(DISCORD_WEVERSE_CHANNEL_ID)
+        tickets = guild.get_channel(DISCORD_TICKETS_CHANNEL_ID)
+        social = guild.get_channel(DISCORD_SOCIAL_CHANNEL_ID)
 
-    # Telegram já roda separado via Application (PTB)
-    # então NÃO conflitar com asyncio.run_until_complete
+        embed = discord.Embed(
+            title="🧪 TESTE SISTEMA ARIRANG",
+            description="Execução de alertas simulados do sistema",
+            color=0x8A2BE2  # roxo fixo
+        )
 
-    tasks.append(asyncio.create_task(monitor_loop()))
+        if weverse:
+            await weverse.send(embed=embed)
 
-    if DISCORD_TOKEN:
-        tasks.append(asyncio.create_task(start_discord()))
+        if tickets:
+            await tickets.send(embed=embed)
 
-    print("[SISTEMA] Bots iniciados com controle único de loop.")
+        if social:
+            await social.send(embed=embed)
 
-    await asyncio.gather(*tasks)
+        await interaction.followup.send("✅ Teste executado com sucesso.", ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erro no teste: {e}", ephemeral=True)
