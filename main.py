@@ -1159,21 +1159,24 @@ async def check_youtube(session):
 # 20 DISCORD: EVENTO ON_READY 
 # ========================= 
 
-@bot_discord.event 
-async def on_ready(): 
-print(f"✅ Logado no Discord como {bot_discord.user}") 
-status_formatado = "🪭 Em tournê! Ouvindo: Arirang" 
-await bot_discord.change_presence( 
+@bot_discord.event
+async def on_ready():
+    print(f"✅ Logado no Discord como {bot_discord.user}")
 
-activity=discord.Activity(type=discord.ActivityType.listening, 
-name=status_formatado), 
-status=discord.Status.online 
-) 
+    status_formatado = "🪭 Em tournê! Ouvindo: Arirang"
 
-try: 
-await bot_discord.tree.sync() 
-except Exception as e: 
-print(f"❌ Erro na sincronização Discord: {e}") 
+    await bot_discord.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name=status_formatado
+        ),
+        status=discord.Status.online
+    )
+
+    try:
+        await bot_discord.tree.sync()
+    except Exception as e:
+        print(f"❌ Erro na sincronização Discord: {e}")
 
 # ===============================
 # 21 INICIALIZAÇÃO FINAL (MAIN) - VERSÃO ESTÁVEL 
