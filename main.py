@@ -1359,7 +1359,11 @@ async def main():
         print("[SISTEMA] Telegram operativo e ouvindo comandos.")
 
         # ✅ CORREÇÃO DO CONFLICT (único polling correto)
-        asyncio.create_task(application.run_polling(drop_pending_updates=True))
+        await application.initialize()
+await application.start()
+await application.bot.initialize()
+
+asyncio.create_task(application.updater.start_polling(drop_pending_updates=True))
 
     # 3. Inicia o Motor de Monitoramento
     asyncio.create_task(monitor_loop())
