@@ -607,7 +607,6 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
   ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**
 
 •°•👾 Wootteo em rota há: **{get_uptime()}** ☄️🌍💫
-•°•°🛸
 """
 
 # =========================
