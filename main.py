@@ -1455,15 +1455,16 @@ if __name__ == "__main__":
 
     except (KeyboardInterrupt, SystemExit):
         print("\n[DESLIGANDO] Motores Arirang parados.")
-# =============================================================
+# =========================
 # 22 DISCORD FIX DEFINITIVO (COMANDOS + START ESTÁVEL)
-# =============================================================
+# =========================
 
 async def start_discord():
     """
-    Inicializa o Discord de forma segura sem travar event loop
-    e garantindo sync dos slash commands.
+    Inicializa o Discord de forma segura SEM conflito de event loop
+    e sem duplicar execução do bot.
     """
+
     try:
         token = os.getenv('DISCORD_TOKEN') or DISCORD_TOKEN
 
@@ -1471,28 +1472,53 @@ async def start_discord():
             print("[ERRO] Token do Discord não encontrado.")
             return
 
-        print("[DISCORD] Tentando login...")
+        print("[DISCORD] Preparando inicialização...")
 
-        # 🔥 IMPORTANTE: sync ANTES de iniciar conexão
+        # Sync dos slash commands ANTES de iniciar conexão
         try:
             synced = await bot_discord.tree.sync()
             print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
         except Exception as e:
             print(f"[DISCORD SYNC ERROR] {e}")
 
-        # Inicia bot (bloqueante, por isso roda em task separada)
+        # IMPORTANTE:
+        # NÃO rodar dentro de create_task se já existe loop controlando execução
+        # Aqui deixamos apenas START controlado pelo main loop
+
         await bot_discord.start(token)
 
     except Exception as e:
         print(f"[FATAL DISCORD] {e}")
 
 
-# =============================================================
-# MAIN - TRECHO CORRIGIDO DO DISCORD
-# =============================================================
+# =========================
+# FIX NO MAIN (SUBSTITUI O START DIRETO DO DISCORD)
+# =========================
 
-# ❌ REMOVER do main():
+# ❌ REMOVER ISSO DO main():
 # await bot_discord.start(token)
 
-# ✅ SUBSTITUIR POR ISSO:
-asyncio.create_task(start_discord())
+# ❌ NÃO usar create_task direto se main já controla loop inteiro
+
+# =========================
+# INICIALIZAÇÃO SEGURA FINAL
+# =========================
+
+async def start_bots():
+    """
+    Controlador único de inicialização (evita loop duplicado)
+    """
+
+    tasks = []
+
+    # Telegram já roda separado via Application (PTB)
+    # então NÃO conflitar com asyncio.run_until_complete
+
+    tasks.append(asyncio.create_task(monitor_loop()))
+
+    if DISCORD_TOKEN:
+        tasks.append(asyncio.create_task(start_discord()))
+
+    print("[SISTEMA] Bots iniciados com controle único de loop.")
+
+    await asyncio.gather(*tasks)
