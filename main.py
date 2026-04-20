@@ -1417,7 +1417,6 @@ async def register_discord_commands():
     if bot_discord.COMMANDS_LOADED:
         return
 
-
     # =========================
     # /ping
     # =========================
@@ -1427,7 +1426,6 @@ async def register_discord_commands():
             "🏓 Pong! Bot ativo.",
             ephemeral=True
         )
-
 
     # =========================
     # /comandos
@@ -1439,32 +1437,27 @@ async def register_discord_commands():
             ephemeral=True
         )
 
-
     # =========================
-    # /teste (CORRIGIDO - SEM COMPLETED)
+    # /teste (CORRIGIDO - SEM COMPLETED / TASK RACE)
     # =========================
     @bot_discord.tree.command(name="teste", description="Executa todos os alertas de teste")
     async def teste(interaction: discord.Interaction):
 
         await interaction.response.defer(ephemeral=True)
 
-        async def runner():
-            try:
-                await run_full_test_discord()
+        try:
+            await run_full_test_discord()
 
-                await interaction.followup.send(
-                    "✅ Teste executado com sucesso.",
-                    ephemeral=True
-                )
+            await interaction.followup.send(
+                "✅ Teste executado com sucesso.",
+                ephemeral=True
+            )
 
-            except Exception as e:
-                await interaction.followup.send(
-                    f"❌ Erro no teste: {e}",
-                    ephemeral=True
-                )
-
-        asyncio.create_task(runner())
-
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Erro no teste: {e}",
+                ephemeral=True
+            )
 
     bot_discord.COMMANDS_LOADED = True
     print("[DISCORD] Comandos registrados com sucesso.")
