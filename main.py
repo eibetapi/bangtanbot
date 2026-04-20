@@ -78,41 +78,39 @@ SEEN_SOCIAL = set()
 # 3 DISCORD SETUP 
 # =========================
 
-intents = discord.Intents.default() 
-intents.message_content = True 
-intents.members = True 
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
 
-bot_discord = commands.Bot(command_prefix="!", intents=intents) 
+bot_discord = commands.Bot(command_prefix="!", intents=intents)
 
-@bot_discord.event 
-async def on_ready(): 
-print(f"[DISCORD] Conectado como 
-{bot_discord.user}") 
+@bot_discord.event
+async def on_ready():
+    print(f"[DISCORD] Conectado como {bot_discord.user}")
 
-# Define a presença do bot 
-await bot_discord.change_presence( 
-activity=discord.Activity( 
-type=discord.ActivityType.listening, 
-name="Em tournê - ouvindo: Arirang 🪭" 
-), 
-status=discord.Status.online 
-) 
+    # Define a presença do bot
+    await bot_discord.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name="Em tournê - ouvindo: Arirang 🪭"
+        ),
+        status=discord.Status.online
+    )
 
-# Sincroniza comandos slash 
-try: 
-synced = await bot_discord.tree.sync() 
-print(f"[DISCORD] Slash commands sincronizados: 
-{len(synced)}") 
-except Exception as e: 
-print(f"[DISCORD SYNC ERROR] {e}") 
+    # Sincroniza comandos slash
+    try:
+        synced = await bot_discord.tree.sync()
+        print(f"[DISCORD] Slash commands sincronizados: {len(synced)}")
+    except Exception as e:
+        print(f"[DISCORD SYNC ERROR] {e}")
 
-# Inicia o servidor Keep Alive 
-keep_alive() 
+    # Inicia o servidor Keep Alive
+    keep_alive()
 
-# Garante que o monitor só inicie se não houver um rodando 
-if not hasattr(bot_discord, 'monitor_started'): bot_discord.loop.create_task(monitor_loop()) 
-bot_discord.monitor_started = True 
-
+    # Garante que o monitor só inicie uma vez
+    if not hasattr(bot_discord, 'monitor_started'):
+        bot_discord.loop.create_task(monitor_loop())
+        bot_discord.monitor_started = True
 
 # =========================
 # 4 WEB SERVER
