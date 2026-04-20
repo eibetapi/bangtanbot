@@ -22,33 +22,34 @@ from flask import Flask
 from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
-# ========================================== 
-# 1 CONFIGURAÇÃO DE CREDENCIAIS & TELEGRAM 
-# ========================================== 
+# ==========================================
+# 1 CONFIGURAÇÃO DE CREDENCIAIS & TELEGRAM
+# ==========================================
 
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') 
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN') 
-PANEL_CHAT_ID = -1003920883053 
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+PANEL_CHAT_ID = -1003920883053
 
-# Variáveis de Controle de Persistência 
-panel_message_id = None 
-discord_panel_msg_id = None 
-panel_initialized = False 
+# Variáveis de Controle de Persistência
+panel_message_id = None
+discord_panel_msg_id = None
+panel_initialized = False
 
-# IDs dos Canais do Discord (DEFINIDOS AQUI) 
-DISCORD_PANEL_CHANNEL_ID = 1494667029150695625 
-DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985 
-DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461 
-DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864 
+# IDs dos Canais do Discord
+DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
+DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
+DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
+DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
 
-# Inicialização do Bot Telegram 
-bot_ticket = None 
-if TELEGRAM_TOKEN: 
-try: 
-bot_ticket = Bot(token=TELEGRAM_TOKEN) 
-print("[SISTEMA] Telegram configurado com sucesso.") 
-except Exception as e: 
-print(f"[ERRO CONFIG TELEGRAM] {e}") 
+# Inicialização do Bot Telegram
+bot_ticket = None
+
+if TELEGRAM_TOKEN:
+    try:
+        bot_ticket = Bot(token=TELEGRAM_TOKEN)
+        print("[SISTEMA] Telegram configurado com sucesso.")
+    except Exception as e:
+        print(f"[ERRO CONFIG TELEGRAM] {e}")
 
 # ==========================================
 # 2 CONTADORES GLOBAIS E PERSISTÊNCIA
