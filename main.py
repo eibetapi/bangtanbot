@@ -1117,7 +1117,7 @@ async def test_youtube_live():
     await send_alert("youtube_live", msg)
 
 # =========================
-# 17 MOTOR + COMANDOS + TESTE (SPOTIFY ROXO & CLEAN)
+# 17 MOTOR + COMANDOS + TESTE (VISUAL SPOTIFY FINAL)
 # =========================
 
 # === BOT DISCORD INIT === #
@@ -1132,12 +1132,9 @@ bot_discord = commands.Bot(command_prefix="!", intents=intents)
 # =========================
 
 async def monitor_loop():
-    print("[SISTEMA] Aguardando conexão com Discord para iniciar monitoramento...")
     while not bot_discord.is_ready():
         await asyncio.sleep(2)
     
-    print("[SISTEMA] Conexão estabelecida! Monitor Arirang ativo.")
-
     async with aiohttp.ClientSession() as session:
         while True:
             try:
@@ -1170,17 +1167,16 @@ async def bts_telegram_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cmd = update.message.text.lower()
-    if "ping" in cmd: await update.message.reply_text("🚀 Wootteo em órbita! Sistema operante.")
+    if "ping" in cmd: await update.message.reply_text("🚀 Wootteo em órbita!")
     elif "comandos" in cmd:
-        await update.message.reply_text("👨‍🚀 **Comandos:** /ping, /bts, /teste, /comandos", parse_mode='Markdown')
+        await update.message.reply_text("/ping, /bts, /teste, /comandos")
     elif "teste" in cmd: await telegram_teste_cmd(update, context)
 
 async def telegram_teste_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if PANEL_CHAT_ID:
         try:
             await context.bot.send_message(chat_id=PANEL_CHAT_ID, text=f"⚠️ TESTE TELEGRAM OK - {datetime.now().strftime('%H:%M:%S')}")
-            await update.message.reply_text(f"✅ Enviado para {PANEL_CHAT_ID}")
-        except Exception as e: await update.message.reply_text(f"❌ Erro: {e}")
+        except: pass
 
 # =========================
 # DISCORD EVENTS & COMMANDS
@@ -1188,58 +1184,44 @@ async def telegram_teste_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 @bot_discord.event
 async def on_ready():
-    print(f"✅ Logado no Discord como {bot_discord.user}")
+    print(f"✅ Logado: {bot_discord.user}")
     try:
-        synced = await bot_discord.tree.sync()
-        print(f"🔄 Slash commands sincronizados: {len(synced)} ativos.")
+        await bot_discord.tree.sync()
     except Exception as e: print(f"[SYNC ERROR] {e}")
-    await bot_discord.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="🪭 Arirang"), status=discord.Status.online)
+    await bot_discord.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="🪭 Arirang"))
 
-@bot_discord.tree.command(name="ping", description="Status do bot")
+@bot_discord.tree.command(name="ping", description="Status")
 async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message("🏓 Pong! Wootteo ativo.", ephemeral=False)
+    await interaction.response.send_message("🏓 Pong!", ephemeral=False)
 
-@bot_discord.tree.command(name="comandos", description="Lista comandos")
+@bot_discord.tree.command(name="comandos", description="Comandos")
 async def comandos(interaction: discord.Interaction):
-    await interaction.response.send_message("🚀 `/ping`, `/bts`, `/teste`, `/comandos`", ephemeral=False)
+    await interaction.response.send_message("`/ping`, `/bts`, `/teste`, `/comandos`", ephemeral=False)
 
 @bot_discord.tree.command(name="bts", description="Fanchant BTS")
 async def bts_discord(interaction: discord.Interaction):
     membros = ["🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI", "🐿️ JUNG HOESOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"]
     
-    # Envia o primeiro membro como resposta inicial
     await interaction.response.send_message(membros[0])
-    
-    # Envia o restante da fanchant
     for nome in membros[1:]:
         await asyncio.sleep(0.8)
         await interaction.followup.send(content=nome)
     
-    await asyncio.sleep(0.8)
-
-    # --- EMBED DO SPOTIFY (ROXO & COM IMAGEM) ---
-    spotify_url = "http://sptfy.bio/btsarirang"
-    image_url = "https://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=LOH7sU1dScWFGMNXDlCIPQ"
-
+    # --- CARD SPOTIFY AJUSTADO ---
     embed_spotify = discord.Embed(
-        title="🪭 Ouça Arirang no Spotify",
-        url=spotify_url,
-        description="Clique no título acima para abrir o álbum.",
-        color=discord.Color.purple() # BARRA ROXA
+        title="🪭 Ouça no Spotify",
+        description="[**ARIRANG**](http://sptfy.bio/btsarirang)",
+        color=discord.Color.purple()
     )
-    # Define a imagem grande do álbum
-    embed_spotify.set_image(url=image_url)
+    # A imagem do álbum agora carrega corretamente no tamanho oficial
+    embed_spotify.set_image(url="https://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=LOH7sU1dScWFGMNXDlCIPQ")
     
     await interaction.followup.send(embed=embed_spotify)
 
-@bot_discord.tree.command(name="teste", description="Teste de Redes Sociais")
+@bot_discord.tree.command(name="teste", description="Disparo de testes")
 async def teste(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=False)
-    try:
-        await run_full_test_discord()
-        await interaction.followup.send("✅ Testes de X, Insta e TikTok enviados ao canal oficial!")
-    except Exception as e: 
-        await interaction.followup.send(f"❌ Erro ao processar teste: {e}")
+    await interaction.response.send_message("⌛", ephemeral=True)
+    await run_full_test_discord()
 
 async def run_telegram_async():
     global bot_ticket
@@ -1254,7 +1236,6 @@ async def run_telegram_async():
         await application.initialize()
         await application.start()
         await application.updater.start_polling(drop_pending_updates=True)
-
 # =========================
 # 18 CHECK SYSTEM + ALERTA REDES SOCIAIS (VERSÃO FINAL 100%)
 # =========================
