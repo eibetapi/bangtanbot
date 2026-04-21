@@ -1162,7 +1162,6 @@ async def monitor_loop():
 # TELEGRAM COMMAND LOGIC
 # =========================
 
-# Comando divertido /bts (TELEGRAM)
 async def bts_telegram_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Posta a fanchant linha por linha e o link final em bloco único no Telegram"""
     membros = [
@@ -1178,12 +1177,11 @@ async def bts_telegram_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for nome in membros:
         await update.message.reply_text(nome)
-        await asyncio.sleep(0.8) # Simula digitação
+        await asyncio.sleep(0.8)
     
     await asyncio.sleep(0.8)
     await update.message.reply_text(post_final, disable_web_page_preview=False)
 
-# Função Genérica para comandos simples (Resolve o NameError anterior)
 async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cmd = update.message.text.lower()
     
@@ -1203,7 +1201,6 @@ async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT
     elif "teste" in cmd:
         await telegram_teste_cmd(update, context)
 
-# Comando específico /teste (TELEGRAM)
 async def telegram_teste_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     await update.message.reply_text("🚀 Iniciando teste de disparo exclusivo Telegram...")
@@ -1265,7 +1262,6 @@ async def comandos(interaction: discord.Interaction):
 
 @bot_discord.tree.command(name="bts", description="Fanchant interativa do BTS")
 async def bts_discord(interaction: discord.Interaction):
-    """Posta a fanchant linha por linha no Discord usando followup"""
     membros = [
         "🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI", 
         "🐿️ JUNG HOESOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", 
@@ -1275,15 +1271,10 @@ async def bts_discord(interaction: discord.Interaction):
         "📀 Ouça Arirang no Spotify\n"
         "🪭 Link: https://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=tSdjqkZhTFSHS1GEJR_3Cw"
     )
-    
-    # Responde a primeira para validar a interação
     await interaction.response.send_message(membros[0])
-    
-    # Envia o restante com delay
     for nome in membros[1:]:
         await asyncio.sleep(0.8)
         await interaction.followup.send(content=nome)
-        
     await asyncio.sleep(0.8)
     await interaction.followup.send(content=post_final)
 
@@ -1302,38 +1293,36 @@ async def teste(interaction: discord.Interaction):
         await interaction.followup.send(f"❌ Erro no teste: {e}", ephemeral=False)
 
 # =========================
-# TELEGRAM START (ASYNC UNIFICADO)
+# TELEGRAM START (ASYNC FIX)
 # =========================
 
 async def run_telegram_async():
     global bot_ticket
-    if TELEGRAM_TOKEN:
-        # Importação local para evitar conflitos
-        from telegram.ext import ApplicationBuilder, CommandHandler
-        
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-        bot_ticket = application.bot
+    if not TELEGRAM_TOKEN:
+        return
 
-        # Registro de Handlers (As funções já estão definidas acima)
-        application.add_handler(CommandHandler("ping", handle_commands_telegram))
-        application.add_handler(CommandHandler("teste", handle_commands_telegram))
-        application.add_handler(CommandHandler("comandos", handle_commands_telegram))
-        application.add_handler(CommandHandler("bts", bts_telegram_cmd))
-        application.add_handler(CommandHandler("BTS", bts_telegram_cmd)) # Case sensitive fix
+    from telegram.ext import ApplicationBuilder, CommandHandler
+    
+    # Criamos a aplicação com polling estável para o Railway
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    bot_ticket = application.bot
 
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling(drop_pending_updates=True)
-        print("[SISTEMA] Telegram configurado com sucesso.")
+    application.add_handler(CommandHandler("ping", handle_commands_telegram))
+    application.add_handler(CommandHandler("teste", handle_commands_telegram))
+    application.add_handler(CommandHandler("comandos", handle_commands_telegram))
+    application.add_handler(CommandHandler("bts", bts_telegram_cmd))
+    application.add_handler(CommandHandler("BTS", bts_telegram_cmd))
 
-# =========================
-# COMMAND REGISTRY SAFE
-# =========================
+    await application.initialize()
+    await application.start()
+    # drop_pending_updates evita que o bot tente responder 100 mensagens de uma vez ao ligar
+    await application.updater.start_polling(drop_pending_updates=True)
+    print("✅ [TELEGRAM] Wootteo configurado com sucesso.")
 
 if not hasattr(bot_discord, "COMMANDS_LOADED"):
     bot_discord.COMMANDS_LOADED = True
 
-## =========================
+# =========================
 # 18 CHECK SYSTEM + AUXILIARES (COMPLETO & ESTÁVEL)
 # =========================
 
@@ -1350,12 +1339,7 @@ async def fetch(session, url):
 
 # === FUNÇÃO AUXILIAR (BUSCA DE PAINEL ANTERIOR) === #
 async def carregar_id_telegram():
-    """
-    Tenta localizar o ID do painel nas últimas mensagens do canal 
-    para evitar duplicatas após resets (Regras A e B).
-    """
     global panel_message_id
-    
     if panel_message_id:
         return panel_message_id
 
@@ -1369,15 +1353,12 @@ async def carregar_id_telegram():
                     return panel_message_id
         except Exception as e:
             print(f"[ERRO RECOVERY TG] {e}")
-            
     return None
 
 # === MONITORAMENTO: TICKETMASTER CHECK === #
 async def check_ticketmaster(session):
     global last_ticket_check, total_tickets
-    if 'TICKET_LINKS' not in globals() or not TICKET_LINKS:
-        return
-
+    if 'TICKET_LINKS' not in globals() or not TICKET_LINKS: return
     last_ticket_check = time.time()
     for url in TICKET_LINKS:
         try:
@@ -1392,9 +1373,7 @@ async def check_ticketmaster(session):
 # === MONITORAMENTO: BUYTICKET CHECK === #
 async def check_buyticket(session):
     global last_buy_check, total_buy
-    if 'BUY_LINKS' not in globals() or not BUY_LINKS:
-        return
-
+    if 'BUY_LINKS' not in globals() or not BUY_LINKS: return
     last_buy_check = time.time()
     for url in BUY_LINKS:
         try:
@@ -1407,9 +1386,7 @@ async def check_buyticket(session):
 # === MONITORAMENTO: WEVERSE CHECK === #
 async def check_weverse(session):
     global last_weverse_check, total_weverse
-    if 'WEVERSE_LINKS' not in globals() or not WEVERSE_LINKS:
-        return
-
+    if 'WEVERSE_LINKS' not in globals() or not WEVERSE_LINKS: return
     last_weverse_check = time.time()
     for url in WEVERSE_LINKS:
         try:
@@ -1423,7 +1400,6 @@ async def check_weverse(session):
 async def check_social(session):
     global last_social_check, total_social
     last_social_check = time.time()
-
     if 'SOCIAL_LINKS' in globals() and SOCIAL_LINKS:
         for url in SOCIAL_LINKS:
             try:
@@ -1432,7 +1408,6 @@ async def check_social(session):
                     total_social += 1
             except Exception as e:
                 print(f"[ERR SOCIAL] {e}")
-
     await check_youtube(session)
 
 async def check_youtube(session):
@@ -1440,11 +1415,7 @@ async def check_youtube(session):
     try:
         html = await fetch(session, f"{youtube_url}/videos")
         if html:
-            is_live = (
-                '{"text":"AO VIVO"}' in html or 
-                '"style":"LIVE"' in html or 
-                ("watch?v=" in html and "live" in html.lower())
-            )
+            is_live = '{"text":"AO VIVO"}' in html or '"style":"LIVE"' in html
             if is_live:
                 if is_new(youtube_url + "/live", "LIVE"):
                     await youtube_live(youtube_url)
@@ -1453,68 +1424,52 @@ async def check_youtube(session):
     except Exception as e:
         print(f"[ERR YOUTUBE] {e}")
 
-# === AUXILIARES DE TEMPO E INTERFACE === #
+# === AUXILIARES DE INTERFACE === #
 def minutes_since(ts):
     if ts == 0: return "---"
     return int((time.time() - ts) / 60)
 
 def status_color(last_check):
     if last_check == 0: return "⚪"
-    agora = time.time()
-    if (agora - last_check) > 1800:
-        return "🔴"
-    return "🟢" if int(agora) % 2 == 0 else "🟡"
+    return "🟢" if int(time.time()) % 2 == 0 else "🟡"
 
 def get_uptime():
     s = int(time.time() - start_time)
     return f"{s//3600}h {(s%3600)//60}m {s%60}s"
 
-def safe_increment(counter_name):
-    global total_tickets, total_buy, total_weverse, total_social
-    if counter_name == "ticket": total_tickets += 1
-    elif counter_name == "buy": total_buy += 1
-    elif counter_name == "weverse": total_weverse += 1
-    elif counter_name == "social": total_social += 1
-
-# === MOTOR DE EXECUÇÃO FINAL (RAILWAY DEFINITIVE) === #
+# === MOTOR DE EXECUÇÃO DEFINITIVO (RAILWAY) === #
 async def main():
     print("🛸 [SISTEMA] WOOTTEO EM PREPARAÇÃO PARA DECOLAGEM...")
     
-    # 1. WebServer para evitar desligamento do Railway
     try:
-        keep_alive()
+        keep_alive() # Inicia o Flask
         print("✅ [FLASK] Web Server ativo.")
     except Exception as e:
         print(f"❌ [FLASK] Erro: {e}")
 
-    # 2. Inicia Telegram (Comandos e Funções)
+    # Inicia Telegram primeiro
     await run_telegram_async()
-    print("✅ [TELEGRAM] Wootteo aguardando comandos.")
 
-    # 3. Dispara as Tarefas de Fundo (Monitoramento)
-    # Usamos o loop atual para garantir que as tasks fiquem penduradas corretamente
+    # Cria as tarefas de fundo no loop atual
     loop = asyncio.get_running_loop()
     loop.create_task(monitor_loop())
     loop.create_task(watchdog_monitor())
     loop.create_task(health_watcher())
     print("✅ [MONITOR] Ciclos Arirang ativados.")
 
-    # 4. Inicia Discord (Mantém o processo principal vivo)
+    # Discord é o "start" final que segura o processo
     try:
         print("✅ [DISCORD] Wootteo tentando login...")
-        # Usamos await bot_discord.start em vez de async with para maior estabilidade no Railway
         await bot_discord.start(DISCORD_TOKEN)
     except Exception as e:
-        print(f"❌ [ERRO CRÍTICO] Falha no motor principal: {e}")
-        # Fallback para o container não fechar se o Discord cair
-        while True:
-            await asyncio.sleep(3600)
+        print(f"❌ [ERRO CRÍTICO] {e}")
+        while True: await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        print("\n🛑 [SISTEMA] Wootteo retornando para a base.")
+        print("\n🛑 [SISTEMA] Wootteo encerrado.")
     except Exception as e:
         print(f"💥 [LOG DE ERRO FINAL]: {e}")
 
