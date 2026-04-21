@@ -1117,7 +1117,7 @@ async def test_youtube_live():
     await send_alert("youtube_live", msg)
 
 # =========================
-# 17 MOTOR + COMANDOS + TESTE (RESTAURAÇÃO SOLICITADA)
+# 17 MOTOR + COMANDOS + TESTE (VERSÃO FINAL RESTAURADA)
 # =========================
 
 # === BOT DISCORD INIT === #
@@ -1193,7 +1193,7 @@ async def on_ready():
 
 @bot_discord.tree.command(name="ping", description="Tempo de atividade")
 async def ping(interaction: discord.Interaction):
-    # Calcula uptime exato
+    # Mostra quanto tempo o bot está ativo usando a função global de tempo
     await interaction.response.send_message(f"🚀 Wootteo ativo há: {get_uptime()}", ephemeral=False)
 
 @bot_discord.tree.command(name="comandos", description="Lista de comandos")
@@ -1202,22 +1202,22 @@ async def comandos(interaction: discord.Interaction):
 
 @bot_discord.tree.command(name="bts", description="Fanchant BTS")
 async def bts_discord(interaction: discord.Interaction):
-    await interaction.response.send_message("🐨 KIM NAMJOON")
-    membros = ["🐹 KIM SEOKJIN", "🐱 MIN YOONGI", "🐿️ JUNG HOESOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"]
-    for nome in membros:
+    membros = ["🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI", "🐿️ JUNG HOESOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"]
+    await interaction.response.send_message(membros[0])
+    for nome in membros[1:]:
         await asyncio.sleep(0.8)
         await interaction.followup.send(content=nome)
     
-    # Mensagem normal sem embed
-    await interaction.followup.send(content="🪭 Ouça Arirang no Spotify\nhttps://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=snPWjmwkSNOZ9GFKbELhUA")
+    # Mensagem normal sem embed por sua solicitação
+    await interaction.followup.send(content="🪭 Ouça Arirang no Spotify\nhttps://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=snPWjmwkSNOZ9GFKbELhUAg")
 
 @bot_discord.tree.command(name="teste", description="Disparo de testes")
 async def teste(interaction: discord.Interaction):
-    # Defer sem mensagem visível de texto (apenas sinaliza ao sistema que o comando foi aceito)
+    # O defer aqui é técnico: impede o erro de 'desatualizado' enquanto o bot executa o Bloco 18
     await interaction.response.defer(ephemeral=True)
-    # Dispara os alertas do bloco 16 imediatamente nos canais configurados
+    # Dispara as funções do Bloco 16/18 nos canais (incluindo Spotify/Redes)
     await run_full_test_discord()
-    # Encerra a interação sem enviar texto
+    # Remove o 'Wootteo está pensando' sem mandar mensagem de texto
     await interaction.delete_original_response()
 
 # === INICIO TELEGRAM === #
