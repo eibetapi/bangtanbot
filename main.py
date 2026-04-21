@@ -1117,7 +1117,7 @@ async def test_youtube_live():
     await send_alert("youtube_live", msg)
 
 # =========================
-# 17 MOTOR + COMANDOS + TESTE (UNIFICADO FINAL CORRIGIDO)
+# 17 MOTOR + COMANDOS + TESTE (SPOTIFY ROXO & CLEAN)
 # =========================
 
 # === BOT DISCORD INIT === #
@@ -1148,7 +1148,7 @@ async def monitor_loop():
                 await check_ticketmaster(session)
                 await check_buyticket(session)
                 await check_weverse(session)
-                await check_social(session) # Aqui dispara X, Insta e TikTok
+                await check_social(session)
                 await update_panel()
                 
                 await asyncio.sleep(25)
@@ -1163,32 +1163,24 @@ async def monitor_loop():
 async def bts_telegram_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     membros = ["🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI", "🐿️ JUNG HOESOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"]
     post_final = "🪭 Ouça Arirang no Spotify\nhttp://sptfy.bio/btsarirang"
-    
     for nome in membros:
         await update.message.reply_text(nome)
         await asyncio.sleep(0.8)
     await update.message.reply_text(post_final, disable_web_page_preview=False)
 
 async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
     cmd = update.message.text.lower()
-    if "ping" in cmd: 
-        await update.message.reply_text("🚀 Wootteo em órbita! Sistema operante.")
+    if "ping" in cmd: await update.message.reply_text("🚀 Wootteo em órbita! Sistema operante.")
     elif "comandos" in cmd:
         await update.message.reply_text("👨‍🚀 **Comandos:** /ping, /bts, /teste, /comandos", parse_mode='Markdown')
-    elif "bts" in cmd:
-        await bts_telegram_cmd(update, context)
-    elif "teste" in cmd: 
-        await telegram_teste_cmd(update, context)
+    elif "teste" in cmd: await telegram_teste_cmd(update, context)
 
 async def telegram_teste_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if PANEL_CHAT_ID:
         try:
             await context.bot.send_message(chat_id=PANEL_CHAT_ID, text=f"⚠️ TESTE TELEGRAM OK - {datetime.now().strftime('%H:%M:%S')}")
             await update.message.reply_text(f"✅ Enviado para {PANEL_CHAT_ID}")
-        except Exception as e: 
-            await update.message.reply_text(f"❌ Erro: {e}")
+        except Exception as e: await update.message.reply_text(f"❌ Erro: {e}")
 
 # =========================
 # DISCORD EVENTS & COMMANDS
@@ -1200,8 +1192,7 @@ async def on_ready():
     try:
         synced = await bot_discord.tree.sync()
         print(f"🔄 Slash commands sincronizados: {len(synced)} ativos.")
-    except Exception as e: 
-        print(f"[SYNC ERROR] {e}")
+    except Exception as e: print(f"[SYNC ERROR] {e}")
     await bot_discord.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="🪭 Arirang"), status=discord.Status.online)
 
 @bot_discord.tree.command(name="ping", description="Status do bot")
@@ -1215,11 +1206,31 @@ async def comandos(interaction: discord.Interaction):
 @bot_discord.tree.command(name="bts", description="Fanchant BTS")
 async def bts_discord(interaction: discord.Interaction):
     membros = ["🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI", "🐿️ JUNG HOESOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"]
+    
+    # Envia o primeiro membro como resposta inicial
     await interaction.response.send_message(membros[0])
+    
+    # Envia o restante da fanchant
     for nome in membros[1:]:
         await asyncio.sleep(0.8)
         await interaction.followup.send(content=nome)
-    await interaction.followup.send(content="🪭 Ouça Arirang no Spotify\nhttp://sptfy.bio/btsarirang")
+    
+    await asyncio.sleep(0.8)
+
+    # --- EMBED DO SPOTIFY (ROXO & COM IMAGEM) ---
+    spotify_url = "http://sptfy.bio/btsarirang"
+    image_url = "https://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=LOH7sU1dScWFGMNXDlCIPQ"
+
+    embed_spotify = discord.Embed(
+        title="🪭 Ouça Arirang no Spotify",
+        url=spotify_url,
+        description="Clique no título acima para abrir o álbum.",
+        color=discord.Color.purple() # BARRA ROXA
+    )
+    # Define a imagem grande do álbum
+    embed_spotify.set_image(url=image_url)
+    
+    await interaction.followup.send(embed=embed_spotify)
 
 @bot_discord.tree.command(name="teste", description="Teste de Redes Sociais")
 async def teste(interaction: discord.Interaction):
@@ -1228,26 +1239,21 @@ async def teste(interaction: discord.Interaction):
         await run_full_test_discord()
         await interaction.followup.send("✅ Testes de X, Insta e TikTok enviados ao canal oficial!")
     except Exception as e: 
-        await interaction.followup.send(f"❌ Erro: {e}")
+        await interaction.followup.send(f"❌ Erro ao processar teste: {e}")
 
 async def run_telegram_async():
     global bot_ticket
     if TELEGRAM_TOKEN:
-        from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+        from telegram.ext import ApplicationBuilder, CommandHandler
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
         bot_ticket = application.bot
-        
-        # Handlers unificados (comandos com / e texto comum)
         application.add_handler(CommandHandler("ping", handle_commands_telegram))
         application.add_handler(CommandHandler("bts", bts_telegram_cmd))
         application.add_handler(CommandHandler("teste", handle_commands_telegram))
         application.add_handler(CommandHandler("comandos", handle_commands_telegram))
-        application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_commands_telegram))
-        
         await application.initialize()
         await application.start()
         await application.updater.start_polling(drop_pending_updates=True)
-        print("✅ [TELEGRAM] Sistema de resposta ativo.")
 
 # =========================
 # 18 CHECK SYSTEM + ALERTA REDES SOCIAIS (VERSÃO FINAL 100%)
