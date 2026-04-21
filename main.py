@@ -1144,9 +1144,8 @@ async def executar_comando(cmd, origem, interaction=None, chat_id=None):
     if cmd == "ping":
         resposta = f"🏓 Pong! {get_uptime()}"
 
-  elif cmd == "bts":
-
-    membros = [
+elif cmd == "bts":
+    resposta = "\n".join([
         "🐨 KIM NAMJOON",
         "🐹 KIM SEOKJIN",
         "🐱 MIN YOONGI",
@@ -1155,7 +1154,7 @@ async def executar_comando(cmd, origem, interaction=None, chat_id=None):
         "🐻 KIM TAEHYUNG",
         "🐰 JEON JUNGKOOK",
         "💜 BTS"
-    ]
+    ])
 
     # vai enviar em "fanchart" (um por um no Discord/Telegram)
     if origem == "discord" and interaction:
