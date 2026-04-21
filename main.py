@@ -1103,88 +1103,186 @@ async def test_youtube_live():
     await send_alert("youtube_live", msg)
 
 # =========================
-# 17 MOTOR + COMANDOS + TESTE (FIX FINAL ESTÁVEL)
+# 17 + 18 CORE FINAL LIMPO
 # =========================
 
-# ⚠️ NÃO recriar bot_discord aqui (já existe no topo)
+# =========================
+# TELEGRAM SEND
+# =========================
 
-# === TELEGRAM LOGIC === #
-async def bts_telegram_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    membros = [
-        "🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI",
-        "🐿️ JUNG HOSEOK", "🐥 PARK JIMIN",
-        "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"
-    ]
-
-    for nome in membros:
-        if update.message:
-            await update.message.reply_text(nome)
-        await asyncio.sleep(0.8)
+async def telegram_send(chat_id, text):
+    try:
+        await bot_ticket.send_message(chat_id=chat_id, text=text)
+    except Exception as e:
+        print(f"[TELEGRAM ERROR] {e}")
 
 
-async def handle_commands_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# =========================
+# COMANDOS UNIFICADOS
+# =========================
+
+async def executar_comando(cmd, origem, interaction=None, chat_id=None):
+
+    resposta = None
+
+    # ===== PING =====
+    if cmd == "ping":
+        resposta = f"🏓 Pong! {get_uptime()}"
+
+    # ===== COMANDOS =====
+    elif cmd == "comandos":
+        resposta = "/ping\n/comandos\n/teste\n/bts"
+
+    # ===== BTS =====
+    elif cmd == "bts":
+        resposta = "\n".join([
+            "🐨 KIM NAMJOON",
+            "🐹 KIM SEOKJIN",
+            "🐱 MIN YOONGI",
+            "🐿️ JUNG HOSEOK",
+            "🐥 PARK JIMIN",
+            "🐻 KIM TAEHYUNG",
+            "🐰 JEON JUNGKOOK",
+            "💜 BTS"
+        ])
+
+    # ===== TESTE =====
+    elif cmd == "teste":
+        resposta = "⚠️ Iniciando teste completo..."
+
+    # =========================
+    # ENVIO DA RESPOSTA
+    # =========================
+
+    if origem == "discord":
+        if resposta:
+            if interaction.response.is_done():
+                await interaction.followup.send(resposta)
+            else:
+                await interaction.response.send_message(resposta)
+
+    elif origem == "telegram":
+        if resposta:
+            await telegram_send(chat_id, resposta)
+
+    # =========================
+    # EXECUÇÃO DE AÇÕES
+    # =========================
+
+    if cmd == "teste":
+        try:
+            await run_full_test_discord()
+
+            if origem == "discord":
+                await interaction.followup.send("✅ Teste finalizado")
+            else:
+                await telegram_send(chat_id, "✅ Teste finalizado")
+
+        except Exception as e:
+            erro = f"❌ Erro: {e}"
+            if origem == "discord":
+                await interaction.followup.send(erro)
+            else:
+                await telegram_send(chat_id, erro)
+
+
+# =========================
+# TELEGRAM HANDLER (ÚNICO)
+# =========================
+
+async def handle_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if not update.message or not update.message.text:
         return
 
-    cmd = update.message.text.lower()
+    cmd = update.message.text.lower().replace("/", "").strip()
 
-    if "ping" in cmd:
-        await update.message.reply_text("🚀 Wootteo em órbita!")
-
-    elif "comandos" in cmd:
-        await update.message.reply_text("/ping, /bts, /teste, /comandos")
-
-    elif "bts" in cmd:
-        await bts_telegram_cmd(update, context)
-
-    elif "teste" in cmd:
-        if PANEL_CHAT_ID:
-            await context.bot.send_message(
-                chat_id=PANEL_CHAT_ID,
-                text="⚠️ TESTE TELEGRAM OK"
-            )
+    await executar_comando(
+        cmd=cmd,
+        origem="telegram",
+        chat_id=update.message.chat_id
+    )
 
 
-# === DISCORD EVENTS === #
+# =========================
+# TELEGRAM START
+# =========================
+
+def start_telegram():
+    if not TELEGRAM_TOKEN:
+        return
+
+    from telegram.ext import ApplicationBuilder, MessageHandler, filters
+
+    async def run():
+        global bot_ticket
+
+        app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        bot_ticket = app.bot
+
+        app.add_handler(MessageHandler(filters.TEXT, handle_telegram))
+
+        await app.initialize()
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        await app.start()
+
+        print("✅ TELEGRAM ONLINE")
+
+        while True:
+            await asyncio.sleep(3600)
+
+    asyncio.create_task(run())
+
+
+# =========================
+# DISCORD COMMANDS
+# =========================
+
+@bot_discord.tree.command(name="ping")
+async def ping(interaction: discord.Interaction):
+    await executar_comando("ping", "discord", interaction=interaction)
+
+
+@bot_discord.tree.command(name="comandos")
+async def comandos(interaction: discord.Interaction):
+    await executar_comando("comandos", "discord", interaction=interaction)
+
+
+@bot_discord.tree.command(name="bts")
+async def bts(interaction: discord.Interaction):
+    await executar_comando("bts", "discord", interaction=interaction)
+
+
+@bot_discord.tree.command(name="teste")
+async def teste(interaction: discord.Interaction):
+    await interaction.response.defer()
+    await executar_comando("teste", "discord", interaction=interaction)
+
+
+# =========================
+# DISCORD READY
+# =========================
+
 @bot_discord.event
 async def on_ready():
-    print(f"✅ Logado: {bot_discord.user}")
+    print(f"✅ Discord conectado: {bot_discord.user}")
 
     try:
         await bot_discord.tree.sync()
     except Exception as e:
         print(f"[SYNC ERROR] {e}")
 
-    await bot_discord.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.listening,
-            name="🪭 Em turnê | Arirang"
-        )
-    )
 
+# =========================
+# MONITOR LOOP ÚNICO
+# =========================
 
-# ⚠️ COMANDO /teste ÚNICO (CORRIGIDO)
-@bot_discord.tree.command(name="teste", description="Dispara teste completo do sistema")
-async def teste(interaction: discord.Interaction):
-
-    await interaction.response.defer(ephemeral=False)
-
-    try:
-        await run_full_test_discord()
-
-    except Exception as e:
-        await interaction.followup.send(
-            f"❌ Erro no teste: {e}",
-            ephemeral=False
-        )
-
-
-# === CORE ENGINE === #
 async def monitor_loop():
-    while not bot_discord.is_ready():
-        await asyncio.sleep(5)
+
+    await bot_discord.wait_until_ready()
 
     async with aiohttp.ClientSession() as session:
+
         while True:
             try:
                 await check_ticketmaster(session)
@@ -1200,151 +1298,25 @@ async def monitor_loop():
                 await asyncio.sleep(10)
 
 
-# === TELEGRAM START (FIX LOOP) === #
-def start_telegram():
-    if not TELEGRAM_TOKEN:
-        return
-
-    from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-
-    async def run():
-        global bot_ticket
-
-        app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-        bot_ticket = app.bot
-
-        app.add_handler(CommandHandler("ping", handle_commands_telegram))
-        app.add_handler(CommandHandler("bts", bts_telegram_cmd))
-        app.add_handler(CommandHandler("teste", handle_commands_telegram))
-        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_commands_telegram))
-
-        await app.initialize()
-        await app.bot.delete_webhook(drop_pending_updates=True)
-        await app.start()
-
-        # ❌ REMOVIDO: run_polling (causava conflito de loop)
-        # ✅ SUBSTITUÍDO POR LOOP MANUAL
-        while True:
-            await asyncio.sleep(3600)
-
-    asyncio.create_task(run())
-
 # =========================
-# 18 CHECK SYSTEM + ALERTA REDES SOCIAIS (VERSÃO FINAL 100%)
+# MAIN FINAL
 # =========================
 
-# Variável global para evitar alertas retroativos no boot
-PRIMEIRO_CICLO = True
-
-# === FUNÇÃO DE ALERTA UNIFICADO (X, INSTA, TIKTOK) === #
-async def disparar_alerta_redes_sociais(plataforma, perfil, link):
-    """Envia alerta para o canal DISCORD_CHANNEL_ID (Redes Sociais)"""
-    
-    # SILENCIADOR: Se for a primeira varredura ao ligar, apenas registra mas não posta
-    if PRIMEIRO_CICLO:
-        print(f"🤫 [SILENCIADOR] Ignorando post antigo de {plataforma} detectado no boot.")
-        return
-
-    channel_id = os.getenv("DISCORD_CHANNEL_ID")
-    if not channel_id:
-        print(f"⚠️ [ERRO] DISCORD_CHANNEL_ID não configurado para {plataforma}.")
-        return
-
-    try:
-        # Busca o canal de forma robusta (Cache ou Fetch)
-        channel = bot_discord.get_channel(int(channel_id)) or await bot_discord.fetch_channel(int(channel_id))
-        
-        if channel:
-            cores = {
-                "X": discord.Color.blue(), 
-                "Instagram": discord.Color.magenta(), 
-                "TikTok": discord.Color.dark_grey()
-            }
-            
-            embed = discord.Embed(
-                title=f"🔔 NOVO POST: {plataforma.upper()}",
-                description=f"O perfil **{perfil}** acaba de postar!",
-                color=cores.get(plataforma, discord.Color.blue()),
-                timestamp=datetime.now()
-            )
-            embed.add_field(name="🔗 Link Direto", value=link, inline=False)
-            embed.set_footer(text="Motor Arirang | Wootteo Monitoring")
-            
-            await channel.send(embed=embed)
-            print(f"✅ [DISCORD] Alerta {plataforma} postado no canal {channel_id}")
-    except Exception as e:
-        print(f"❌ [ERRO ALERTA REDES] {e}")
-
-# ⚠️⚠️⚠️ CORREÇÃO AQUI ⚠️⚠️⚠️
-# RENOMEAMOS PARA NÃO QUEBRAR O /teste PRINCIPAL
-
-async def run_social_test_only():
-    """Simula apenas os disparos de rede social (NÃO interfere no /teste principal)"""
-    print("🧪 [TESTE SOCIAL] Iniciando simulação de redes sociais...")
-
-    global PRIMEIRO_CICLO
-    estado_original = PRIMEIRO_CICLO
-    PRIMEIRO_CICLO = False
-
-    await disparar_alerta_redes_sociais("X", "@BTS_twt", "https://x.com/bts_twt")
-    await asyncio.sleep(1.2)
-    await disparar_alerta_redes_sociais("Instagram", "@uarmyhope", "https://instagram.com/uarmyhope")
-    await asyncio.sleep(1.2)
-    await disparar_alerta_redes_sociais("TikTok", "@bts_official_bighit", "https://tiktok.com/@bts_official_bighit")
-
-    PRIMEIRO_CICLO = estado_original
-
-    print("✅ [TESTE SOCIAL] concluído.")
-
-# === AUXILIARES DO MOTOR === #
-async def fetch(session, url):
-    try:
-        async with session.get(url, timeout=15) as resp:
-            return await resp.text() if resp.status == 200 else None
-    except: return None
-
-def get_uptime():
-    s = int(time.time() - start_time)
-    return f"{s//3600}h {(s%3600)//60}m {s%60}s"
-
-# === MOTOR DE EXECUÇÃO PRINCIPAL (DECOLAGEM) === #
 async def main():
-    global PRIMEIRO_CICLO
-    print("🛸 [SISTEMA] WOOTTEO EM PREPARAÇÃO PARA DECOLAGEM...")
-    
-    # 1. Flask
-    try:
-        keep_alive()
-        print("✅ [FLASK] Web Server ativo.")
-    except Exception as e: 
-        print(f"❌ [FLASK] Erro: {e}")
 
-    # 2. Iniciar Telegram (CORRIGIDO)
+    print("🛸 WOOTTEO CORE FINAL INICIANDO")
+
+    # WEB
+    keep_alive()
+
+    # TELEGRAM
     start_telegram()
-    print("✅ [TELEGRAM] Wootteo online e respondendo.")
 
-    # 3. Monitor
-    loop = asyncio.get_running_loop()
-    loop.create_task(monitor_loop())
-    print("✅ [MONITOR] Ciclo Arirang iniciado.")
+    # MONITOR
+    asyncio.create_task(monitor_loop())
 
-    # 4. Liberação de alertas
-    async def liberar_alertas():
-        global PRIMEIRO_CICLO
-        await asyncio.sleep(45)
-        PRIMEIRO_CICLO = False
-        print("🔔 [SISTEMA] Alertas reais ativados.")
-
-    loop.create_task(liberar_alertas())
-
-    # 5. Discord
-    try:
-        print("✅ [DISCORD] Wootteo tentando login...")
-        await bot_discord.start(DISCORD_TOKEN)
-    except Exception as e:
-        print(f"❌ [DISCORD ERROR] {e}")
-        while True:
-            await asyncio.sleep(3600)
+    # DISCORD
+    await bot_discord.start(DISCORD_TOKEN)
 
 # =========================
 # 19 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL
