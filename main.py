@@ -481,6 +481,7 @@ async def update_panel():
         # TELEGRAM (PAINEL FIXO)
         # =========================
         if bot_ticket and PANEL_CHAT_ID:
+
             try:
                 if not panel_message_id:
                     panel_message_id = carregar_id_telegram()
@@ -502,6 +503,7 @@ async def update_panel():
 
                 # recria se não existir
                 if not edited:
+
                     try:
                         await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
                     except:
@@ -553,36 +555,27 @@ async def update_panel():
 
                 try:
 
-                    # tenta recuperar mensagem antiga
                     if not discord_panel_msg_id:
-
                         async for msg in channel.history(limit=10):
                             if msg.author == bot_discord.user:
                                 discord_panel_msg_id = msg.id
                                 break
 
-                    # edita se existir
                     if discord_panel_msg_id:
-
                         msg = await channel.fetch_message(discord_panel_msg_id)
                         await msg.edit(embed=embed)
-
-                    # cria se não existir
                     else:
-
                         msg = await channel.send(embed=embed)
                         discord_panel_msg_id = msg.id
 
                 except Exception as e:
-                    print(f"[DC PANEL ERROR] {e}")
+                    print(f"[DISCORD PANEL ERROR] {e}")
 
     except Exception as e:
         print(f"[PANEL UPDATE FATAL ERROR] {e}")
 
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
-    global total_weverse, total_social, total_tickets, total_buy
-    global last_weverse_check, last_social_check, last_ticket_check, last_buy_check
 
 
     return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
