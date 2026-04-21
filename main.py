@@ -1117,7 +1117,7 @@ async def test_youtube_live():
     await send_alert("youtube_live", msg)
 
 # =========================
-# 17 MOTOR + COMANDOS + TESTE (FIX DISPARO DISCORD)
+# 17 MOTOR + COMANDOS + TESTE (RESTAURAÇÃO DE DISPARO)
 # =========================
 
 # === BOT DISCORD INIT === #
@@ -1206,25 +1206,21 @@ async def bts_discord(interaction: discord.Interaction):
     for nome in membros:
         await asyncio.sleep(0.8)
         await interaction.followup.send(content=nome)
-    await interaction.followup.send(content="🪭 Ouça Arirang no Spotify\nhttp://sptfy.bio/btsarirang")
+    await interaction.followup.send(content="🪭 Ouça Arirang no Spotify\nhttps://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h?si=-_f7djpeS1uJlq71_SiOOg")
 
 @bot_discord.tree.command(name="teste", description="Disparo de testes")
 async def teste(interaction: discord.Interaction):
-    # Defer silencioso para processar o disparo
+    # Defer silencioso para evitar erro de timeout no Discord
     await interaction.response.defer(ephemeral=True)
     
-    # FORÇA O DISPARO: Ignora o silenciador de boot apenas para este comando
-    global PRIMEIRO_CICLO
-    temp_ciclo = PRIMEIRO_CICLO
-    PRIMEIRO_CICLO = False 
-    
-    # Executa a função do Bloco 18 que manda as msgs para os canais
+    # Chama diretamente a função global de disparo definida no Bloco 18
+    # Esta função deve conter os disparar_alerta_redes_sociais para cada rede
     try:
         await run_full_test_discord()
-    finally:
-        # Restaura o estado original do ciclo
-        PRIMEIRO_CICLO = temp_ciclo
+        # Após o disparo bem-sucedido nas salas, remove o status de carregamento
         await interaction.delete_original_response()
+    except Exception as e:
+        print(f"[TESTE ERROR] Falha ao disparar nas salas: {e}")
 
 # === INICIO TELEGRAM === #
 async def run_telegram_async():
