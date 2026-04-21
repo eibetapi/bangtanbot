@@ -1163,38 +1163,20 @@ async def on_ready():
     )
 
 
-# ⚠️ COMANDO /teste ÚNICO (NÃO DUPLICAR)
+# ⚠️ COMANDO /teste ÚNICO (CORRIGIDO)
 @bot_discord.tree.command(name="teste", description="Dispara teste completo do sistema")
 async def teste(interaction: discord.Interaction):
 
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
     try:
-        # executa TODOS os testes reais (bloco 16)
         await run_full_test_discord()
 
     except Exception as e:
         await interaction.followup.send(
             f"❌ Erro no teste: {e}",
-            ephemeral=True
+            ephemeral=False
         )
-
-
-# ✅ COMANDO /bts ADICIONADO PARA DISCORD
-@bot_discord.tree.command(name="bts", description="Lista membros do BTS")
-async def bts(interaction: discord.Interaction):
-
-    membros = [
-        "🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI",
-        "🐿️ JUNG HOSEOK", "🐥 PARK JIMIN",
-        "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"
-    ]
-
-    await interaction.response.defer(ephemeral=True)
-
-    for nome in membros:
-        await interaction.followup.send(nome, ephemeral=True)
-        await asyncio.sleep(0.8)
 
 
 # === CORE ENGINE === #
@@ -1240,10 +1222,10 @@ def start_telegram():
         await app.bot.delete_webhook(drop_pending_updates=True)
         await app.start()
 
-        # ✅ CORRETO (sem updater)
         await app.run_polling()
 
     asyncio.create_task(run())
+
 # =========================
 # 18 CHECK SYSTEM + ALERTA REDES SOCIAIS (VERSÃO FINAL 100%)
 # =========================
