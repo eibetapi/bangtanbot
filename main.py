@@ -1275,24 +1275,26 @@ async def disparar_alerta_redes_sociais(plataforma, perfil, link):
     except Exception as e:
         print(f"❌ [ERRO ALERTA REDES] {e}")
 
-# === FUNÇÃO DE TESTE (CHAMADA PELO /TESTE) === #
-async def run_full_test_discord():
-    """Simula os disparos de rede social para o canal oficial"""
-    print("🧪 [TESTE] Iniciando simulação unificada para Redes Sociais...")
-    
-    # Força PRIMEIRO_CICLO como False apenas para o teste aparecer
+# ⚠️⚠️⚠️ CORREÇÃO AQUI ⚠️⚠️⚠️
+# RENOMEAMOS PARA NÃO QUEBRAR O /teste PRINCIPAL
+
+async def run_social_test_only():
+    """Simula apenas os disparos de rede social (NÃO interfere no /teste principal)"""
+    print("🧪 [TESTE SOCIAL] Iniciando simulação de redes sociais...")
+
     global PRIMEIRO_CICLO
     estado_original = PRIMEIRO_CICLO
     PRIMEIRO_CICLO = False
-    
+
     await disparar_alerta_redes_sociais("X", "@BTS_twt", "https://x.com/bts_twt")
     await asyncio.sleep(1.2)
     await disparar_alerta_redes_sociais("Instagram", "@uarmyhope", "https://instagram.com/uarmyhope")
     await asyncio.sleep(1.2)
     await disparar_alerta_redes_sociais("TikTok", "@bts_official_bighit", "https://tiktok.com/@bts_official_bighit")
-    
+
     PRIMEIRO_CICLO = estado_original
-    print("✅ [TESTE] Simulação concluída.")
+
+    print("✅ [TESTE SOCIAL] concluído.")
 
 # === AUXILIARES DO MOTOR === #
 async def fetch(session, url):
@@ -1344,16 +1346,6 @@ async def main():
         while True:
             await asyncio.sleep(3600)
 
-
-# =========================
-# EXECUÇÃO FINAL (CORREÇÃO DO CRASH)
-# =========================
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        print(f"[FATAL ERROR] {e}")
 # =========================
 # 19 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL
 # =========================
