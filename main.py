@@ -1742,7 +1742,7 @@ async def check_social(session):
                 await trigger_alert("social", url, msg)
 
 # =========================
-# 19 FINAL MASTER (ANTI-CRASH + CACHE + DUPLICAÇÃO GLOBAL)
+# 19 FINAL MASTER (ANTI-SPAM INTELIGENTE + DIF REAL + PRIORIDADE)
 # =========================
 
 import asyncio
@@ -1754,7 +1754,6 @@ import hashlib
 
 GLOBAL_CACHE = {}
 GLOBAL_LOCK = asyncio.Lock()
-
 
 # =========================
 # SMART CACHE CHECK (EVITA RE-ALERT REPETIDO)
@@ -1804,7 +1803,6 @@ async def watchdog_monitor():
 
         try:
 
-            # evita múltiplos monitor_loop rodando ao mesmo tempo
             task = asyncio.create_task(monitor_loop())
 
             await asyncio.wait_for(task, timeout=300)
@@ -1823,10 +1821,6 @@ async def watchdog_monitor():
 # =========================
 
 async def safe_fetch(session, url):
-    """
-    Fetch seguro usando aiohttp.
-    Substitui a chamada inexistente fetch().
-    """
 
     try:
         async with session.get(url, timeout=20) as resp:
@@ -1840,6 +1834,7 @@ async def safe_fetch(session, url):
     except Exception as e:
         print(f"[FETCH SAFE ERROR] {e}")
         return None
+
 
 # =========================
 # LOCKED UPDATE PANEL (EVITA CONCORRÊNCIA)
@@ -1962,6 +1957,7 @@ async def run_task_safe(task_func, *args):
     except Exception as e:
         print(f"[TASK ERROR] {e}")
         return None
+
 
 # =========================
 # 20 FINAL CORE HARDENING (ANTI-SPAM INTELIGENTE + DIF REAL + PRIORIDADE)
@@ -2196,4 +2192,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("[SYSTEM] Encerrado manualmente")
 
- 
