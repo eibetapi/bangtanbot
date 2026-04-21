@@ -1735,7 +1735,8 @@ async def check_social(session):
 """
 
                 await trigger_alert("social", url, msg)
-## =========================
+
+# =========================
 # 19 FINAL MASTER (ANTI-CRASH + CACHE + DUPLICAÇÃO GLOBAL)
 # =========================
 
@@ -1798,17 +1799,15 @@ async def watchdog_monitor():
 
         try:
 
-            # evita múltiplos monitor_loop rodando sem controle
+            # evita múltiplos monitor_loop rodando ao mesmo tempo
             task = asyncio.create_task(monitor_loop())
 
             await asyncio.wait_for(task, timeout=300)
 
         except asyncio.TimeoutError:
-
             print("[WATCHDOG] monitor travado -> reiniciando")
 
         except Exception as e:
-
             print(f"[WATCHDOG ERROR] {e}")
 
         await asyncio.sleep(5)
@@ -1821,7 +1820,7 @@ async def watchdog_monitor():
 async def safe_fetch(session, url):
 
     try:
-
+        # depende do seu fetch global já existente no projeto
         html = await fetch(session, url)
 
         if not html:
@@ -1841,7 +1840,6 @@ async def safe_fetch(session, url):
 async def locked_update_panel():
 
     async with GLOBAL_LOCK:
-
         await safe_run(update_panel(), "PANEL")
 
 
@@ -1867,7 +1865,7 @@ def run_with_guard(loop_func):
 
 
 # =========================
-# CLEAN START MONITOR (FINAL ENGINE)
+# CLEAN START MONITOR (ENGINE ÚNICO)
 # =========================
 
 async def start_engine():
@@ -1888,9 +1886,7 @@ async def start_engine():
 
 async def dispatch_alert(alert_type, message, key=None):
 
-    # evita duplicação global
     if key:
-
         if not is_new_global(key, message):
             return
 
@@ -1939,18 +1935,15 @@ async def auto_repair_panel():
     try:
 
         if not panel_message_id:
-
             print("[AUTO FIX] recriando painel telegram")
-
             await update_panel()
 
     except Exception as e:
-
         print(f"[AUTO REPAIR ERROR] {e}")
 
 
 # =========================
-# CLEAN TASK RUNNER
+# SAFE TASK RUNNER
 # =========================
 
 async def run_task_safe(task_func, *args):
