@@ -1327,20 +1327,24 @@ async def teste_cmd(interaction: discord.Interaction):
 
 
 # =========================
-# 🔒 HARDLOCK DE SLASH COMMANDS (ANTI-SUMIÇO)
+# 🔒 SETUP HOOK ÚNICO (SYNC + HARDLOCK DE SLASH COMMANDS)
 # =========================
 
 @bot_discord.event
 async def setup_hook():
 
-    print("[SYNC] iniciando hardlock de comandos...")
+    print("[SYNC] iniciando setup_hook completo...")
 
     try:
-        # força sync total
+        # =========================
+        # SYNC INICIAL
+        # =========================
         synced = await bot_discord.tree.sync()
         print(f"[SYNC] {len(synced)} comandos sincronizados")
 
-        # valida se comandos críticos existem
+        # =========================
+        # HARDLOCK DE VERIFICAÇÃO
+        # =========================
         nomes = [c.name for c in synced]
 
         obrigatorios = ["ping", "comandos", "bts", "teste"]
@@ -1351,9 +1355,10 @@ async def setup_hook():
                 await bot_discord.tree.sync()
                 break
 
-    except Exception as e:
-        print(f"[SYNC HARDLOCK ERROR] {e}")
+        print("[SYNC] setup_hook concluído com sucesso")
 
+    except Exception as e:
+        print(f"[SYNC ERROR] {e}")
 
 # =========================
 # 18 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL
@@ -1814,14 +1819,18 @@ async def watchdog_monitor():
 
 
 # =========================
-# SAFE FETCH WRAPPER (ANTI-SPAM REQUESTS)
+# SAFE FETCH WRAPPER 
 # =========================
 
 async def safe_fetch(session, url):
+    """
+    Fetch seguro usando aiohttp.
+    Substitui a chamada inexistente fetch().
+    """
 
     try:
-        # depende do seu fetch global já existente no projeto
-        html = await fetch(session, url)
+        async with session.get(url, timeout=20) as resp:
+            html = await resp.text()
 
         if not html:
             return None
@@ -1831,7 +1840,6 @@ async def safe_fetch(session, url):
     except Exception as e:
         print(f"[FETCH SAFE ERROR] {e}")
         return None
-
 
 # =========================
 # LOCKED UPDATE PANEL (EVITA CONCORRÊNCIA)
