@@ -400,6 +400,36 @@ def format_member(member_name):
     return emoji, name
 
 # =========================
+# 10.1 RECOVERY DO PAINEL DISCORD (STARTUP SAFE)
+# =========================
+
+async def recover_discord_panel():
+    global discord_panel_msg_id
+
+    if not DISCORD_PANEL_CHANNEL_ID or not bot_discord:
+        return
+
+    try:
+        channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+
+        if not channel:
+            return
+
+        # procura APENAS mensagens fixadas
+        pinned_messages = await channel.pins()
+
+        for msg in pinned_messages:
+            if msg.author == bot_discord.user:
+                discord_panel_msg_id = msg.id
+                print("[10.1 RECOVERY] painel restaurado com sucesso")
+                return
+
+        print("[10.1 RECOVERY] nenhum painel fixado encontrado")
+
+    except Exception as e:
+        print(f"[10.1 RECOVERY ERROR] {e}")
+
+# =========================
 # 11 TEST MODE + CORE ROUTER (SEM COMANDOS DUPLICADOS)
 # =========================
 
