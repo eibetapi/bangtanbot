@@ -462,7 +462,7 @@ async def send_alert(alert_type, message):
         print(f"[DISCORD ROUTER ERROR] {e}")
 
 # ======================
-# 12 GESTÃO DO PAINEL (TELEGRAM FIX FINAL)
+# 12 GESTÃO DO PAINEL (FIX REAL TEMPO-REAL)
 # ======================
 
 async def update_panel():
@@ -476,103 +476,102 @@ async def update_panel():
         texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
         # =========================
-        # ANTI-SPAM (10s)
+        # ANTI-SPAM ULTRA ESTÁVEL
         # =========================
         now = time.time()
 
-        if 'last_panel_update' not in globals():
+        if last_panel_update is None:
             last_panel_update = 0
 
-        if last_panel_update and (now - last_panel_update < 10):
+        if (now - last_panel_update) < 5:
             return
 
         last_panel_update = now
 
         # =========================
-        # TELEGRAM PAINEL
+        # TELEGRAM PAINEL (REGRA FIXA)
         # =========================
-        if bot_ticket is None or PANEL_CHAT_ID is None:
-            return
+        if bot_ticket and PANEL_CHAT_ID:
 
-        try:
-            if panel_message_id is None:
-                try:
-                    panel_message_id = carregar_id_telegram()
-                except:
-                    panel_message_id = None
+            try:
+                # tenta carregar ID uma única vez se vazio
+                if not panel_message_id:
+                    try:
+                        panel_message_id = carregar_id_telegram()
+                    except:
+                        panel_message_id = None
 
-            edited = False
+                # EDITA SEMPRE PRIMEIRO
+                if panel_message_id:
+                    try:
+                        await bot_ticket.edit_message_text(
+                            chat_id=PANEL_CHAT_ID,
+                            message_id=panel_message_id,
+                            text=texto,
+                            parse_mode=None
+                        )
+                    except:
+                        panel_message_id = None
 
-            if panel_message_id:
-                try:
-                    await bot_ticket.edit_message_text(
+                # SE NÃO EXISTE, CRIA NOVO E FIXA
+                if not panel_message_id:
+
+                    try:
+                        await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
+                    except:
+                        pass
+
+                    msg = await bot_ticket.send_message(
                         chat_id=PANEL_CHAT_ID,
-                        message_id=panel_message_id,
                         text=texto,
                         parse_mode=None
                     )
-                    edited = True
-                except:
-                    panel_message_id = None
 
-            if not edited:
+                    panel_message_id = msg.message_id
+                    salvar_id_telegram(panel_message_id)
 
-                try:
-                    await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
-                except:
-                    pass
+                    try:
+                        await bot_ticket.pin_chat_message(
+                            chat_id=PANEL_CHAT_ID,
+                            message_id=panel_message_id,
+                            disable_notification=True
+                        )
+                    except:
+                        pass
 
-                msg = await bot_ticket.send_message(
-                    chat_id=PANEL_CHAT_ID,
-                    text=texto,
-                    parse_mode=None
-                )
+            except Exception as e:
+                print(f"[TELEGRAM PANEL ERROR] {e}")
 
-                panel_message_id = msg.message_id
-                salvar_id_telegram(panel_message_id)
+        # =========================
+        # DISCORD PAINEL (EDIT ONLY)
+        # =========================
+        if DISCORD_PANEL_CHANNEL_ID and bot_discord:
 
-                try:
-                    await bot_ticket.pin_chat_message(
-                        chat_id=PANEL_CHAT_ID,
-                        message_id=panel_message_id,
-                        disable_notification=True
+            try:
+                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+
+                if channel:
+
+                    embed = discord.Embed(
+                        description=texto,
+                        color=0x8A2BE2
                     )
-                except:
-                    pass
 
-        except Exception as e:
-            print(f"[TELEGRAM PANEL ERROR] {e}")
-
-        # =========================
-        # DISCORD PAINEL (DENTRO DA FUNÇÃO - FIX REAL)
-        # =========================
-        if DISCORD_PANEL_CHANNEL_ID:
-
-            channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
-            if channel:
-
-                embed = discord.Embed(
-                    description=texto,
-                    color=0x8A2BE2
-                )
-
-                try:
-
+                    # SEMPRE EDITA PRIMEIRO
                     if discord_panel_msg_id:
-
                         try:
                             msg = await channel.fetch_message(discord_panel_msg_id)
                             await msg.edit(embed=embed)
                         except:
                             discord_panel_msg_id = None
 
+                    # SÓ CRIA SE PERDEU REFERÊNCIA
                     if not discord_panel_msg_id:
                         msg = await channel.send(embed=embed)
                         discord_panel_msg_id = msg.id
 
-                except Exception as e:
-                    print(f"[DISCORD PANEL ERROR] {e}")
+            except Exception as e:
+                print(f"[DISCORD PANEL ERROR] {e}")
 
     except Exception as e:
         print(f"[UPDATE PANEL ERROR] {e}")
