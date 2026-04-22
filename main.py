@@ -1632,12 +1632,12 @@ async def check_buyticket(session):
 
             changed = is_real_change(f"buy:{url}", html)
 
-            total_buy += 1
-last_buy_check = time.time()
-
-asyncio.create_task(sync_panel_counters())
-
             if changed:
+
+                total_buy += 1
+                last_buy_check = time.time()
+
+                asyncio.create_task(sync_panel_counters())
 
                 msg = f"""
 🎟️ BUYTICKET UPDATE
@@ -1650,7 +1650,6 @@ asyncio.create_task(sync_panel_counters())
 
     except Exception as e:
         print(f"[CHECK BUY ERROR] {e}")
-
 
 # =========================
 # WEVERSE CHECK REAL
@@ -1674,12 +1673,12 @@ async def check_weverse(session):
 
             changed = is_real_change(f"weverse:{url}", html)
 
-          total_weverse += 1
-last_weverse_check = time.time()
-
-asyncio.create_task(sync_panel_counters())
-
             if changed:
+
+                total_weverse += 1
+                last_weverse_check = time.time()
+
+                asyncio.create_task(sync_panel_counters())
 
                 soup = BeautifulSoup(html, "html.parser")
                 title = soup.title.text.strip() if soup.title else "Weverse Update"
@@ -1696,7 +1695,6 @@ asyncio.create_task(sync_panel_counters())
 
     except Exception as e:
         print(f"[CHECK WEVERSE ERROR] {e}")
-
 
 # =========================
 # SOCIAL CHECK REAL
@@ -1722,12 +1720,12 @@ async def check_social(session):
 
             changed = is_real_change(f"social:{url}", html)
 
-           total_social += 1
-last_social_check = time.time()
-
-asyncio.create_task(sync_panel_counters())
-
             if changed:
+
+                total_social += 1
+                last_social_check = time.time()
+
+                asyncio.create_task(sync_panel_counters())
 
                 msg = f"""
 🌐 SOCIAL UPDATE
@@ -1740,7 +1738,6 @@ asyncio.create_task(sync_panel_counters())
 
     except Exception as e:
         print(f"[CHECK SOCIAL ERROR] {e}")
-
 
 # =========================
 # SAFE SESSION WRAPPER (OPCIONAL MAS RECOMENDADO)
