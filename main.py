@@ -1809,11 +1809,16 @@ async def check_social(session):
 
             try:
                 async with session.get(url, timeout=20) as resp:
-                    html = await resp.text()
+                    if resp.status != 200:
+                        raise Exception(f"Status {resp.status}")
+
+                    html = await resp.text(errors="ignore")
+
             except Exception as fetch_error:
                 print(f"[SOCIAL FETCH ERROR] {url} -> {fetch_error}")
+                html = None  # ✅ sem ()
 
-            # 🔥 CONTADOR SEMPRE (mesmo com erro)
+            # 🔥 CONTADOR SEMPRE
             total_social += 1
             last_social_check = time.time()
 
