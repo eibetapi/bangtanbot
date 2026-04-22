@@ -550,59 +550,66 @@ async def update_panel():
                     print(f"[TELEGRAM PANEL ERROR] {e}")
 
         # =========================
-        # DISCORD PAINEL (FIX REAL SINCRONIZADO)
+# DISCORD PAINEL (SYNC FIX REAL)
+# =========================
+if DISCORD_PANEL_CHANNEL_ID and bot_discord:
+
+    try:
+        channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            description=texto,
+            color=0x8A2BE2
+        )
+
+        edited = False
+
         # =========================
-        if DISCORD_PANEL_CHANNEL_ID and bot_discord:
+        # 1 - EDITA PELO ID (PRIORIDADE ABSOLUTA)
+        # =========================
+        if discord_panel_msg_id:
+            try:
+                msg = await channel.fetch_message(discord_panel_msg_id)
+                await msg.edit(embed=embed)
+                edited = True
+
+            except Exception:
+                discord_panel_msg_id = None
+
+        # =========================
+        # 2 - RECUPERA APENAS MENSAGEM FIXADA (SEM HISTORY)
+        # =========================
+        if not edited:
+            try:
+                pinned = await channel.pins()
+
+                for msg in pinned:
+                    if msg.author == bot_discord.user:
+                        discord_panel_msg_id = msg.id
+                        await msg.edit(embed=embed)
+                        edited = True
+                        break
+
+            except Exception:
+                pass
+
+        # =========================
+        # 3 - FALLBACK SE PERDEU TUDO
+        # =========================
+        if not edited:
+            msg = await channel.send(embed=embed)
+            discord_panel_msg_id = msg.id
 
             try:
-                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
-                if channel:
-
-                    embed = discord.Embed(
-                        description=texto,
-                        color=0x8A2BE2
-                    )
-
-                    edited = False
-
-                    # =========================
-                    # 1 - TENTA EDITAR DIRETO
-                    # =========================
-                    if discord_panel_msg_id:
-                        try:
-                            msg = await channel.fetch_message(discord_panel_msg_id)
-                            await msg.edit(embed=embed)
-                            edited = True
-                        except:
-                            discord_panel_msg_id = None
-
-                    # =========================
-                    # 2 - RECUPERA ÚLTIMA MENSAGEM DO BOT
-                    # =========================
-                    if not edited:
-                        try:
-                            async for msg in channel.history(limit=15):
-                                if msg.author == bot_discord.user:
-                                    discord_panel_msg_id = msg.id
-                                    await msg.edit(embed=embed)
-                                    edited = True
-                                    break
-                        except:
-                            pass
-
-                    # =========================
-                    # 3 - CRIA NOVO APENAS SE PERDEU TUDO
-                    # =========================
-                    if not edited:
-                        msg = await channel.send(embed=embed)
-                        discord_panel_msg_id = msg.id
-
-            except Exception as e:
-                print(f"[DISCORD PANEL ERROR] {e}")
+                await msg.pin()
+            except:
+                pass
 
     except Exception as e:
-        print(f"[UPDATE PANEL ERROR] {e}")
+        print(f"[DISCORD PANEL ERROR] {e}")
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
 
