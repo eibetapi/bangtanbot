@@ -1919,13 +1919,12 @@ async def start_engine():
 
     print("[ENGINE] iniciando sistema completo")
 
-  await asyncio.gather(
-    monitor_loop(),
-    watchdog_monitor(),
-    health_watcher(),
-    panel_heartbeat()
+    await asyncio.gather(
+        monitor_loop(),
+        watchdog_monitor(),
+        health_watcher(),
+        panel_heartbeat()
     )
-
 
 # =========================
 # GLOBAL SAFE DISPATCH ALERT
