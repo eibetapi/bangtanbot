@@ -1655,7 +1655,8 @@ async def update_panel():
 
 @bot_discord.event
 async def on_ready():
-await recover_discord_panel()
+
+    await recover_discord_panel()
 
     print(f"Discord conectado: {bot_discord.user}")
 
@@ -1673,6 +1674,8 @@ await recover_discord_panel()
         )
     except Exception as e:
         print(f"[STATUS ERROR] {e}")
+
+
 # =========================
 # 18.1 CHECK FUNCTIONS (VERSÃO REAL + SEGURA)
 # =========================
