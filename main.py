@@ -1385,11 +1385,8 @@ def start_telegram():
         # =========================
         # 🔥 CORREÇÃO PRINCIPAL (SEM run_polling / SEM updater)
         # =========================
-        await app.initialize()
-        await app.start()
 
-        # 🚨 start polling correto (async-safe)
-        await app.updater.start_polling()
+       await app.run_polling()
 
         # mantém vivo
         while True:
