@@ -1364,17 +1364,11 @@ def start_telegram():
 
         app.add_handler(MessageHandler(filters.TEXT, handle_telegram))
 
-        await app.initialize()
-        await app.bot.delete_webhook(drop_pending_updates=True)
-        await app.start()
-
         print("✅ TELEGRAM ONLINE")
 
-        while True:
-            await asyncio.sleep(3600)
+        await app.run_polling()
 
     asyncio.create_task(run())
-
 
 # =========================
 # DISCORD COMMANDS
