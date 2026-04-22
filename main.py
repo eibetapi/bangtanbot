@@ -1358,21 +1358,33 @@ def start_telegram():
         app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
         bot_ticket = app.bot
 
-        # 🔥 tenta recuperar ID salvo (não sobrescreve se já existir)
+        # 🔒 recupera painel existente (SE EXISTIR)
         try:
             saved_id = carregar_id_telegram()
             if saved_id:
                 panel_message_id = saved_id
         except Exception as e:
             print(f"[PANEL LOAD ERROR] {e}")
+            panel_message_id = None
 
         app.add_handler(MessageHandler(filters.TEXT, handle_telegram))
 
         print("✅ TELEGRAM ONLINE")
 
-        await app.run_polling()
+        # =========================
+        # 🔥 CORREÇÃO PRINCIPAL (SEM run_polling / SEM updater)
+        # =========================
+        await app.initialize()
+        await app.start()
 
-    asyncio.create_task(run())
+        # 🚨 start polling correto (async-safe)
+        await app.updater.start_polling()
+
+        # mantém vivo
+        while True:
+            await asyncio.sleep(3600)
+
+    asyncio.get_event_loop().create_task(run())
 
 # =========================
 # DISCORD COMMANDS
