@@ -1,4 +1,4 @@
-# =========================
+ # =========================
 # 1 BOT WOOTTEO
 # =========================
 
@@ -465,6 +465,8 @@ async def send_alert(alert_type, message):
 # 12 GESTÃO DO PAINEL (FIX REAL TEMPO-REAL)
 # ======================
 
+panel_lock = asyncio.Lock()
+
 async def update_panel():
     global panel_message_id, discord_panel_msg_id, last_panel_update
 
@@ -493,57 +495,63 @@ async def update_panel():
         # =========================
         if bot_ticket and PANEL_CHAT_ID:
 
-            try:
-                # RECUPERA ID SALVO
-                if not panel_message_id:
-                    try:
-                        panel_message_id = carregar_id_telegram()
-                    except:
-                        panel_message_id = None
+            async with panel_lock:
 
-                edited = False
+                try:
+                    # RECUPERA ID SALVO
+                    if not panel_message_id:
+                        try:
+                            panel_message_id = carregar_id_telegram()
+                        except:
+                            panel_message_id = None
 
-                # TENTA EDITAR PRIMEIRO
-                if panel_message_id:
-                    try:
-                        await bot_ticket.edit_message_text(
+                    edited = False
+
+                    # TENTA EDITAR PRIMEIRO
+                    if panel_message_id:
+                        try:
+                            await bot_ticket.edit_message_text(
+                                chat_id=PANEL_CHAT_ID,
+                                message_id=panel_message_id,
+                                text=texto,
+                                parse_mode=None
+                            )
+                            edited = True
+                        except Exception as e:
+                            # aqui entra o Flood Control
+                            if "Retry in" in str(e):
+                                print(f"[EDIT FAIL] {e}")
+                                return
+                            panel_message_id = None
+
+                    # FALLBACK: CRIA NOVO SE PERDEU REFERÊNCIA
+                    if not edited:
+
+                        try:
+                            await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
+                        except:
+                            pass
+
+                        msg = await bot_ticket.send_message(
                             chat_id=PANEL_CHAT_ID,
-                            message_id=panel_message_id,
                             text=texto,
                             parse_mode=None
                         )
-                        edited = True
-                    except:
-                        panel_message_id = None
 
-                # FALLBACK: CRIA NOVO SE PERDEU REFERÊNCIA
-                if not edited:
+                        panel_message_id = msg.message_id
+                        salvar_id_telegram(panel_message_id)
 
-                    try:
-                        await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
-                    except:
-                        pass
+                        try:
+                            await bot_ticket.pin_chat_message(
+                                chat_id=PANEL_CHAT_ID,
+                                message_id=panel_message_id,
+                                disable_notification=True
+                            )
+                        except:
+                            pass
 
-                    msg = await bot_ticket.send_message(
-                        chat_id=PANEL_CHAT_ID,
-                        text=texto,
-                        parse_mode=None
-                    )
-
-                    panel_message_id = msg.message_id
-                    salvar_id_telegram(panel_message_id)
-
-                    try:
-                        await bot_ticket.pin_chat_message(
-                            chat_id=PANEL_CHAT_ID,
-                            message_id=panel_message_id,
-                            disable_notification=True
-                        )
-                    except:
-                        pass
-
-            except Exception as e:
-                print(f"[TELEGRAM PANEL ERROR] {e}")
+                except Exception as e:
+                    print(f"[TELEGRAM PANEL ERROR] {e}")
 
         # =========================
         # DISCORD PAINEL (EDIT ONLY)
@@ -560,7 +568,6 @@ async def update_panel():
                         color=0x8A2BE2
                     )
 
-                    # EDITA PRIMEIRO
                     if discord_panel_msg_id:
                         try:
                             msg = await channel.fetch_message(discord_panel_msg_id)
@@ -568,7 +575,6 @@ async def update_panel():
                         except:
                             discord_panel_msg_id = None
 
-                    # CRIA SÓ SE PERDEU REFERÊNCIA
                     if not discord_panel_msg_id:
                         msg = await channel.send(embed=embed)
                         discord_panel_msg_id = msg.id
