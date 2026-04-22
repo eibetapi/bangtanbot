@@ -1,4 +1,4 @@
- # =========================
+# =========================
 # 1 BOT WOOTTEO
 # =========================
 
@@ -491,14 +491,13 @@ async def update_panel():
         last_panel_update = now
 
         # =========================
-        # TELEGRAM PAINEL (REGRA FIXA)
+        # TELEGRAM PAINEL (REGRA FIXA - NÃO ALTERADO)
         # =========================
         if bot_ticket and PANEL_CHAT_ID:
 
             async with panel_lock:
 
                 try:
-                    # RECUPERA ID SALVO
                     if not panel_message_id:
                         try:
                             panel_message_id = carregar_id_telegram()
@@ -507,7 +506,6 @@ async def update_panel():
 
                     edited = False
 
-                    # TENTA EDITAR PRIMEIRO
                     if panel_message_id:
                         try:
                             await bot_ticket.edit_message_text(
@@ -518,13 +516,11 @@ async def update_panel():
                             )
                             edited = True
                         except Exception as e:
-                            # aqui entra o Flood Control
                             if "Retry in" in str(e):
                                 print(f"[EDIT FAIL] {e}")
                                 return
                             panel_message_id = None
 
-                    # FALLBACK: CRIA NOVO SE PERDEU REFERÊNCIA
                     if not edited:
 
                         try:
@@ -554,7 +550,7 @@ async def update_panel():
                     print(f"[TELEGRAM PANEL ERROR] {e}")
 
         # =========================
-        # DISCORD PAINEL (EDIT ONLY)
+        # DISCORD PAINEL (FIX REAL SINCRONIZADO)
         # =========================
         if DISCORD_PANEL_CHANNEL_ID and bot_discord:
 
@@ -568,14 +564,37 @@ async def update_panel():
                         color=0x8A2BE2
                     )
 
+                    edited = False
+
+                    # =========================
+                    # 1 - TENTA EDITAR DIRETO
+                    # =========================
                     if discord_panel_msg_id:
                         try:
                             msg = await channel.fetch_message(discord_panel_msg_id)
                             await msg.edit(embed=embed)
+                            edited = True
                         except:
                             discord_panel_msg_id = None
 
-                    if not discord_panel_msg_id:
+                    # =========================
+                    # 2 - RECUPERA ÚLTIMA MENSAGEM DO BOT
+                    # =========================
+                    if not edited:
+                        try:
+                            async for msg in channel.history(limit=15):
+                                if msg.author == bot_discord.user:
+                                    discord_panel_msg_id = msg.id
+                                    await msg.edit(embed=embed)
+                                    edited = True
+                                    break
+                        except:
+                            pass
+
+                    # =========================
+                    # 3 - CRIA NOVO APENAS SE PERDEU TUDO
+                    # =========================
+                    if not edited:
                         msg = await channel.send(embed=embed)
                         discord_panel_msg_id = msg.id
 
