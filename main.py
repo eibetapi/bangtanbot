@@ -620,20 +620,20 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 •°•🌙.•°**ATUALIZAÇÕES** .💫 * . * •°•°🛸
 
   🟣 Weverse {status_color(last_weverse_check)}
-  🎯 Acessos realizados: **{total_weverse}**
-  ⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
+  🎯 Acessos realizados: {total_weverse}
+  ⏳ Último rastreio há: {minutes_since(last_weverse_check)} min
 
   ⚪ Redes sociais {status_color(last_social_check)}
-  🎯 Acessos realizados: **{total_social}**
-  ⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
+  🎯 Acessos realizados: {total_social}
+  ⏳ Último rastreio há: **{minutes_since(last_social_check)} min
 
   🟠 Ticketmaster {status_color(last_ticket_check)}
-  🎯 Acessos realizados: **{total_tickets}**
-  ⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
+  🎯 Acessos realizados: {total_tickets}
+  ⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min
 
   🔵 Buyticket {status_color(last_buy_check)}
-  🎯 Acessos realizados: **{total_buy}**
-  ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**
+  🎯 Acessos realizados: {total_buy}
+  ⏳ Último rastreio há {minutes_since(last_buy_check)} min
 
 •°•👾 Wootteo em rota há: {get_uptime()} ✨
 """
@@ -826,36 +826,13 @@ async def instagram_live(url, member_name, title, found):
     await update_panel()
 
 # =========================
-# 15 ALERTAS X, TIKTOK E YOUTUBE (CORRIGIDO)
+# 15 ALERTAS TIKTOK E YOUTUBE (CORRIGIDO)
 # =========================
 
-LAST_X_LINK = None
 LAST_TIKTOK_LINK = None
 LAST_YOUTUBE_LINK = None
 
-# === X (TWITTER) === #
-
-async def x_post(url, member_name, message_translated, found):
-    global LAST_X_LINK, total_social, last_social_check
-
-    if url == LAST_X_LINK:
-        return
-
-    LAST_X_LINK = url
-
-    total_social += 1
-    last_social_check = time.time()
-
-    emoji = get_member_emoji(member_name)
-
-    msg = f"""
-🐦 X POST 🐦
-💜 BTS publicou um post!
-📝 {message_translated}
-🔗 {url}
-"""
-    await send_alert("x_post", msg)
-    await update_panel()
+)
 
 # === TIKTOK === #
 
@@ -1012,10 +989,6 @@ async def run_full_test_discord():
     await test_weverse_media()
     await asyncio.sleep(1)
 
-    # --- X (TWITTER) ---
-    await test_x_post()
-    await asyncio.sleep(1)
-
     # --- INSTAGRAM ---
     await test_instagram_post()
     await test_instagram_reel()
@@ -1107,16 +1080,6 @@ async def test_weverse_media():
 """
     await send_alert("weverse_media", msg)
 
-# === X TEST (TWITTER) === #
-
-async def test_x_post():
-    msg = f"""
-⚠️ TESTE ⚠️
-🐦 X POST 🐦
-💜 BTS publicou um novo post no X
-🔗 https://x.com/BTS_twt
-"""
-    await send_alert("x_post", msg)
 
 # === INSTAGRAM TEST === #
 
@@ -1550,20 +1513,20 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 •°•🌙.•°**ATUALIZAÇÕES** .💫 * . * •°•°🛸
 
 🟣 Weverse {status_color(last_weverse_check)}
-🎯 Acessos realizados: **{total_weverse}**
-⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
+🎯 Acessos realizados: {total_weverse}
+⏳ Último rastreio há: {minutes_since(last_weverse_check)} min
 
 ⚪ Redes sociais {status_color(last_social_check)}
-🎯 Acessos realizados: **{total_social}**
-⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
+🎯 Acessos realizados: {total_social}
+⏳ Último rastreio há: {minutes_since(last_social_check)} min
 
 🟠 Ticketmaster {status_color(last_ticket_check)}
-🎯 Acessos realizados: **{total_tickets}**
-⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
+🎯 Acessos realizados: {total_tickets}
+⏳ Último rastreio há: {minutes_since(last_ticket_check)} min
 
 🔵 Buyticket {status_color(last_buy_check)}
-🎯 Acessos realizados: **{total_buy}**
-⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**
+🎯 Acessos realizados: **{total_buy}
+⏳ Último rastreio há: **{minutes_since(last_buy_check)} min
 
 •°•👾 Wootteo em rota há: {get_uptime()} ✨
 """
