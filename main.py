@@ -1417,7 +1417,7 @@ async def setup_hook():
         print(f"[SYNC ERROR] {e}")
 
 # =========================
-# 18 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL (CORRIGIDO)
+# 18 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL (FIX FINAL)
 # =========================
 
 import asyncio
@@ -1429,7 +1429,7 @@ from bs4 import BeautifulSoup
 
 
 # =========================
-# STATUS COUNTDOWN DATA (ÚNICO E CORRIGIDO)
+# STATUS COUNTDOWN DATA
 # =========================
 
 def get_countdown_data():
@@ -1444,7 +1444,6 @@ def get_countdown_data():
     brazil_found = False
 
     for item in AGENDA:
-
         try:
             show_dt = datetime.strptime(
                 f"{item[0]} {item[3]}",
@@ -1452,7 +1451,6 @@ def get_countdown_data():
             )
 
             if show_dt > now_dt:
-
                 next_global_date = item[0]
                 next_global_local = f"{item[1]}, {item[2]}"
                 days_to_next_global = (show_dt.date() - now_dt.date()).days
@@ -1462,15 +1460,12 @@ def get_countdown_data():
             continue
 
     for item in AGENDA:
-
         try:
-
             if "Brasil" in item[2]:
 
                 br_date = datetime.strptime(item[0], "%d/%m/%Y").date()
 
                 if not brazil_found and br_date >= now_dt.date():
-
                     days_to_brazil = (br_date - now_dt.date()).days
                     brazil_found = True
                     break
@@ -1480,46 +1475,46 @@ def get_countdown_data():
 
     return next_global_date, next_global_local, days_to_next_global, days_to_brazil
 
+
 # =========================
-# PAINEL RENDER (TEXTO BASE)
+# PAINEL TEXTO
 # =========================
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
 
     return f"""🪭 ⊙⊝⊜ **ARIRANG TOUR** ⊙⊝⊜ 🪭
 
-
 **✈️ PRÓXIMAS DATAS**
 
-  🎫 Data: **{data_show}**
-  📍 Local: **{city}**
-  🔔 Faltam **{d_prox}** dias.
-  🩷 Faltam **{d_br}** dias para o BTS no Brasil!
+🎫 Data: **{data_show}**
+📍 Local: **{city}**
+🔔 Faltam **{d_prox}** dias.
+🩷 Faltam **{d_br}** dias para o BTS no Brasil!
 
 •°•🌙.•°**ATUALIZAÇÕES** .💫 * . * •°•°🛸
 
-  🟣 **Weverse** {status_color(last_weverse_check)}
-  🎯 Acessos realizados: **{total_weverse}**
-  ⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
+🟣 **Weverse** {status_color(last_weverse_check)}
+🎯 Acessos realizados: **{total_weverse}**
+⏳ Último rastreio há: **{minutes_since(last_weverse_check)} min**
 
-  ⚪ **Redes sociais** {status_color(last_social_check)}
-  🎯 Acessos realizados: **{total_social}**
-  ⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
+⚪ **Redes sociais** {status_color(last_social_check)}
+🎯 Acessos realizados: **{total_social}**
+⏳ Último rastreio há: **{minutes_since(last_social_check)} min**
 
-  🟠 **Ticketmaster** {status_color(last_ticket_check)}
-  🎯 Acessos realizados: **{total_tickets}**
-  ⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
+🟠 **Ticketmaster** {status_color(last_ticket_check)}
+🎯 Acessos realizados: **{total_tickets}**
+⏳ Último rastreio há: **{minutes_since(last_ticket_check)} min**
 
-  🔵 **Buyticket** {status_color(last_buy_check)}
-  🎯 Acessos realizados: **{total_buy}**
-  ⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**
+🔵 **Buyticket** {status_color(last_buy_check)}
+🎯 Acessos realizados: **{total_buy}**
+⏳ Último rastreio há: **{minutes_since(last_buy_check)} min**
 
 •°•👾 Wootteo em rota há: **{get_uptime()}** ☄️🌍💫
 """
 
 
 # =========================
-# UPDATE PANEL (FIX DUPLICATION SAFE)
+# UPDATE PANEL (SEGURO)
 # =========================
 
 async def update_panel():
@@ -1529,14 +1524,10 @@ async def update_panel():
     data_show, city, d_prox, d_br = get_countdown_data()
     texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
-    # =========================
-    # TELEGRAM PANEL
-    # =========================
+    # ===== TELEGRAM =====
     if bot_ticket and PANEL_CHAT_ID:
-
         try:
 
-            # tenta editar mensagem existente
             if panel_message_id:
                 try:
                     await bot_ticket.edit_message_text(
@@ -1544,11 +1535,10 @@ async def update_panel():
                         message_id=panel_message_id,
                         text=texto
                     )
-                    return  # evita duplicação de envio no mesmo ciclo
+                    return
                 except:
-                    panel_message_id = None  # força recriação se falhar
+                    panel_message_id = None
 
-            # se não existe ou falhou, cria nova
             msg = await bot_ticket.send_message(
                 chat_id=PANEL_CHAT_ID,
                 text=texto
@@ -1559,12 +1549,10 @@ async def update_panel():
         except Exception as e:
             print(f"[TELEGRAM PANEL ERROR] {e}")
 
-    # =========================
-    # DISCORD PANEL
-    # =========================
+    # ===== DISCORD =====
     if DISCORD_PANEL_CHANNEL_ID:
-
         try:
+
             channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
             if not channel:
@@ -1572,7 +1560,6 @@ async def update_panel():
 
             embed = discord.Embed(description=texto, color=0x8A2BE2)
 
-            # tenta recuperar mensagem já existente
             if not discord_panel_msg_id:
                 async for msg in channel.history(limit=15):
                     if msg.author == bot_discord.user:
@@ -1584,7 +1571,7 @@ async def update_panel():
                     msg = await channel.fetch_message(discord_panel_msg_id)
                     await msg.edit(embed=embed)
                 except:
-                    discord_panel_msg_id = None  # força recriação
+                    discord_panel_msg_id = None
 
             if not discord_panel_msg_id:
                 msg = await channel.send(embed=embed)
@@ -1593,6 +1580,30 @@ async def update_panel():
         except Exception as e:
             print(f"[DISCORD PANEL ERROR] {e}")
 
+
+# =========================
+# DISCORD READY
+# =========================
+
+@bot_discord.event
+async def on_ready():
+
+    print(f"Discord conectado: {bot_discord.user}")
+
+    try:
+        await bot_discord.tree.sync()
+    except Exception as e:
+        print(f"[SYNC ERROR] {e}")
+
+    try:
+        await bot_discord.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.listening,
+                name="🪭 Em tournê - Ouvindo Arirang🪭"
+            )
+        )
+    except Exception as e:
+        print(f"[STATUS ERROR] {e}")
 # =========================
 # 18.1 CHECK FUNCTIONS (VERSÃO REAL + SEGURA)
 # =========================
