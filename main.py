@@ -1383,14 +1383,9 @@ def start_telegram():
         print("✅ TELEGRAM ONLINE")
 
         # =========================
-        # 🔥 CORREÇÃO PRINCIPAL (SEM run_polling / SEM updater)
+        # 🔥 CORREÇÃO PRINCIPAL (SEGURA)
         # =========================
-
-       await app.run_polling()
-
-        # mantém vivo
-        while True:
-            await asyncio.sleep(3600)
+        await app.run_polling()
 
     asyncio.get_event_loop().create_task(run())
 
