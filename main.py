@@ -496,6 +496,10 @@ async def send_alert(alert_type, message):
 # 12 GESTÃO DO PAINEL (FIX REAL TEMPO-REAL)
 # ======================
 
+# ======================
+# 12 GESTÃO DO PAINEL (FIX REAL TEMPO-REAL)
+# ======================
+
 panel_lock = asyncio.Lock()
 
 async def update_panel():
@@ -580,67 +584,68 @@ async def update_panel():
                 except Exception as e:
                     print(f"[TELEGRAM PANEL ERROR] {e}")
 
-# =========================
-# DISCORD PAINEL (SYNC FIX REAL)
-# =========================
-if DISCORD_PANEL_CHANNEL_ID and bot_discord:
-
-    try:
-        channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
-        if not channel:
-            return
-
-        embed = discord.Embed(
-            description=texto,
-            color=0x8A2BE2
-        )
-
-        edited = False
-
         # =========================
-        # 1 - EDITA PELO ID (PRIORIDADE ABSOLUTA)
+        # DISCORD PAINEL (SYNC FIX REAL)
         # =========================
-        if discord_panel_msg_id:
+        if DISCORD_PANEL_CHANNEL_ID and bot_discord:
+
             try:
-                msg = await channel.fetch_message(discord_panel_msg_id)
-                await msg.edit(embed=embed)
-                edited = True
+                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
-            except Exception:
-                discord_panel_msg_id = None
+                if not channel:
+                    return
 
-        # =========================
-        # 2 - RECUPERA APENAS MENSAGEM FIXADA (SEM HISTORY)
-        # =========================
-        if not edited:
-            try:
-                pinned = await channel.pins()
+                embed = discord.Embed(
+                    description=texto,
+                    color=0x8A2BE2
+                )
 
-                for msg in pinned:
-                    if msg.author == bot_discord.user:
-                        discord_panel_msg_id = msg.id
+                edited = False
+
+                # =========================
+                # 1 - EDITA PELO ID
+                # =========================
+                if discord_panel_msg_id:
+                    try:
+                        msg = await channel.fetch_message(discord_panel_msg_id)
                         await msg.edit(embed=embed)
                         edited = True
-                        break
+                    except:
+                        discord_panel_msg_id = None
 
-            except Exception:
-                pass
+                # =========================
+                # 2 - RECUPERA MENSAGEM FIXADA
+                # =========================
+                if not edited:
+                    try:
+                        pinned = await channel.pins()
 
-        # =========================
-        # 3 - FALLBACK SE PERDEU TUDO
-        # =========================
-        if not edited:
-            msg = await channel.send(embed=embed)
-            discord_panel_msg_id = msg.id
+                        for msg in pinned:
+                            if msg.author == bot_discord.user:
+                                discord_panel_msg_id = msg.id
+                                await msg.edit(embed=embed)
+                                edited = True
+                                break
+                    except:
+                        pass
 
-            try:
-                await msg.pin()
-            except:
-                pass
+                # =========================
+                # 3 - FALLBACK FINAL
+                # =========================
+                if not edited:
+                    msg = await channel.send(embed=embed)
+                    discord_panel_msg_id = msg.id
+
+                    try:
+                        await msg.pin()
+                    except:
+                        pass
+
+            except Exception as e:
+                print(f"[DISCORD PANEL ERROR] {e}")
 
     except Exception as e:
-        print(f"[DISCORD PANEL ERROR] {e}")
+        print(f"[UPDATE PANEL ERROR] {e}")
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
 
