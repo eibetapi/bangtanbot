@@ -1591,12 +1591,12 @@ async def check_ticketmaster(session):
 
             changed = is_real_change(f"ticket:{url}", html)
 
-           total_tickets += 1
-last_ticket_check = time.time()
-
-asyncio.create_task(sync_panel_counters())
-
             if changed:
+
+                total_tickets += 1
+                last_ticket_check = time.time()
+
+                asyncio.create_task(sync_panel_counters())
 
                 msg = f"""
 🎫 TICKETMASTER UPDATE
@@ -1609,7 +1609,6 @@ asyncio.create_task(sync_panel_counters())
 
     except Exception as e:
         print(f"[CHECK TICKET ERROR] {e}")
-
 
 # =========================
 # BUYTICKET CHECK REAL
