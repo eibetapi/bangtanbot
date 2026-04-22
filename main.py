@@ -479,93 +479,89 @@ async def update_panel():
         # ANTI-SPAM (10s)
         # =========================
         now = time.time()
-        if now - last_panel_update < 10:
+
+        if last_panel_update and (now - last_panel_update < 10):
             return
+
         last_panel_update = now
 
         # =========================
         # TELEGRAM PAINEL
         # =========================
-        if bot_ticket and PANEL_CHAT_ID:
+        if bot_ticket is None or PANEL_CHAT_ID is None:
+            return
 
-            try:
-                # =========================
-                # 1) RECUPERA ID SALVO SEMPRE
-                # =========================
-                if not panel_message_id:
-                    try:
-                        panel_message_id = carregar_id_telegram()
-                    except Exception as e:
-                        print(f"[PANEL LOAD ERROR] {e}")
-                        panel_message_id = None
+        try:
+            # =========================
+            # RECUPERA ID SALVO
+            # =========================
+            if panel_message_id is None:
+                try:
+                    panel_message_id = carregar_id_telegram()
+                except Exception as e:
+                    print(f"[PANEL LOAD ERROR] {e}")
+                    panel_message_id = None
 
-                edited = False
+            edited = False
 
-                # =========================
-                # 2) TENTA EDITAR PRIMEIRO (REGRA OBRIGATÓRIA)
-                # =========================
-                if panel_message_id:
-                    try:
-                        await bot_ticket.edit_message_text(
-                            chat_id=PANEL_CHAT_ID,
-                            message_id=panel_message_id,
-                            text=texto,
-                            parse_mode=None
-                        )
-                        edited = True
-
-                    except Exception:
-                        # se falhar, perde referência mas NÃO cria ainda
-                        panel_message_id = None
-
-                # =========================
-                # 3) SÓ CRIA SE REALMENTE NÃO EXISTE
-                # =========================
-                if not edited:
-
-                    # tenta limpar fixações antigas (sem risco se falhar)
-                    try:
-                        await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
-                    except:
-                        pass
-
-                    msg = await bot_ticket.send_message(
+            # =========================
+            # EDITA PRIMEIRO (REGRA A)
+            # =========================
+            if panel_message_id is not None:
+                try:
+                    await bot_ticket.edit_message_text(
                         chat_id=PANEL_CHAT_ID,
+                        message_id=panel_message_id,
                         text=texto,
                         parse_mode=None
                     )
+                    edited = True
 
-                    panel_message_id = msg.message_id
-                    salvar_id_telegram(panel_message_id)
+                except Exception:
+                    panel_message_id = None
 
-                    # =========================
-                    # 4) FIXAÇÃO SEGURA
-                    # =========================
-                    try:
-                        await bot_ticket.pin_chat_message(
-                            chat_id=PANEL_CHAT_ID,
-                            message_id=panel_message_id,
-                            disable_notification=True
-                        )
-                    except Exception as e:
-                        print(f"[PIN ERROR] {e}")
+            # =========================
+            # CRIA SOMENTE SE NECESSÁRIO
+            # =========================
+            if not edited:
 
-            except Exception as e:
-                # =========================
-                # FLOOD CONTROL
-                # =========================
-                if "Flood control" in str(e):
-                    try:
-                        wait = int(str(e).split("Retry in ")[1].split(" ")[0])
-                        print(f"[TELEGRAM FLOOD] aguardando {wait}s...")
-                        await asyncio.sleep(wait)
-                    except:
-                        pass
-                else:
-                    print(f"[TELEGRAM PANEL ERROR] {e}")
+                try:
+                    await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
+                except Exception:
+                    pass
+
+                msg = await bot_ticket.send_message(
+                    chat_id=PANEL_CHAT_ID,
+                    text=texto,
+                    parse_mode=None
+                )
+
+                panel_message_id = msg.message_id
+                salvar_id_telegram(panel_message_id)
+
+                try:
+                    await bot_ticket.pin_chat_message(
+                        chat_id=PANEL_CHAT_ID,
+                        message_id=panel_message_id,
+                        disable_notification=True
+                    )
+                except Exception as e:
+                    print(f"[PIN ERROR] {e}")
+
+        except Exception as e:
+            if "Flood control" in str(e):
+                try:
+                    wait = int(str(e).split("Retry in ")[1].split(" ")[0])
+                    print(f"[TELEGRAM FLOOD] aguardando {wait}s...")
+                    await asyncio.sleep(wait)
+                except Exception:
+                    pass
+            else:
+                print(f"[TELEGRAM PANEL ERROR] {e}")
 
     except Exception as e:
         print(f"[UPDATE PANEL ERROR] {e}")
+
  # =========================
 # DISCORD PAINEL (MÓDULO A - FIX OBRIGATÓRIO)
 # =========================
