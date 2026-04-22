@@ -486,61 +486,64 @@ async def update_panel():
 
                 edited = False
 
-        # =========================
-        # 🧠 REGRA B: tenta editar primeiro SEMPRE
-        # =========================
-        if panel_message_id:
-            try:
-                await bot_ticket.edit_message_text(
-                    chat_id=PANEL_CHAT_ID,
-                    message_id=panel_message_id,
-                    text=texto,
-                    parse_mode=None
-                )
-                edited = True
+                # =========================
+                # 🧠 REGRA B: tenta editar primeiro SEMPRE
+                # =========================
+                if panel_message_id:
+                    try:
+                        await bot_ticket.edit_message_text(
+                            chat_id=PANEL_CHAT_ID,
+                            message_id=panel_message_id,
+                            text=texto,
+                            parse_mode=None
+                        )
+                        edited = True
 
-            except:
-                panel_message_id = None
+                    except:
+                        panel_message_id = None
 
-        # =========================
-        # 🧠 REGRA A: só cria SE NÃO EXISTIR
-        # =========================
-        if not edited:
+                # =========================
+                # 🧠 REGRA A: só cria SE NÃO EXISTIR
+                # =========================
+                if not edited:
 
-            try:
-                # evita duplicação de fixados antigos
-                await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
-            except:
-                pass
+                    try:
+                        # evita duplicação de fixados antigos
+                        await bot_ticket.unpin_all_chat_messages(chat_id=PANEL_CHAT_ID)
+                    except:
+                        pass
 
-            msg = await bot_ticket.send_message(
-                chat_id=PANEL_CHAT_ID,
-                text=texto,
-                parse_mode=None
-            )
-
-            panel_message_id = msg.message_id
-            salvar_id_telegram(panel_message_id)
-
-            try:
-                await bot_ticket.pin_chat_message(
-                    chat_id=PANEL_CHAT_ID,
-                    message_id=panel_message_id,
-                    disable_notification=True
-                )
-            except:
-                await asyncio.sleep(1)
-                try:
-                    await bot_ticket.pin_chat_message(
+                    msg = await bot_ticket.send_message(
                         chat_id=PANEL_CHAT_ID,
-                        message_id=panel_message_id,
-                        disable_notification=True
+                        text=texto,
+                        parse_mode=None
                     )
-                except:
-                    pass
+
+                    panel_message_id = msg.message_id
+                    salvar_id_telegram(panel_message_id)
+
+                    try:
+                        await bot_ticket.pin_chat_message(
+                            chat_id=PANEL_CHAT_ID,
+                            message_id=panel_message_id,
+                            disable_notification=True
+                        )
+                    except:
+                        await asyncio.sleep(1)
+                        try:
+                            await bot_ticket.pin_chat_message(
+                                chat_id=PANEL_CHAT_ID,
+                                message_id=panel_message_id,
+                                disable_notification=True
+                            )
+                        except:
+                            pass
+
+            except Exception as e:
+                print(f"[TELEGRAM PANEL ERROR] {e}")
 
     except Exception as e:
-        print(f"[TELEGRAM PANEL ERROR] {e}")
+        print(f"[UPDATE PANEL ERROR] {e}")
 
         # =========================
         # DISCORD PAINEL (EMBED ROXO FIXO)
