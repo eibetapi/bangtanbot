@@ -556,41 +556,47 @@ async def update_panel():
     except Exception as e:
         print(f"[UPDATE PANEL ERROR] {e}")
 
-        # =========================
-        # DISCORD PAINEL (EMBED ROXO FIXO)
-        # =========================
-        if DISCORD_PANEL_CHANNEL_ID:
+ # =========================
+# DISCORD PAINEL (MÓDULO A - FIX OBRIGATÓRIO)
+# =========================
 
-            channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+if DISCORD_PANEL_CHANNEL_ID:
 
-            if channel:
+    channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
-                embed = discord.Embed(
-                    description=texto,
-                    color=0x8A2BE2
-                )
+    if channel:
+
+        embed = discord.Embed(
+            description=texto,
+            color=0x8A2BE2
+        )
+
+        try:
+
+            # =========================
+            # REGRA A (OBRIGATÓRIA):
+            # SEMPRE TENTAR EDITAR PRIMEIRO
+            # =========================
+            if discord_panel_msg_id:
 
                 try:
+                    msg = await channel.fetch_message(discord_panel_msg_id)
+                    await msg.edit(embed=embed)
 
-                    if not discord_panel_msg_id:
-                        async for msg in channel.history(limit=10):
-                            if msg.author == bot_discord.user:
-                                discord_panel_msg_id = msg.id
-                                break
+                except Exception:
+                    # se falhar, perde referência mas NÃO cria duplicado ainda
+                    discord_panel_msg_id = None
 
-                    if discord_panel_msg_id:
-                        msg = await channel.fetch_message(discord_panel_msg_id)
-                        await msg.edit(embed=embed)
-                    else:
-                        msg = await channel.send(embed=embed)
-                        discord_panel_msg_id = msg.id
+            # =========================
+            # SÓ CRIA NOVO SE NÃO EXISTIR
+            # =========================
+            if not discord_panel_msg_id:
 
-                except Exception as e:
-                    print(f"[DISCORD PANEL ERROR] {e}")
+                msg = await channel.send(embed=embed)
+                discord_panel_msg_id = msg.id
 
-    except Exception as e:
-        print(f"[PANEL UPDATE FATAL ERROR] {e}")
-
+        except Exception as e:
+            print(f"[DISCORD PANEL ERROR] {e}")
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
 
