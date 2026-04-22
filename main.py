@@ -1589,12 +1589,13 @@ async def check_ticketmaster(session):
             if not html:
                 continue
 
+            # 🔥 CONTADOR SEMPRE (acesso real)
+            total_tickets += 1
+            last_ticket_check = time.time()
+
             changed = is_real_change(f"ticket:{url}", html)
 
             if changed:
-
-                total_tickets += 1
-                last_ticket_check = time.time()
 
                 asyncio.create_task(sync_panel_counters())
 
@@ -1630,12 +1631,13 @@ async def check_buyticket(session):
             if not html:
                 continue
 
+            # 🔥 CONTADOR SEMPRE
+            total_buy += 1
+            last_buy_check = time.time()
+
             changed = is_real_change(f"buy:{url}", html)
 
             if changed:
-
-                total_buy += 1
-                last_buy_check = time.time()
 
                 asyncio.create_task(sync_panel_counters())
 
@@ -1671,12 +1673,13 @@ async def check_weverse(session):
             if not html:
                 continue
 
+            # 🔥 CONTADOR SEMPRE
+            total_weverse += 1
+            last_weverse_check = time.time()
+
             changed = is_real_change(f"weverse:{url}", html)
 
             if changed:
-
-                total_weverse += 1
-                last_weverse_check = time.time()
 
                 asyncio.create_task(sync_panel_counters())
 
@@ -1718,12 +1721,13 @@ async def check_social(session):
             if not html:
                 continue
 
+            # 🔥 CONTADOR SEMPRE
+            total_social += 1
+            last_social_check = time.time()
+
             changed = is_real_change(f"social:{url}", html)
 
             if changed:
-
-                total_social += 1
-                last_social_check = time.time()
 
                 asyncio.create_task(sync_panel_counters())
 
