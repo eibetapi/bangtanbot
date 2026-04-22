@@ -604,29 +604,6 @@ async def update_panel():
     except Exception as e:
         print(f"[UPDATE PANEL ERROR] {e}")
 
-# =========================
-# START LOOP DO PAINEL (DISCORD SYNC)
-# =========================
-
-async def panel_loop():
-    while True:
-        try:
-            await update_panel()
-        except Exception as e:
-            print(f"[PANEL LOOP ERROR] {e}")
-
-        await asyncio.sleep(3)
-
-
-async def start_background_tasks():
-    asyncio.create_task(panel_loop())
-
-
-# chama quando o bot estiver pronto
-@bot_discord.event
-async def on_connect():
-    asyncio.create_task(panel_loop())
-
 def gerar_texto_painel(data_show, city, d_prox, d_br):
 
 
@@ -2391,3 +2368,25 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("[SYSTEM] Encerrado manualmente")
 
+# =========================
+# 22 START LOOP DO PAINEL (DISCORD SYNC)
+# =========================
+
+async def panel_loop():
+    while True:
+        try:
+            await update_panel()
+        except Exception as e:
+            print(f"[PANEL LOOP ERROR] {e}")
+
+        await asyncio.sleep(3)
+
+
+async def start_background_tasks():
+    asyncio.create_task(panel_loop())
+
+
+# chama quando o bot estiver pronto
+@bot_discord.event
+async def on_connect():
+    asyncio.create_task(panel_loop())
