@@ -477,14 +477,14 @@ async def update_panel():
         data_show, city, d_prox, d_br = get_countdown_data()
         texto = gerar_texto_painel(data_show, city, d_prox, d_br)
 
-       if bot_ticket and PANEL_CHAT_ID:
+        if bot_ticket and PANEL_CHAT_ID:
 
-    try:
-        # 🔍 garante memória do painel
-        if not panel_message_id:
-            panel_message_id = carregar_id_telegram()
+            try:
+                # 🔍 garante memória do painel
+                if not panel_message_id:
+                    panel_message_id = carregar_id_telegram()
 
-        edited = False
+                edited = False
 
         # =========================
         # 🧠 REGRA B: tenta editar primeiro SEMPRE
