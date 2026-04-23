@@ -634,6 +634,54 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 """
 
 # =========================
+# 12.1 PANEL RECOVERY SYSTEM (ANTI-DUPLICAÇÃO RECONNECT)
+# =========================
+
+panel_ready = False
+
+async def recover_panel_state():
+    global panel_message_id, discord_panel_msg_id, panel_ready
+
+    try:
+        # =========================
+        # TELEGRAM RECOVERY
+        # =========================
+        try:
+            panel_message_id = carregar_id_telegram()
+        except Exception as e:
+            print(f"[PANEL LOAD ERROR] {e}")
+            panel_message_id = None
+
+        # =========================
+        # DISCORD RECOVERY
+        # =========================
+        if bot_discord and DISCORD_PANEL_CHANNEL_ID:
+
+            try:
+                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+
+                if channel:
+
+                    # tenta recuperar última mensagem do bot
+                    async for msg in channel.history(limit=20):
+                        if msg.author == bot_discord.user:
+                            discord_panel_msg_id = msg.id
+                            break
+
+            except Exception as e:
+                print(f"[DISCORD RECOVERY ERROR] {e}")
+
+        # =========================
+        # LIBERA SISTEMA PARA UPDATE
+        # =========================
+        panel_ready = True
+        print("[PANEL] recovery completo")
+
+    except Exception as e:
+        print(f"[PANEL RECOVERY FATAL] {e}")
+        panel_ready = True
+
+# =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
 # =========================
 
