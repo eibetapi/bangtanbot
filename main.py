@@ -3289,118 +3289,23 @@ async def on_connect():
     print("[DISCORD] connect event (safe)")
 
 # =========================
-# 23 SINGLETON LOCK COM HEARTBEAT (ANTI CRASH + AUTO RECOVERY)
+# HEALTH CHECK (FINAL DO SISTEMA)
 # =========================
-
-import os
-import sys
-import time
-import atexit
-import threading
-
-# =========================
-# CONFIGURAÇÃO
-# =========================
-
-LOCK_FILE = "/tmp/bot.lock"
-HEARTBEAT_FILE = "/tmp/bot.heartbeat"
-HEARTBEAT_INTERVAL = 10          # segundos
-HEARTBEAT_TIMEOUT = 30           # tempo limite para considerar "morto"
-
-
-# =========================
-# VERIFICA INSTÂNCIA ATIVA (COM RECOVERY)
-# =========================
-
-def is_process_alive():
-
-    if not os.path.exists(HEARTBEAT_FILE):
-        return False
-
-    try:
-        with open(HEARTBEAT_FILE, "r") as f:
-            last = float(f.read().strip())
-
-        return (time.time() - last) < HEARTBEAT_TIMEOUT
-
-    except:
-        return False
-
-
-# =========================
-# SINGLETON CHECK INTELIGENTE
-# =========================
-
-if os.path.exists(LOCK_FILE) and is_process_alive():
-    print("[LOCK] Bot já ativo e saudável. Encerrando nova instância...")
-    sys.exit(0)
-
-# se lock existe mas processo morreu → limpa e continua
-if os.path.exists(LOCK_FILE) and not is_process_alive():
-    print("[LOCK] Instância antiga morta detectada. Limpando lock...")
-    try:
-        os.remove(LOCK_FILE)
-    except:
-        pass
-
-
-# =========================
-# CRIA LOCK
-# =========================
-
-with open(LOCK_FILE, "w") as f:
-    f.write("active")
-
-
-# =========================
-# HEARTBEAT LOOP
-# =========================
-
-_running = True
-
-def heartbeat_loop():
-
-    while _running:
-        try:
-            with open(HEARTBEAT_FILE, "w") as f:
-                f.write(str(time.time()))
-        except Exception as e:
-            print(f"[HEARTBEAT ERROR] {e}")
-
-        time.sleep(HEARTBEAT_INTERVAL)
-
-
-threading.Thread(target=heartbeat_loop, daemon=True).start()
-
-
-# =========================
-# CLEAN EXIT
-# =========================
-
-def cleanup():
-
-    global _running
-    _running = False
-
-    try:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
-
-        if os.path.exists(HEARTBEAT_FILE):
-            os.remove(HEARTBEAT_FILE)
-
-        print("[LOCK] limpo com sucesso")
-
-    except Exception as e:
-        print(f"[LOCK CLEANUP ERROR] {e}")
-
-
-atexit.register(cleanup)
 
 def system_health():
 
-    return {
-        "panel_ok": bool(panel_message_id or discord_panel_msg_id),
-        "boot_done": BOOT_DONE,
-        "panel_loop": PANEL_LOOP_RUNNING
-    }
+    try:
+        return {
+            "panel_ok": bool(panel_message_id or discord_panel_msg_id),
+            "boot_done": BOOT_DONE,
+            "panel_loop": PANEL_LOOP_RUNNING
+        }
+
+    except Exception as e:
+        print(f"[HEALTH ERROR] {e}")
+
+        return {
+            "panel_ok": False,
+            "boot_done": False,
+            "panel_loop": False
+        }
