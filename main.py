@@ -1288,9 +1288,9 @@ async def test_youtube_live():
 
     await safe_send_alert("youtube_live", msg)
 
-# =====================================
-# 17 COMMAND ENGINE FRAMEWORK - RESTAURADO E CORRIGIDO
-# =====================================
+# =========================================================
+# 17 COMMAND ENGINE FRAMEWORK - FINAL (COM FORÇA BRUTA)
+# =========================================================
 
 COMMANDS = {}
 
@@ -1305,15 +1305,11 @@ class CommandContext:
         self.origin = origin
         self.interaction = interaction
         self.chat_id = chat_id
-
     @property
     def is_discord(self): return self.origin == "discord"
     @property
     def is_telegram(self): return self.origin == "telegram"
 
-# =========================
-# SENDER UNIFICADO
-# =========================
 async def send(ctx, text):
     if ctx.is_discord and ctx.interaction:
         try:
@@ -1323,33 +1319,29 @@ async def send(ctx, text):
                 await ctx.interaction.followup.send(text)
         except: pass
     elif ctx.is_telegram and ctx.chat_id:
-        try:
-            await bot_ticket.send_message(chat_id=ctx.chat_id, text=text)
+        try: await bot_ticket.send_message(chat_id=ctx.chat_id, text=text)
         except: pass
 
-# ======================
-# SET DE COMANDOS (RESTAURADO)
-# ======================
+# =========================================================
+# COMANDOS BLOQUEADOS (LAYOUT ORIGINAL)
+# =========================================================
 
 @command("ping")
 async def ping(ctx):
-    await send(ctx, f"🏓 Pong! | Uptime: {get_uptime()}")
+    await send(ctx, f"🏓 Pong! | {get_uptime()}")
 
 @command("comandos")
 async def comandos(ctx):
-    msg = "/ping\n/comandos\n/teste\n/bts"
-    await send(ctx, msg)
+    await send(ctx, "/ping\n/comandos\n/teste\n/bts")
 
 @command("bts")
 async def bts(ctx):
-    # NOMES COMPLETOS RESTAURADOS CONFORME ORIGINAL
     membros = [
         "🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI",
         "🐿️ JUNG HOSEOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG",
         "🐰 JEON JUNGKOOK", "💜 BTS"
     ]
     if ctx.is_discord:
-        # Layout original Discord (Sequencial)
         await ctx.interaction.response.send_message(membros[0])
         for m in membros[1:]:
             await asyncio.sleep(1.2)
@@ -1357,38 +1349,40 @@ async def bts(ctx):
         await asyncio.sleep(1.2)
         await ctx.interaction.channel.send("🪭Ouça Arirang no Spotify🪭\nhttps://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h")
     else:
-        # Layout original Telegram
         texto = "\n".join(membros) + "\n\n🪭Ouça Arirang no Spotify🪭\nhttps://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h"
         await send(ctx, texto)
 
-# ==============
-# /TESTE (CHAMANDO ALERTAS DO BLOCO 16 SEM VAZAR)
-# ==============
+# =========================================================
+# /TESTE - AGORA FORÇANDO ALERTA NAS SALAS
+# =========================================================
 @command("teste")
 async def teste(ctx):
     if ctx.is_discord:
-        await send(ctx, "⚠️ [DISCORD] Verificando integridade e disparando alertas do Bloco 16...")
+        await send(ctx, "⚠️ [DISCORD] Forçando disparo de alertas nas salas de teste...")
         
-        # Backup para silenciar o Telegram durante o teste do Bloco 16
+        # Silencia o Telegram para não vazar
         orig_tg = bot_ticket.send_message
         bot_ticket.send_message = lambda *a, **k: asyncio.sleep(0) 
         
         try:
-            # Chama a função que gerencia os alertas (Bloco 16)
-            if "run_full_test_discord" in globals():
-                await run_full_test_discord()
+            # 1. Tenta a rotina do Bloco 16
+            await run_full_test_discord()
             
-            await send(ctx, "✅ Alertas enviados para as salas do Discord.\n✅ Telegram mantido em silêncio.")
-            await update_panel()
+            # 2. FORÇA BRUTA: Se a rotina acima não mandou nada (porque não houve mudança real),
+            # nós mandamos um alerta manual agora para confirmar a rota.
+            alerta_canais = globals().get("DISCORD_ALERTA_CHANNELS", [])
+            for cid in alerta_canais:
+                canal = bot_discord.get_channel(cid)
+                if canal:
+                    await canal.send("🚨 **SINAL DE TESTE:** Este canal está recebendo alertas corretamente.")
+
+            await send(ctx, f"✅ Alertas enviados para {len(alerta_canais)} salas.\n✅ Telegram mantido em silêncio.")
         finally:
             bot_ticket.send_message = orig_tg
     else:
-        await send(ctx, "⚠️ [TELEGRAM] Iniciando teste de rotina...")
-        try:
-            await run_full_test_discord()
-            await send(ctx, "✅ Teste concluído.")
-        except:
-            await send(ctx, "❌ Erro no teste.")
+        await send(ctx, "⚠️ [TELEGRAM] Rodando teste padrão...")
+        await run_full_test_discord()
+        await send(ctx, "✅ Teste concluído.")
 
 # =========================
 # PONTES DE EXECUÇÃO
@@ -1407,7 +1401,6 @@ async def executar_telegram(update, context):
         handler = COMMANDS.get(cmd)
         if handler: await handler(ctx)
 
-# REGISTRO SLASH
 @bot_discord.tree.command(name="ping")
 async def slash_ping(i: discord.Interaction): await executar_discord("ping", i)
 @bot_discord.tree.command(name="bts")
