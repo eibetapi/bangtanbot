@@ -437,7 +437,6 @@ async def ensure_single_panel():
     PANEL_BOOT_DONE = True
     print(f"[RECOVERY] IDs carregados: TG={panel_message_id} DC={discord_panel_msg_id}")
 
-
 # =========================
 # 13 WEVERSE ALERTS (PRODUÇÃO SEGURA)
 # =========================
@@ -485,8 +484,10 @@ async def weverse_post(url, member_name, title, message_translated, found):
 
         global total_weverse, last_weverse_check
 
+        # [FIX] Incremento com persistência
         total_weverse += 1
         last_weverse_check = time.time()
+        await save_counters() 
 
         emoji = get_member_emoji(member_name)
 
@@ -514,8 +515,10 @@ async def weverse_live(url, member_name, found):
 
         global total_weverse, last_weverse_check
 
+        # [FIX] Incremento com persistência
         total_weverse += 1
         last_weverse_check = time.time()
+        await save_counters()
 
         emoji = get_member_emoji(member_name)
 
@@ -541,8 +544,10 @@ async def weverse_news(url, member_name, message_translated, found):
 
         global total_weverse, last_weverse_check
 
+        # [FIX] Incremento com persistência
         total_weverse += 1
         last_weverse_check = time.time()
+        await save_counters()
 
         emoji = get_member_emoji(member_name)
 
@@ -569,8 +574,10 @@ async def weverse_media(url, member_name, title, message_translated, found):
 
         global total_weverse, last_weverse_check
 
+        # [FIX] Incremento com persistência
         total_weverse += 1
         last_weverse_check = time.time()
+        await save_counters()
 
         emoji = get_member_emoji(member_name)
 
@@ -584,6 +591,7 @@ async def weverse_media(url, member_name, title, message_translated, found):
 
         await send_alert("weverse_media", msg)
         await update_panel()
+
 
 # =========================
 # 14 INSTAGRAM ALERTS (PRODUÇÃO SEGURA)
@@ -632,8 +640,12 @@ async def instagram_post(url, member_name, title, found):
 
         total_social += 1
         last_social_check = time.time()
+        await save_counters()
 
-        emoji, name = format_member(member_name)
+        # FIX: format_member retorna dict, acessando chaves corretamente
+        m_data = format_member(member_name)
+        emoji = m_data["emoji"]
+        name = m_data["name"]
 
         msg = f"""
 🌟 INSTAGRAM POST 🌟
@@ -659,8 +671,11 @@ async def instagram_reel(url, member_name, title, found):
 
         total_social += 1
         last_social_check = time.time()
+        await save_counters()
 
-        emoji, name = format_member(member_name)
+        m_data = format_member(member_name)
+        emoji = m_data["emoji"]
+        name = m_data["name"]
 
         msg = f"""
 🎬 INSTAGRAM REELS 🎬
@@ -686,8 +701,11 @@ async def instagram_story(url, member_name, title, found):
 
         total_social += 1
         last_social_check = time.time()
+        await save_counters()
 
-        emoji, name = format_member(member_name)
+        m_data = format_member(member_name)
+        emoji = m_data["emoji"]
+        name = m_data["name"]
 
         msg = f"""
 🫧 INSTAGRAM STORY 🫧
@@ -713,8 +731,11 @@ async def instagram_live(url, member_name, title, found):
 
         total_social += 1
         last_social_check = time.time()
+        await save_counters()
 
-        emoji, name = format_member(member_name)
+        m_data = format_member(member_name)
+        emoji = m_data["emoji"]
+        name = m_data["name"]
 
         msg = f"""
 🎥 INSTAGRAM LIVE 🎥
@@ -760,6 +781,12 @@ async def tiktok_post(url, member_name, title, found):
         if not is_new_social(LAST_TIKTOK, key):
             return
 
+        # FIX: Incremento e persistência
+        global total_social, last_social_check
+        total_social += 1
+        last_social_check = time.time()
+        await save_counters()
+
         emoji = get_member_emoji(member_name)
 
         msg = f"""
@@ -784,6 +811,11 @@ async def tiktok_live(url, member_name, title, found):
         key = f"live:{member_name}:{url}"
         if not is_new_social(LAST_TIKTOK, key):
             return
+
+        global total_social, last_social_check
+        total_social += 1
+        last_social_check = time.time()
+        await save_counters()
 
         emoji = get_member_emoji(member_name)
 
@@ -810,6 +842,11 @@ async def youtube_post(url, final_url=None):
         if not is_new_social(LAST_YOUTUBE, key):
             return
 
+        global total_social, last_social_check
+        total_social += 1
+        last_social_check = time.time()
+        await save_counters()
+
         link = final_url or "https://www.youtube.com/@BTS"
 
         msg = f"""
@@ -834,6 +871,11 @@ async def youtube_live(url=None):
         key = "live:youtube"
         if not is_new_social(LAST_YOUTUBE, key):
             return
+
+        global total_social, last_social_check
+        total_social += 1
+        last_social_check = time.time()
+        await save_counters()
 
         live_url = "https://www.youtube.com/@BTS/live"
 
@@ -887,6 +929,11 @@ async def ticket_reposicao(url, data, setor, categoria):
     if not is_new_event("reposicao", key):
         return
 
+    # FIX: Incremento e persistência
+    total_tickets += 1
+    last_ticket_check = time.time()
+    await save_counters()
+
     msg = f"""
 
 🔥 ALERTA DE REPOSIÇÃO 🔥
@@ -913,6 +960,11 @@ async def ticket_agenda(url, data, cidade, pais):
     if not is_new_event("agenda", key):
         return
 
+    # FIX: Incremento e persistência
+    total_tickets += 1
+    last_ticket_check = time.time()
+    await save_counters()
+
     msg = f"""
 
 💜 AGENDA - NOVAS DATAS 💜
@@ -927,6 +979,7 @@ async def ticket_agenda(url, data, cidade, pais):
 
     await send_alert("agenda", msg)
     await update_panel()
+
 
 # =========================
 # 16 SISTEMA DE TESTE (ESTRUTURA FIXA E SEGURA)
