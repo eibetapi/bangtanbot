@@ -440,169 +440,26 @@ async def ensure_single_panel():
     print(f"[RECOVERY] IDs carregados: TG={panel_message_id} DC={discord_panel_msg_id}")
 
 # =========================
-# 13 WEVERSE ALERTS (PRODUÇÃO SEGURA)
+# 13 SISTEMA DE PERSISTÊNCIA & WEVERSE ALERTS
 # =========================
 
 import hashlib
 import asyncio
-
-# =========================
-# CACHE GLOBAL POR TIPO + CONTEÚDO
-# =========================
-WEVERSE_CACHE = {}
-
-# 🔒 lock para evitar race condition em concorrência
-WEVERSE_LOCK = asyncio.Lock()
-
-
-def is_new_weverse_event(event_type, url, content=""):
-
-    """
-    Evita duplicação REAL usando:
-    - tipo do evento
-    - URL
-    - conteúdo
-    """
-
-    raw = f"{event_type}:{url}:{content}"
-    new_hash = hashlib.md5(raw.encode("utf-8")).hexdigest()
-
-    if WEVERSE_CACHE.get(event_type) == new_hash:
-        return False
-
-    WEVERSE_CACHE[event_type] = new_hash
-    return True
-
-
-# =========================
-# POST
-# =========================
-async def weverse_post(url, member_name, title, message_translated, found):
-
-    async with WEVERSE_LOCK:
-
-        if not is_new_weverse_event("post", url, title + message_translated):
-            return
-
-        global total_weverse, last_weverse_check
-
-        # [FIX] Incremento com persistência
-        total_weverse += 1
-        last_weverse_check = time.time()
-        await save_counters() 
-
-        emoji = get_member_emoji(member_name)
-
-        msg = f"""
-🩷 WEVERSE POST 🩷
-{emoji} {member_name.upper()} fez uma publicação 
-📌 {title}
-📝 {message_translated}
-🔗 {url}
-"""
-
-        await send_alert("weverse_post", msg)
-        await update_panel()
-
-
-# =========================
-# LIVE
-# =========================
-async def weverse_live(url, member_name, found):
-
-    async with WEVERSE_LOCK:
-
-        if not is_new_weverse_event("live", url):
-            return
-
-        global total_weverse, last_weverse_check
-
-        # [FIX] Incremento com persistência
-        total_weverse += 1
-        last_weverse_check = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-
-        msg = f"""
-📹 WEVERSE LIVE 📹
-{emoji} {member_name.upper()} está ao vivo
-🔗 {url}
-"""
-
-        await send_alert("weverse_live", msg)
-        await update_panel()
-
-
-# =========================
-# NEWS
-# =========================
-async def weverse_news(url, member_name, message_translated, found):
-
-    async with WEVERSE_LOCK:
-
-        if not is_new_weverse_event("news", url, message_translated):
-            return
-
-        global total_weverse, last_weverse_check
-
-        # [FIX] Incremento com persistência
-        total_weverse += 1
-        last_weverse_check = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-
-        msg = f"""
-🚨 WEVERSE NEWS 🚨
-{emoji} {member_name.upper()} fez uma publicação 
-📝 {message_translated}
-🔗 {url}
-"""
-
-        await send_alert("weverse_news", msg)
-        await update_panel()
-
-
-# =========================
-# MEDIA
-# =========================
-async def weverse_media(url, member_name, title, message_translated, found):
-
-    async with WEVERSE_LOCK:
-
-        if not is_new_weverse_event("media", url, title + message_translated):
-            return
-
-        global total_weverse, last_weverse_check
-
-        # [FIX] Incremento com persistência
-        total_weverse += 1
-        last_weverse_check = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-
-        msg = f"""
-📀 WEVERSE MEDIA 📀
-{emoji} {member_name.upper()} fez uma publicação 
-⭐ {title}
-📝 {message_translated}
-🔗 {url}
-"""
-
-        await send_alert("weverse_media", msg)
-        await update_panel()
-
-# =========================
-# SISTEMA DE PERSISTÊNCIA (CONTADORES & ESTADO)
-# =========================
-
 import json
 import os
+import time  # [FIX] Import necessário para o time.time()
 
-# Arquivo para salvar os números e garantir que não zerem no restart
+# =========================
+# INICIALIZAÇÃO DE GLOBAIS (ANTI-ERROR)
+# =========================
+PANEL_BOOT_DONE = globals().get("PANEL_BOOT_DONE", False)
 COUNTERS_FILE = "counters_state.json"
+WEVERSE_CACHE = {}
+WEVERSE_LOCK = asyncio.Lock()
+
+# =========================
+# SISTEMA DE DISCO (RAILWAY SAFE)
+# =========================
 
 async def save_counters():
     """Salva os totais de acessos e timestamps no disco da Railway."""
@@ -626,8 +483,7 @@ async def load_counters():
         try:
             with open(COUNTERS_FILE, 'r') as f:
                 data = json.load(f)
-                
-            # Restaura os valores para as variáveis globais
+            
             globals()["total_weverse"] = data.get("total_weverse", 0)
             globals()["total_social"] = data.get("total_social", 0)
             globals()["total_tickets"] = data.get("total_tickets", 0)
@@ -640,6 +496,99 @@ async def load_counters():
             print(f"[LOAD ERROR] Falha ao carregar contadores: {e}")
     else:
         print("[SYSTEM] Nenhum arquivo de contadores prévio encontrado.")
+
+# =========================
+# LOGICA DE DUPLICAÇÃO
+# =========================
+
+def is_new_weverse_event(event_type, url, content=""):
+    """Evita duplicação usando hash do conteúdo."""
+    raw = f"{event_type}:{url}:{content}"
+    new_hash = hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+    if WEVERSE_CACHE.get(event_type) == new_hash:
+        return False
+
+    WEVERSE_CACHE[event_type] = new_hash
+    return True
+
+# =========================
+# FUNÇÕES DE ALERTA (WEVERSE)
+# =========================
+
+async def weverse_post(url, member_name, title, message_translated, found):
+    async with WEVERSE_LOCK:
+        if not is_new_weverse_event("post", url, title + message_translated):
+            return
+
+        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
+        globals()["last_weverse_check"] = time.time()
+        await save_counters() 
+
+        emoji = get_member_emoji(member_name)
+        msg = f"""🩷 WEVERSE POST 🩷
+{emoji} {member_name.upper()} fez uma publicação 
+📌 {title}
+📝 {message_translated}
+🔗 {url}"""
+
+        await send_alert("weverse_post", msg)
+        await update_panel()
+
+async def weverse_live(url, member_name, found):
+    async with WEVERSE_LOCK:
+        if not is_new_weverse_event("live", url):
+            return
+
+        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
+        globals()["last_weverse_check"] = time.time()
+        await save_counters()
+
+        emoji = get_member_emoji(member_name)
+        msg = f"""📹 WEVERSE LIVE 📹
+{emoji} {member_name.upper()} está ao vivo
+🔗 {url}"""
+
+        await send_alert("weverse_live", msg)
+        await update_panel()
+
+async def weverse_news(url, member_name, message_translated, found):
+    async with WEVERSE_LOCK:
+        if not is_new_weverse_event("news", url, message_translated):
+            return
+
+        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
+        globals()["last_weverse_check"] = time.time()
+        await save_counters()
+
+        emoji = get_member_emoji(member_name)
+        msg = f"""🚨 WEVERSE NEWS 🚨
+{emoji} {member_name.upper()} fez uma publicação 
+📝 {message_translated}
+🔗 {url}"""
+
+        await send_alert("weverse_news", msg)
+        await update_panel()
+
+async def weverse_media(url, member_name, title, message_translated, found):
+    async with WEVERSE_LOCK:
+        if not is_new_weverse_event("media", url, title + message_translated):
+            return
+
+        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
+        globals()["last_weverse_check"] = time.time()
+        await save_counters()
+
+        emoji = get_member_emoji(member_name)
+        msg = f"""📀 WEVERSE MEDIA 📀
+{emoji} {member_name.upper()} fez uma publicação 
+⭐ {title}
+📝 {message_translated}
+🔗 {url}"""
+
+        await send_alert("weverse_media", msg)
+        await update_panel()
+
 
 # =========================
 # 14 INSTAGRAM ALERTS (PRODUÇÃO SEGURA)
