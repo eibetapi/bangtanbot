@@ -37,6 +37,7 @@ bot_discord = commands.Bot(command_prefix="!", intents=intents)
 # =========================
 # FIX OBRIGATÓRIO: SYNC DE SLASH COMMANDS
 # =========================
+
 @bot_discord.event
 async def setup_hook():
     try:
