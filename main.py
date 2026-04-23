@@ -282,712 +282,161 @@ AGENDA = [
 # =========================
 # 8 CONTROLE (VERSÃO PRODUÇÃO)
 # =========================
-
 from datetime import datetime
 import time
 
-# =========================
-# UPTIME
-# =========================
 def get_uptime():
     try:
         s = int(time.time() - start_time)
         return f"{s//3600}h {(s%3600)//60}m {s%60}s"
-    except Exception as e:
-        print(f"[UPTIME ERROR] {e}")
-        return "0h 0m 0s"
+    except: return "0h 0m 0s"
 
-
-# =========================
-# STATUS REAL
-# =========================
 def resolve_status(last_check_time):
     try:
-        if not isinstance(last_check_time, (int, float)):
-            print(f"[STATUS WARNING] valor inválido: {last_check_time}")
-            return "🔴"
+        diff = time.time() - last_check_time
+        if diff > 1800: return "🔴"
+        return "🟡" if diff > 600 else "🟢"
+    except: return "🔴"
 
-        agora = time.time()
-        diff = agora - last_check_time
+def clean(v): return v if v and str(v).strip() else "ESGOTADO"
 
-        if diff > 1800:
-            return "🔴"
-        elif diff > 600:
-            return "🟡"
-        else:
-            return "🟢"
-
-    except Exception as e:
-        print(f"[STATUS ERROR] {e}")
-        return "🔴"
-
-
-# =========================
-# CLEAN SAFE VALUE
-# =========================
-def clean(v):
-    try:
-        return v if v and str(v).strip() else "ESGOTADO"
-    except Exception as e:
-        print(f"[CLEAN ERROR] {e}")
-        return "ESGOTADO"
-
-
-# =========================
-# DAYS LEFT
-# =========================
 def days_left(date_str):
     try:
-        if not date_str or not isinstance(date_str, str):
-            return 0
-
         target = datetime.strptime(date_str, "%d/%m/%Y").date()
-        today = datetime.now().date()
+        return max((target - datetime.now().date()).days, 0)
+    except: return 0
 
-        return max((target - today).days, 0)
-
-    except Exception as e:
-        print(f"[DATE PARSE ERROR] {date_str} -> {e}")
-        return 0
-
-
-# =========================
-# TIME UTILS
-# =========================
 def minutes_since(ts):
-    try:
-        if not isinstance(ts, (int, float)):
-            return 0
-        return int((time.time() - ts) / 60)
-    except Exception as e:
-        print(f"[TIME ERROR] {e}")
-        return 0
+    try: return int((time.time() - ts) / 60)
+    except: return 0
 
-
-# =========================
-# COUNTDOWN DATA (ROBUSTO + LOG)
-# =========================
 def get_countdown_data():
-
     now_dt = datetime.now()
-
-    prox_data = "Continua…"
-    prox_local = "---"
-    d_prox = 0
-    d_br = 0
-
-    if not isinstance(AGENDA, list):
-        print("[AGENDA ERROR] formato inválido")
-        return prox_data, prox_local, d_prox, d_br
-
+    prox_data, prox_local, d_prox, d_br = "Continua…", "---", 0, 0
+    if not isinstance(globals().get("AGENDA"), list): return prox_data, prox_local, d_prox, d_br
     for item in AGENDA:
-
-        if not isinstance(item, (list, tuple)) or len(item) < 4:
-            print(f"[AGENDA WARNING] item inválido ignorado: {item}")
-            continue
-
         try:
-            show_dt = datetime.strptime(
-                f"{item[0]} {item[3]}",
-                "%d/%m/%Y %H:%M"
-            )
-
-            # próximo show global
+            show_dt = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
             if show_dt > now_dt and prox_data == "Continua…":
-                prox_data = item[0]
-                prox_local = f"{item[1]}, {item[2]}"
+                prox_data, prox_local = item[0], f"{item[1]}, {item[2]}"
                 d_prox = (show_dt.date() - now_dt.date()).days
-
-            # Brasil separado
             if "Brasil" in str(item[2]) and d_br == 0:
                 br_date = datetime.strptime(item[0], "%d/%m/%Y").date()
-
-                if br_date >= now_dt.date():
-                    d_br = (br_date - now_dt.date()).days
-
-        except Exception as e:
-            print(f"[AGENDA PARSE ERROR] {item} -> {e}")
-            continue
-
+                if br_date >= now_dt.date(): d_br = (br_date - now_dt.date()).days
+        except: continue
     return prox_data, prox_local, d_prox, d_br
 
-
 # =========================
-# STATUS COLOR
+# 9 SESSION HTTP
 # =========================
-def status_color(last_check):
-    return resolve_status(last_check)
-
-# =========================
-# 9 SESSION HTTP (PRODUÇÃO SEGURA)
-# =========================
-
-import aiohttp
-import asyncio
-import time
-
 http_session = None
 _session_lock = asyncio.Lock()
 
-
-# =========================
-# GET SESSION (THREAD SAFE)
-# =========================
 async def get_session():
-
     global http_session
-
     async with _session_lock:
-
         if http_session is None or http_session.closed:
-
-            http_session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=30),
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 Chrome/120 Safari/537.36"
-                    )
-                }
-            )
-
-            print("[SESSION] nova sessão HTTP criada")
-
+            http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30),
+                headers={"User-Agent": "Mozilla/5.0"})
     return http_session
 
-
-# =========================
-# FETCH COM RETRY
-# =========================
 async def fetch(url, retries=2):
-
     for attempt in range(retries + 1):
-
         try:
             session = await get_session()
-
             async with session.get(url) as resp:
-
-                if resp.status != 200:
-                    print(f"[HTTP WARNING] {url} status={resp.status}")
-                    return None
-
-                return await resp.text()
-
-        except asyncio.TimeoutError:
-            print(f"[HTTP TIMEOUT] {url} tentativa {attempt+1}")
-
-        except Exception as e:
-            print(f"[FETCH ERROR] {url} -> {e}")
-
-        await asyncio.sleep(1)  # pequeno backoff
-
+                if resp.status == 200: return await resp.text()
+        except: await asyncio.sleep(1)
     return None
 
+# =========================
+# 10 EMOJIS & FORMATTER
+# =========================
+MEMBER_EMOJI = {"rm":"🐨","jin":"🐹","suga":"🐱","jhope":"🐿️","jimin":"🐥","v":"🐻","jungkook":"🐰","bts":"💜","wootteo":"🛸"}
+
+def get_member_emoji(name):
+    return MEMBER_EMOJI.get(re.sub(r"[^a-z0-9]", "", str(name).lower()), "💜")
+
+def format_member(name):
+    emoji = get_member_emoji(name)
+    return {"emoji": emoji, "name": str(name).upper(), "display": f"{emoji} {name.upper()}"}
 
 # =========================
-# CLOSE SEGURO (SHUTDOWN)
-# =========================
-async def close_session():
-
-    global http_session
-
-    try:
-        if http_session and not http_session.closed:
-            await http_session.close()
-            print("[SESSION] fechada com segurança")
-
-    except Exception as e:
-        print(f"[SESSION CLOSE ERROR] {e}")
-
-# =========================
-# 10 EMOJIS (PRODUÇÃO LIMPA)
-# =========================
-
-import re
-
-MEMBER_EMOJI = {
-    "rm": "🐨",
-    "jin": "🐹",
-    "suga": "🐱",
-    "jhope": "🐿️",
-    "jimin": "🐥",
-    "v": "🐻",
-    "jungkook": "🐰",
-    "bts": "💜",
-    "wootteo": "🛸"
-}
-
-
-# =========================
-# NORMALIZAÇÃO SEGURA
-# =========================
-def normalize_name(name: str) -> str:
-
-    if not name:
-        return ""
-
-    name = name.lower().strip()
-
-    # remove espaços e caracteres especiais leves
-    name = re.sub(r"[^a-z0-9]", "", name)
-
-    return name
-
-
-# =========================
-# GET EMOJI (VERSÃO FINAL)
-# =========================
-def get_member_emoji(member_name: str) -> str:
-
-    key = normalize_name(member_name)
-
-    return MEMBER_EMOJI.get(key, "💜")
-
-
-# =========================
-# FORMATADOR ÚNICO (SEM DUPLICAÇÃO)
-# =========================
-def format_member(member_name: str):
-
-    emoji = get_member_emoji(member_name)
-
-    name = str(member_name).upper().strip()
-
-    return {
-        "emoji": emoji,
-        "name": name,
-        "display": f"{emoji} {name}"
-    }
-
-# =========================
-# 11 CORE ROUTER (PRODUÇÃO SEGURA)
-# =========================
-
-import asyncio
-import discord
-
-
-# =========================
-# DISCORD SAFE SEND
-# =========================
-async def send_discord(channel_id, content=None, embed=None):
-
-    try:
-        channel = bot_discord.get_channel(channel_id)
-
-        # fallback se cache falhar
-        if channel is None:
-            channel = await bot_discord.fetch_channel(channel_id)
-
-        if not channel:
-            print(f"[DISCORD] canal não encontrado: {channel_id}")
-            return
-
-        if embed is None and content is not None:
-            embed = discord.Embed(
-                description=content,
-                color=0x8A2BE2
-            )
-
-        await channel.send(embed=embed)
-
-    except Exception as e:
-        print(f"[DISCORD SEND ERROR] {e}")
-
-
-# =========================
-# SAFE TASK WRAPPER
-# =========================
-def safe_task(coro, label="TASK"):
-
-    async def wrapper():
-        try:
-            await coro
-        except Exception as e:
-            print(f"[TASK ERROR {label}] {e}")
-
-    return asyncio.create_task(wrapper())
-
-
-# =========================
-# ALERT ROUTER (REFATORADO)
+# 11 CORE ROUTER (FIX CONTADORES)
 # =========================
 async def send_alert(alert_type, message):
-
     try:
+        # Incremento automático baseado no tipo de alerta
+        if "ticket" in alert_type: await increment_ticket()
+        elif "weverse" in alert_type: await increment_weverse()
+        elif any(x in alert_type for x in ["instagram", "tiktok", "youtube"]): await increment_social()
 
-        # =========================
-        # TELEGRAM (SAFE)
-        # =========================
-        test_mode = globals().get("TEST_MODE", False)
-
-        if bot_ticket is not None and not test_mode:
-            try:
-                await bot_ticket.send_message(
-                    chat_id=PANEL_CHAT_ID,
-                    text=message
-                )
-            except Exception as e:
-                print(f"[TELEGRAM ERROR] {e}")
-
-        # =========================
-        # DISCORD ROUTING MAP
-        # =========================
+        if bot_ticket: await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=message)
+        
         discord_map = {
-            "ticket": DISCORD_TICKETS_CHANNEL_ID,
-            "reposicao": DISCORD_TICKETS_CHANNEL_ID,
-            "agenda": DISCORD_TICKETS_CHANNEL_ID,
-
-            "weverse_post": DISCORD_WEVERSE_CHANNEL_ID,
-            "weverse_live": DISCORD_WEVERSE_CHANNEL_ID,
-            "weverse_news": DISCORD_WEVERSE_CHANNEL_ID,
-            "weverse_media": DISCORD_WEVERSE_CHANNEL_ID,
-
-            "instagram_post": DISCORD_SOCIAL_CHANNEL_ID,
-            "instagram_reels": DISCORD_SOCIAL_CHANNEL_ID,
-            "instagram_stories": DISCORD_SOCIAL_CHANNEL_ID,
-            "instagram_live": DISCORD_SOCIAL_CHANNEL_ID,
-
-            "tiktok_post": DISCORD_SOCIAL_CHANNEL_ID,
-            "tiktok_live": DISCORD_SOCIAL_CHANNEL_ID,
-
-            "youtube_post": DISCORD_SOCIAL_CHANNEL_ID,
-            "youtube_live": DISCORD_SOCIAL_CHANNEL_ID,
+            "ticket": DISCORD_TICKETS_CHANNEL_ID, "weverse_post": DISCORD_WEVERSE_CHANNEL_ID,
+            "instagram_post": DISCORD_SOCIAL_CHANNEL_ID, "tiktok_post": DISCORD_SOCIAL_CHANNEL_ID
         }
-
-        channel_id = discord_map.get(alert_type)
-
-        if channel_id:
-
-            safe_task(
-                send_discord(channel_id, content=message),
-                label=alert_type
-            )
-
-    except Exception as e:
-        print(f"[ALERT ROUTER ERROR] {e}")
+        cid = discord_map.get(alert_type) or DISCORD_SOCIAL_CHANNEL_ID
+        ch = bot_discord.get_channel(cid) or await bot_discord.fetch_channel(cid)
+        if ch: await ch.send(embed=discord.Embed(description=message, color=0x8A2BE2))
+    except Exception as e: print(f"[ALERT ERROR] {e}")
 
 # =========================
-# 12 PAINEL (PRODUÇÃO ESTÁVEL)
-# =========================
-
-import asyncio
-import time
-import discord
-
-
-# =========================
-# LOCK GLOBAL DO PAINEL
+# 12 PAINEL (FIX OBRIGATÓRIO ANTI-DUPLICAÇÃO)
 # =========================
 panel_lock = asyncio.Lock()
-last_panel_update = 0
 
-
-# =========================
-# FUNÇÃO CENTRAL ÚNICA (SEM DUPLICAÇÃO)
-# =========================
 async def update_panel():
-
-    global panel_message_id, discord_panel_msg_id, last_panel_update
-
-    # 🔒 evita execução antes do bot estar pronto
-    if bot_ticket is None or bot_discord is None:
-        print("[PANEL] bots ainda não prontos")
-        return
-
+    global panel_message_id, discord_panel_msg_id
     async with panel_lock:
-
-        now = time.time()
-
-        # anti spam (mínimo 5s entre updates)
-        if now - last_panel_update < 5:
-            return
-
-        last_panel_update = now
-
         try:
             data_show, city, d_prox, d_br = get_countdown_data()
             texto = gerar_texto_painel(data_show, city, d_prox, d_br)
-        except Exception as e:
-            print(f"[PANEL DATA ERROR] {e}")
-            return
-
-        # =========================
-        # TELEGRAM SAFE UPDATE
-        # =========================
-        if bot_ticket and PANEL_CHAT_ID:
-
-            try:
-                if panel_message_id:
-
-                    try:
-                        await bot_ticket.edit_message_text(
-                            chat_id=PANEL_CHAT_ID,
-                            message_id=panel_message_id,
-                            text=texto
-                        )
-                        return
-
-                    except Exception as e:
-                        print(f"[TELEGRAM EDIT FAIL] {e}")
-                        panel_message_id = None
-
-                msg = await bot_ticket.send_message(
-                    chat_id=PANEL_CHAT_ID,
-                    text=texto
-                )
-
-                panel_message_id = msg.message_id
-
+            
+            # --- TELEGRAM (EDIT OU POST) ---
+            if bot_ticket:
                 try:
-                    await bot_ticket.pin_chat_message(
-                        chat_id=PANEL_CHAT_ID,
-                        message_id=panel_message_id,
-                        disable_notification=True
-                    )
-                except Exception as e:
-                    print(f"[TELEGRAM PIN FAIL] {e}")
+                    if panel_message_id:
+                        await bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=panel_message_id, text=texto)
+                    else:
+                        msg = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto)
+                        panel_message_id = msg.message_id
+                        await bot_ticket.pin_chat_message(chat_id=PANEL_CHAT_ID, message_id=panel_message_id)
+                        save_storage(PANEL_DATA_FILE, {"tg_msg_id": panel_message_id, "dc_msg_id": discord_panel_msg_id})
+                except: panel_message_id = None
 
-            except Exception as e:
-                print(f"[TELEGRAM PANEL ERROR] {e}")
-
-
-        # =========================
-        # DISCORD SAFE UPDATE
-        # =========================
-        if DISCORD_PANEL_CHANNEL_ID:
-
-            try:
-                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
-                if channel is None:
-                    channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
-
-                if not channel:
-                    print("[DISCORD PANEL] canal não encontrado")
-                    return
-
-                embed = discord.Embed(
-                    description=texto,
-                    color=0x8A2BE2
-                )
-
-                # 1) tenta mensagem salva
+            # --- DISCORD (EDIT OU POST) ---
+            ch = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID) or await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
+            if ch:
+                embed = discord.Embed(description=texto, color=0x8A2BE2)
                 if discord_panel_msg_id:
                     try:
-                        msg = await channel.fetch_message(discord_panel_msg_id)
-                        await msg.edit(embed=embed)
-                        return
-                    except Exception as e:
-                        print(f"[DISCORD EDIT FAIL] {e}")
-                        discord_panel_msg_id = None
-
-                # 2) fallback histórico
-                try:
-                    async for m in channel.history(limit=25):
-                        if m.author == bot_discord.user:
-                            discord_panel_msg_id = m.id
-                            await m.edit(embed=embed)
-                            return
-                except Exception as e:
-                    print(f"[DISCORD HISTORY FAIL] {e}")
-
-                # 3) cria nova mensagem
-                msg = await channel.send(embed=embed)
-                discord_panel_msg_id = msg.id
-
-            except Exception as e:
-                print(f"[DISCORD PANEL ERROR] {e}")
-
+                        m = await ch.fetch_message(discord_panel_msg_id)
+                        await m.edit(embed=embed)
+                    except: discord_panel_msg_id = None
+                
+                if not discord_panel_msg_id:
+                    msg = await ch.send(embed=embed)
+                    discord_panel_msg_id = msg.id
+                    await msg.pin()
+                    save_storage(PANEL_DATA_FILE, {"tg_msg_id": panel_message_id, "dc_msg_id": discord_panel_msg_id})
+        except Exception as e: print(f"[PANEL ERROR] {e}")
 
 # =========================
-# PAINEL BLINDADO (RECOVERY ROBUSTO)
+# 12.1 RECOVERY (OBRIGATÓRIO)
 # =========================
 async def ensure_single_panel():
+    global PANEL_BOOT_DONE, panel_message_id, discord_panel_msg_id
+    if PANEL_BOOT_DONE: return
+    
+    data = load_storage(PANEL_DATA_FILE, {"tg_msg_id": None, "dc_msg_id": None})
+    panel_message_id = data.get("tg_msg_id")
+    discord_panel_msg_id = data.get("dc_msg_id")
+    
+    PANEL_BOOT_DONE = True
+    print(f"[RECOVERY] IDs carregados: TG={panel_message_id} DC={discord_panel_msg_id}")
 
-    global PANEL_BOOT_DONE
-    global panel_message_id, discord_panel_msg_id
-
-    async with PANEL_BOOT_LOCK:
-
-        if PANEL_BOOT_DONE:
-            return
-
-        print("[12.1] iniciando recovery blindado...")
-
-        # =========================
-        # TELEGRAM RECOVERY
-        # =========================
-        try:
-            saved_id = carregar_id_telegram()
-            panel_message_id = saved_id if saved_id else None
-        except Exception as e:
-            print(f"[TELEGRAM RECOVERY ERROR] {e}")
-            panel_message_id = None
-
-
-        # =========================
-        # DISCORD RECOVERY (VALIDADO)
-        # =========================
-        try:
-
-            if bot_discord is None:
-                print("[RECOVERY] bot discord ainda não pronto")
-                discord_panel_msg_id = None
-                return
-
-            channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
-            if channel is None:
-                channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
-
-            if channel:
-
-                async for msg in channel.history(limit=50):
-
-                    if (
-                        msg.author == bot_discord.user
-                        and msg.embeds
-                        and "ARIRANG TOUR" in msg.embeds[0].description
-                    ):
-                        discord_panel_msg_id = msg.id
-                        break
-
-        except Exception as e:
-            print(f"[12.1 DISCORD RECOVERY ERROR] {e}")
-            discord_panel_msg_id = None
-
-
-        PANEL_BOOT_DONE = True
-        print("[12.1] painel único garantido com validação real")
-
-
-# =========================
-# SAFE BOOT WRAPPER
-# =========================
-async def safe_boot():
-
-    async with PANEL_BOOT_LOCK:
-
-        if PANEL_BOOT_DONE:
-            return
-
-        try:
-            await ensure_single_panel()
-        except Exception as e:
-            print(f"[BOOT ERROR] {e}")
-            return
-
-        await asyncio.sleep(2)
-
-        print("[BOOT] sistema estabilizado com painel único")
-
-# =========================
-# 12.1 PAINEL BLINDADO (RECOVERY ROBUSTO)
-# =========================
-
-import asyncio
-
-PANEL_BOOT_LOCK = asyncio.Lock()
-PANEL_BOOT_DONE = False
-
-
-async def ensure_single_panel():
-
-    global PANEL_BOOT_DONE
-    global panel_message_id, discord_panel_msg_id
-
-    async with PANEL_BOOT_LOCK:
-
-        if PANEL_BOOT_DONE:
-            return
-
-        print("[12.1] iniciando recovery blindado...")
-
-        telegram_ok = False
-        discord_ok = False
-
-        # =========================
-        # TELEGRAM RECOVERY
-        # =========================
-        try:
-            saved_id = carregar_id_telegram()
-
-            if saved_id:
-                panel_message_id = saved_id
-                telegram_ok = True
-            else:
-                panel_message_id = None
-
-        except Exception as e:
-            print(f"[TELEGRAM RECOVERY ERROR] {e}")
-            panel_message_id = None
-
-
-        # =========================
-        # DISCORD RECOVERY (VALIDADO)
-        # =========================
-        try:
-
-            if bot_discord is None:
-                print("[RECOVERY] bot discord ainda não pronto")
-                discord_panel_msg_id = None
-            else:
-
-                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
-
-                if channel is None:
-                    channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
-
-                if channel:
-
-                    async for msg in channel.history(limit=50):
-
-                        if (
-                            msg.author == bot_discord.user
-                            and msg.embeds
-                            and msg.embeds[0].description
-                            and "ARIRANG TOUR" in msg.embeds[0].description
-                        ):
-                            discord_panel_msg_id = msg.id
-                            discord_ok = True
-                            break
-
-        except Exception as e:
-            print(f"[12.1 DISCORD RECOVERY ERROR] {e}")
-            discord_panel_msg_id = None
-
-
-        # =========================
-        # SÓ FINALIZA SE PELO MENOS 1 OK
-        # =========================
-        if telegram_ok or discord_ok:
-            PANEL_BOOT_DONE = True
-            print("[12.1] painel único garantido com validação real")
-        else:
-            print("[12.1] recovery falhou - tentando novamente no próximo boot")
-            PANEL_BOOT_DONE = False
-
-
-# =========================
-# SAFE BOOT WRAPPER (OBRIGATÓRIO NO STARTUP)
-# =========================
-async def safe_boot():
-
-    async with PANEL_BOOT_LOCK:
-
-        if PANEL_BOOT_DONE:
-            return
-
-        await ensure_single_panel()
-
-        await asyncio.sleep(2)
-
-        if PANEL_BOOT_DONE:
-            print("[BOOT] sistema estabilizado com painel único")
-        else:
-            print("[BOOT] sistema ainda em recuperação")
 
 # =========================
 # 13 WEVERSE ALERTS (PRODUÇÃO SEGURA)
