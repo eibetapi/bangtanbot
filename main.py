@@ -1,5 +1,5 @@
 # =========================
-# 0 HEALTH CHECK (MUST BE FIRST LEVEL)
+# HEALTH CHECK (MUST BE FIRST LEVEL)
 # =========================
 
 def system_health():
@@ -18,6 +18,17 @@ def system_health():
             "boot_done": False,
             "panel_loop": False
         }
+
+
+# =========================
+# AUTO REPAIR SAFE (FIX OBRIGATÓRIO DO LOG)
+# =========================
+
+async def auto_repair_panel():
+    try:
+        await update_panel()
+    except Exception as e:
+        print(f"[AUTO REPAIR ERROR] {e}")
 
 # =========================
 # 1 BOT WOOTTEO
