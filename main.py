@@ -3396,3 +3396,11 @@ def cleanup():
 
 
 atexit.register(cleanup)
+
+def system_health():
+
+    return {
+        "panel_ok": bool(panel_message_id or discord_panel_msg_id),
+        "boot_done": BOOT_DONE,
+        "panel_loop": PANEL_LOOP_RUNNING
+    }
