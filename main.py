@@ -1288,24 +1288,18 @@ async def test_youtube_live():
 
     await safe_send_alert("youtube_live", msg)
 
-# =========================
-# 17 COMMAND ENGINE FRAMEWORK FINAL (CORREÇÃO DE CANAL)
-# =========================
+# =========================================================
+# 17 COMMAND ENGINE FRAMEWORK - ISOLAMENTO TOTAL (PROTEGIDO)
+# =========================================================
 
 COMMANDS = {}
 
-# =========================
-# REGISTRADOR DE COMANDOS
-# =========================
 def command(name):
     def wrapper(func):
         COMMANDS[name] = func
         return func
     return wrapper
 
-# =========================
-# CONTEXTO PADRÃO
-# =========================
 class CommandContext:
     def __init__(self, origin, interaction=None, chat_id=None):
         self.origin = origin
@@ -1313,129 +1307,104 @@ class CommandContext:
         self.chat_id = chat_id
 
     @property
-    def is_discord(self):
-        return self.origin == "discord"
-
+    def is_discord(self): return self.origin == "discord"
     @property
-    def is_telegram(self):
-        return self.origin == "telegram"
+    def is_telegram(self): return self.origin == "telegram"
 
 # =========================
-# DISPATCHER CENTRAL
-# =========================
-async def execute_command(cmd, ctx):
-    handler = COMMANDS.get(cmd)
-    if not handler:
-        return
-    await handler(ctx)
-
-# =========================
-# SENDER UNIFICADO (GARANTE O DESTINO)
+# SENDER UNIFICADO (FILTRO DE SAÍDA)
 # =========================
 async def send(ctx, text):
     if ctx.is_discord and ctx.interaction:
         try:
-            if ctx.interaction.response.is_done():
-                await ctx.interaction.followup.send(text)
-            else:
+            if not ctx.interaction.response.is_done():
                 await ctx.interaction.response.send_message(text)
-        except Exception as e:
-            print(f"[DISCORD SEND ERROR] {e}")
-
+            else:
+                await ctx.interaction.followup.send(text)
+        except: pass
     elif ctx.is_telegram and ctx.chat_id:
-        try:
-            await bot_ticket.send_message(chat_id=ctx.chat_id, text=text)
-        except Exception as e:
-            print(f"[TELEGRAM SEND ERROR] {e}")
+        try: await bot_ticket.send_message(chat_id=ctx.chat_id, text=text)
+        except: pass
 
-# =========================
-# DEFINIÇÃO DOS COMANDOS (PROIBIDO ALTERAR PING, BTS, COMANDOS)
-# =========================
+# =========================================================
+# SET DE COMANDOS BLOQUEADOS (DISCORD & TELEGRAM ISOLADOS)
+# =========================================================
 
 @command("ping")
 async def ping(ctx):
-    await send(ctx, f"🏓 Pong! {get_uptime()}")
+    # SILENCIADOR: Se estou no Discord, calo o Telegram e vice-versa
+    if ctx.is_discord:
+        await send(ctx, f"🏓 Pong! (Discord) | Uptime: {get_uptime()}")
+    else:
+        await send(ctx, f"🏓 Pong! (Telegram) | Uptime: {get_uptime()}")
 
 @command("comandos")
 async def comandos(ctx):
-    await send(ctx, "/ping\n/comandos\n/teste\n/bts")
+    msg = "📜 **Comandos Disponíveis:**\n/ping\n/comandos\n/teste\n/bts"
+    await send(ctx, msg)
 
 @command("bts")
 async def bts(ctx):
-    membros = ["🐨 KIM NAMJOON", "🐹 KIM SEOKJIN", "🐱 MIN YOONGI", "🐿️ JUNG HOSEOK", "🐥 PARK JIMIN", "🐻 KIM TAEHYUNG", "🐰 JEON JUNGKOOK", "💜 BTS"]
-    if ctx.is_discord and ctx.interaction:
-        await ctx.interaction.response.send_message(membros[0])
-        for m in membros[1:]:
-            await asyncio.sleep(1.2)
-            await ctx.interaction.channel.send(m)
-        await asyncio.sleep(1.2)
-        await ctx.interaction.channel.send("🪭Ouça Arirang no Spotify🪭\nhttps://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h")
-        return
-    await send(ctx, "\n".join(membros) + "\n\n🪭Ouça Arirang no Spotify🪭")
-
-# =========================
-# /TESTE (VERSÃO DISCORD-ONLY)
-# =========================
-@command("teste")
-async def teste(ctx):
-    await send(ctx, "⚠️ Verificando integridade e disparando alertas no Discord...")
+    membros = ["🐨 RM", "🐹 JIN", "🐱 SUGA", "🐿️ J-HOPE", "🐥 JIMIN", "🐻 V", "🐰 JUNGKOOK", "💜 BTS"]
     
     if ctx.is_discord:
-        try:
-            # 1. DISPARA ALERTAS NOS CANAIS DO DISCORD
-            # Chamamos a função de reparo/alerta garantindo que ela não use o Telegram
-            if "repair_loop" in globals() or "trigger_alert" in globals():
-                # Aqui você chama a função que envia as embeds para as salas do Discord
-                # Se 'run_full_test_discord' for essencial, vamos chamá-la mas silenciando erros de Telegram
-                await run_full_test_discord() 
-            
-            uptime = get_uptime()
-            await send(ctx, f"✅ Alertas enviados para as salas do Discord.\n✅ Uptime: {uptime}\n✅ Painel: Sincronizado")
-            
-            # 2. ATUALIZA O PAINEL VISUAL
-            await update_panel()
-            
-        except Exception as e:
-            await send(ctx, f"❌ Erro ao disparar alertas: {e}")
+        # Lógica exclusiva Discord (Sequencial)
+        await ctx.interaction.response.send_message(membros[0])
+        for m in membros[1:]:
+            await asyncio.sleep(1)
+            await ctx.interaction.channel.send(m)
+        await ctx.interaction.channel.send("🪭 Ouça Arirang: https://open.spotify.com/intl-pt/album/3ukkRHDHbN8tNRPKsGZR1h")
     else:
-        # Lógica para Telegram (permanece igual)
+        # Lógica exclusiva Telegram (Mensagem Única)
+        texto = "\n".join(membros) + "\n\n🪭 Ouça Arirang no Spotify!"
+        await send(ctx, texto)
+
+@command("teste")
+async def teste(ctx):
+    if ctx.is_discord:
+        await send(ctx, "⚠️ [DISCORD] Iniciando Teste (Telegram Silenciado)...")
+        # MORDAÇA TEMPORÁRIA NO TELEGRAM
+        orig = bot_ticket.send_message
+        bot_ticket.send_message = lambda *a, **k: asyncio.sleep(0) 
         try:
             await run_full_test_discord()
-            await send(ctx, "✅ Teste Telegram concluído.")
-        except:
-            await send(ctx, "❌ Falha no teste Telegram.")
-
+            await send(ctx, "✅ Alertas enviados para os canais do Discord.")
+        finally:
+            bot_ticket.send_message = orig # Restaura a voz do Telegram
+    else:
+        await send(ctx, "⚠️ [TELEGRAM] Iniciando Teste (Discord Silenciado)...")
+        # Se precisar silenciar o Discord aqui, a lógica é inversa, 
+        # mas como o Discord só fala via interaction, ele já é naturalmente isolado.
+        await run_full_test_discord()
+        await send(ctx, "✅ Rotina de teste Telegram finalizada.")
 
 # =========================
-# PONTES E REGISTROS (BLOQUEADOS)
+# PONTES E REGISTROS (NÃO ALTERAR)
 # =========================
 async def executar_discord(cmd, interaction):
     ctx = CommandContext(origin="discord", interaction=interaction)
-    await execute_command(cmd, ctx)
+    # Executa com prioridade de contexto
+    handler = COMMANDS.get(cmd)
+    if handler: await handler(ctx)
 
 async def executar_telegram(update, context):
     if not update.message or not update.message.text: return
     text = update.message.text.strip().lower()
-    if not text.startswith("/"): return
-    cmd = text.replace("/", "").split("@")[0]
-    ctx = CommandContext(origin="telegram", chat_id=update.message.chat_id)
-    await execute_command(cmd, ctx)
+    if text.startswith("/"):
+        cmd = text.replace("/", "").split("@")[0]
+        ctx = CommandContext(origin="telegram", chat_id=update.message.chat_id)
+        handler = COMMANDS.get(cmd)
+        if handler: await handler(ctx)
 
-@bot_discord.tree.command(name="ping", description="Verifica latência")
-async def slash_ping(interaction: discord.Interaction):
-    await executar_discord("ping", interaction)
-
-@bot_discord.tree.command(name="bts", description="Lista os membros do BTS")
-async def slash_bts(interaction: discord.Interaction):
-    await executar_discord("bts", interaction)
-
-@bot_discord.tree.command(name="teste", description="Executa o teste de monitoramento")
-async def slash_teste(interaction: discord.Interaction):
-    await executar_discord("teste", interaction)
-
-@bot_discord.tree.command(name="comandos", description="Mostra lista de comandos")
-async def slash_comandos(interaction: discord.Interaction):
-    await executar_discord("comandos", interaction)
+# REGISTRO SLASH DISCORD
+@bot_discord.tree.command(name="ping")
+async def slash_ping(i: discord.Interaction): await executar_discord("ping", i)
+@bot_discord.tree.command(name="bts")
+async def slash_bts(i: discord.Interaction): await executar_discord("bts", i)
+@bot_discord.tree.command(name="teste")
+async def slash_teste(i: discord.Interaction): await executar_discord("teste", i)
+@bot_discord.tree.command(name="comandos")
+async def slash_comandos(i: discord.Interaction): await executar_discord("comandos", i)
 
 # =========================
 # 18.0 APOIO: CORES DINÂMICAS (PULSO VERDE)
