@@ -980,7 +980,6 @@ async def ticket_agenda(url, data, cidade, pais):
     await send_alert("agenda", msg)
     await update_panel()
 
-
 # =========================
 # 16 SISTEMA DE TESTE (ESTRUTURA FIXA E SEGURA)
 # =========================
@@ -1003,7 +1002,7 @@ PROD_MODE = ENV_MODE == "production"
 
 async def safe_send_alert(alert_type, message):
 
-    # TEST MODE: apenas log
+    # TEST MODE: apenas log (Não incrementa contadores reais)
     if TEST_MODE:
         print(f"[TEST MODE ALERT] {alert_type}")
         print(message)
@@ -1019,6 +1018,7 @@ async def safe_update_panel():
         print("[TEST MODE] painel ignorado")
         return
 
+    # Em produção, usa a lógica de EDIT vs SEND protegida no Bloco 12
     await update_panel()
 
 
@@ -1436,7 +1436,13 @@ async def teste(ctx):
     await send(ctx, "⚠️ Iniciando teste completo...")
 
     try:
+        # Garante que os testes rodem e o painel sincronize ao final
         await run_full_test_discord()
+        
+        # FIX: Sincroniza os painéis após o teste (se não estiver em modo isolado)
+        if not globals().get("TEST_MODE", False):
+            await update_panel()
+            
         await send(ctx, "✅ Teste finalizado")
 
     except Exception as e:
@@ -1460,6 +1466,10 @@ async def executar_discord(cmd, interaction):
 # TELEGRAM HANDLER
 # =========================
 async def executar_telegram(update, context):
+
+    # FIX: Verificação de segurança para mensagens nulas
+    if not update.message or not update.message.text:
+        return
 
     text = update.message.text.strip().lower()
 
