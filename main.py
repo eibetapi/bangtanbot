@@ -861,7 +861,9 @@ async def send_alert(alert_type, message):
         # =========================
         # TELEGRAM (SAFE)
         # =========================
-        if bot_ticket is not None and not TEST_MODE:
+        test_mode = globals().get("TEST_MODE", False)
+
+        if bot_ticket is not None and not test_mode:
             try:
                 await bot_ticket.send_message(
                     chat_id=PANEL_CHAT_ID,
