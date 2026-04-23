@@ -2497,3 +2497,22 @@ async def start_background_tasks():
 @bot_discord.event
 async def on_connect():
     asyncio.create_task(panel_loop())
+
+# =========================
+# 23 PANEL RECOVERY (BLINDAGEM)
+# =========================
+
+async def recover_discord_panel():
+    global discord_panel_msg_id
+
+    channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+    if not channel:
+        return
+
+    try:
+        async for msg in channel.history(limit=30):
+            if msg.author == bot_discord.user:
+                discord_panel_msg_id = msg.id
+                return
+    except:
+        pass
