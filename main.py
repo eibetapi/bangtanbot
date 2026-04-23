@@ -634,80 +634,159 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 """
 
 # =========================
-# 12.1 PANEL RECOVERY SYSTEM (ANTI-DUPLICAÇÃO + ANTI-DUPLO DEPLOY)
+# 12.1 PAINEL BLINDADO (RECOVERY + SYNC TOTAL + ANTI-DUPLICAÇÃO)
 # =========================
 
-import os
-import time
-import asyncio
-
-panel_ready = False
-
-# =========================
-# LOCK DE INSTÂNCIA ÚNICA
-# =========================
-INSTANCE_LOCK_FILE = "/tmp/bot_instance.lock"
-
-
-def acquire_instance_lock():
-    """
-    Garante que só 1 instância do bot rode por vez.
-    Se já existir lock, outra instância está ativa.
-    """
-    try:
-        if os.path.exists(INSTANCE_LOCK_FILE):
-            print("[INSTANCE LOCK] Já existe uma instância rodando.")
-            return False
-
-        with open(INSTANCE_LOCK_FILE, "w") as f:
-            f.write(str(time.time()))
-
-        return True
-
-    except Exception as e:
-        print(f"[INSTANCE LOCK ERROR] {e}")
-        return True
-
+panel_lock = asyncio.Lock()
 
 async def recover_panel_state():
-    global panel_message_id, discord_panel_msg_id, panel_ready
-
+    global panel_message_id, discord_panel_msg_id
     try:
-        # =========================
-        # TELEGRAM RECOVERY
-        # =========================
         try:
             panel_message_id = carregar_id_telegram()
-        except Exception as e:
-            print(f"[PANEL LOAD ERROR] {e}")
+        except:
             panel_message_id = None
 
+        try:
+            if DISCORD_PANEL_CHANNEL_ID and bot_discord:
+                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+                if channel:
+                    async for msg in channel.history(limit=30):
+                        if msg.author == bot_discord.user:
+                            discord_panel_msg_id = msg.id
+                            break
+        except:
+            pass
+
+        print("[RECOVERY] painel restaurado com sucesso")
+
+    except Exception as e:
+        print(f"[RECOVERY ERROR] {e}")
+
+
+async def update_panel():
+    global panel_message_id, discord_panel_msg_id, last_panel_update
+
+    try:
+        now = time.time()
+
+        if last_panel_update is None:
+            last_panel_update = 0
+
+        if (now - last_panel_update) < 60:
+            return
+
+        last_panel_update = now
+
+        data_show, city, d_prox, d_br = get_countdown_data()
+        texto = gerar_texto_painel(data_show, city, d_prox, d_br)
+
         # =========================
-        # DISCORD RECOVERY
+        # TELEGRAM
         # =========================
-        if bot_discord and DISCORD_PANEL_CHANNEL_ID:
+        if bot_ticket and PANEL_CHAT_ID:
+
+            async with panel_lock:
+
+                try:
+                    if not panel_message_id:
+                        try:
+                            panel_message_id = carregar_id_telegram()
+                        except:
+                            panel_message_id = None
+
+                    edited = False
+
+                    if panel_message_id:
+                        try:
+                            await bot_ticket.edit_message_text(
+                                chat_id=PANEL_CHAT_ID,
+                                message_id=panel_message_id,
+                                text=texto,
+                                parse_mode=None
+                            )
+                            edited = True
+                        except Exception as e:
+                            if "Retry in" in str(e):
+                                print(f"[TELEGRAM FLOOD] {e}")
+                                return
+                            panel_message_id = None
+
+                    if not edited:
+                        msg = await bot_ticket.send_message(
+                            chat_id=PANEL_CHAT_ID,
+                            text=texto,
+                            parse_mode=None
+                        )
+
+                        panel_message_id = msg.message_id
+                        salvar_id_telegram(panel_message_id)
+
+                        try:
+                            await bot_ticket.pin_chat_message(
+                                chat_id=PANEL_CHAT_ID,
+                                message_id=panel_message_id,
+                                disable_notification=True
+                            )
+                        except:
+                            pass
+
+                except Exception as e:
+                    print(f"[TELEGRAM PANEL ERROR] {e}")
+
+        # =========================
+        # DISCORD
+        # =========================
+        if DISCORD_PANEL_CHANNEL_ID and bot_discord:
 
             try:
                 channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
-                if channel:
-                    async for msg in channel.history(limit=20):
-                        if msg.author == bot_discord.user:
-                            discord_panel_msg_id = msg.id
-                            break
+                if not channel:
+                    return
+
+                embed = discord.Embed(
+                    description=texto,
+                    color=0x8A2BE2
+                )
+
+                edited = False
+
+                if discord_panel_msg_id:
+                    try:
+                        msg = await channel.fetch_message(discord_panel_msg_id)
+                        await msg.edit(embed=embed)
+                        edited = True
+                    except:
+                        discord_panel_msg_id = None
+
+                if not edited:
+                    try:
+                        async for msg in channel.history(limit=25):
+                            if msg.author == bot_discord.user:
+                                discord_panel_msg_id = msg.id
+                                await msg.edit(embed=embed)
+                                edited = True
+                                break
+                    except:
+                        pass
+
+                if not edited:
+                    msg = await channel.send(embed=embed)
+                    discord_panel_msg_id = msg.id
 
             except Exception as e:
-                print(f"[DISCORD RECOVERY ERROR] {e}")
+                print(f"[DISCORD PANEL ERROR] {e}")
 
-        # =========================
-        # LIBERA SISTEMA
-        # =========================
-        panel_ready = True
-        print("[PANEL] recovery completo")
 
-    except Exception as e:
-        print(f"[PANEL RECOVERY FATAL] {e}")
-        panel_ready = True
+# =========================
+# OBS 12.1
+# =========================
+# - evita duplicação em restart
+# - recupera painel automaticamente
+# - edita antes de criar
+# - sync Discord + Telegram
+# - anti flood 60s
 
 # =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
