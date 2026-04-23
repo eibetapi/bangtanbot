@@ -281,10 +281,19 @@ def keep_alive():
 import hashlib
 import os
 import json
+import asyncio
+import time
 
 CONTENT_HASH = {}
 
 CACHE_FILE = "content_hash_cache.json"
+
+# 🔒 lock para acesso concorrente
+CONTENT_LOCK = asyncio.Lock()
+
+# controle de save otimizado
+_last_save_time = 0
+SAVE_INTERVAL = 10  # segundos
 
 
 # =========================
@@ -304,9 +313,9 @@ def load_content_cache():
 
 
 # =========================
-# SAVE CACHE (PERSISTÊNCIA)
+# SAVE CACHE (OTIMIZADO)
 # =========================
-def save_content_cache():
+def _save_now():
     try:
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(CONTENT_HASH, f)
@@ -314,21 +323,38 @@ def save_content_cache():
         print(f"[CACHE SAVE ERROR] {e}")
 
 
+async def save_content_cache():
+    global _last_save_time
+
+    now = time.time()
+
+    # evita salvar toda hora
+    if now - _last_save_time < SAVE_INTERVAL:
+        return
+
+    async with CONTENT_LOCK:
+        _save_now()
+        _last_save_time = now
+
+
 # =========================
-# NORMALIZAÇÃO INTELIGENTE
+# NORMALIZAÇÃO INTELIGENTE (MELHORADA)
 # =========================
 def normalize_html(html):
 
     if not html:
         return ""
 
-    # remove espaços extras
-    text = " ".join(html.split())
+    try:
+        from bs4 import BeautifulSoup
 
-    # remove ruído comum leve (scripts básicos)
-    text = text.replace("<script", " ").replace("</script>", " ")
+        soup = BeautifulSoup(html, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
 
-    return text
+        return " ".join(text.split())
+
+    except Exception:
+        return " ".join(html.split())
 
 
 # =========================
@@ -339,29 +365,31 @@ def generate_hash(content):
 
 
 # =========================
-# DETECTOR DE MUDANÇA REAL
+# DETECTOR DE MUDANÇA REAL (THREAD SAFE)
 # =========================
-def is_new(url, html):
+async def is_new(url, html):
 
     global CONTENT_HASH
 
     clean_content = normalize_html(html)
     new_hash = generate_hash(clean_content)
 
-    old_hash = CONTENT_HASH.get(url)
+    async with CONTENT_LOCK:
 
-    # primeira vez vendo a URL
-    if not old_hash:
-        CONTENT_HASH[url] = new_hash
-        save_content_cache()
-        return False
+        old_hash = CONTENT_HASH.get(url)
 
-    # mudou de verdade
-    if old_hash != new_hash:
-        CONTENT_HASH[url] = new_hash
-        save_content_cache()
-        print(f"[CHANGE DETECTED] {url}")
-        return True
+        # primeira vez vendo a URL
+        if not old_hash:
+            CONTENT_HASH[url] = new_hash
+            await save_content_cache()
+            return False
+
+        # mudou de verdade
+        if old_hash != new_hash:
+            CONTENT_HASH[url] = new_hash
+            await save_content_cache()
+            print(f"[CHANGE DETECTED] {url}")
+            return True
 
     return False
 
