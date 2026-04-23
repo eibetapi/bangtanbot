@@ -634,10 +634,40 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 """
 
 # =========================
-# 12.1 PANEL RECOVERY SYSTEM (ANTI-DUPLICAÇÃO RECONNECT)
+# 12.1 PANEL RECOVERY SYSTEM (ANTI-DUPLICAÇÃO + ANTI-DUPLO DEPLOY)
 # =========================
 
+import os
+import time
+import asyncio
+
 panel_ready = False
+
+# =========================
+# LOCK DE INSTÂNCIA ÚNICA
+# =========================
+INSTANCE_LOCK_FILE = "/tmp/bot_instance.lock"
+
+
+def acquire_instance_lock():
+    """
+    Garante que só 1 instância do bot rode por vez.
+    Se já existir lock, outra instância está ativa.
+    """
+    try:
+        if os.path.exists(INSTANCE_LOCK_FILE):
+            print("[INSTANCE LOCK] Já existe uma instância rodando.")
+            return False
+
+        with open(INSTANCE_LOCK_FILE, "w") as f:
+            f.write(str(time.time()))
+
+        return True
+
+    except Exception as e:
+        print(f"[INSTANCE LOCK ERROR] {e}")
+        return True
+
 
 async def recover_panel_state():
     global panel_message_id, discord_panel_msg_id, panel_ready
@@ -661,8 +691,6 @@ async def recover_panel_state():
                 channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
                 if channel:
-
-                    # tenta recuperar última mensagem do bot
                     async for msg in channel.history(limit=20):
                         if msg.author == bot_discord.user:
                             discord_panel_msg_id = msg.id
@@ -672,7 +700,7 @@ async def recover_panel_state():
                 print(f"[DISCORD RECOVERY ERROR] {e}")
 
         # =========================
-        # LIBERA SISTEMA PARA UPDATE
+        # LIBERA SISTEMA
         # =========================
         panel_ready = True
         print("[PANEL] recovery completo")
