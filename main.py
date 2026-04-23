@@ -2310,14 +2310,8 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 💷 Ticketmaster {status_color(last_ticket_check)}
 🎯 Acessos realizados: {total_tickets}
 
-
-💶 Buyticket {status_color(last_buy_check)}
-🎯 Acessos realizados: {total_buy}
-
-
 •°•👾 Wootteo em rota há: {get_uptime()} ✨
 """
-
 
 # =========================
 # UPDATE PANEL (BLINDADO SEM ALTERAR LAYOUT)
