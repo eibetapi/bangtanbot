@@ -144,7 +144,6 @@ async def start_telegram():
 
 import asyncio
 import time
-from datetime import datetime
 
 # =========================
 # CONTADORES GLOBAIS
@@ -160,8 +159,6 @@ last_buy_check = time.time()
 last_weverse_check = time.time()
 last_social_check = time.time()
 
-CONTENT_HASH = {}
-
 SEEN_TICKET = set()
 SEEN_BUY = set()
 SEEN_WEVERSE = set()
@@ -171,48 +168,6 @@ start_time = time.time()
 
 # 🔒 lock leve para proteger updates concorrentes
 COUNTER_LOCK = asyncio.Lock()
-
-# =========================
-# UPTIME
-# =========================
-
-def get_uptime():
-    s = int(time.time() - start_time)
-    return f"{s//3600}h {(s%3600)//60}m {s%60}s"
-
-# =========================
-# STATUS HELPERS
-# =========================
-
-def resolve_status(found):
-    return "DISPONÍVEL" if found else "ESGOTADO"
-
-def clean(v):
-    return v if v and str(v).strip() else "ESGOTADO"
-
-def days_left(date_str):
-    try:
-        target = datetime.strptime(date_str, "%d/%m/%Y").date()
-        today = datetime.now().date()
-        return max((target - today).days, 0)
-    except:
-        return 0
-
-def minutes_since(ts):
-    return int((time.time() - ts) / 60)
-
-# =========================
-# STATUS VISUAL (CORRIGIDO)
-# =========================
-
-def status_color(last_check):
-    agora = time.time()
-
-    if (agora - last_check) > 1800:
-        return "🔴"
-
-    # 🔥 mantém sua estética, mas baseada em estado real
-    return "🟢" if int(agora - last_check) % 2 == 0 else "🟡"
 
 # =========================
 # FUNÇÕES SEGURAS PARA ATUALIZAR CONTADORES
