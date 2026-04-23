@@ -1,4 +1,25 @@
 # =========================
+# 0 HEALTH CHECK (MUST BE FIRST LEVEL)
+# =========================
+
+def system_health():
+
+    try:
+        return {
+            "panel_ok": bool(globals().get("panel_message_id") or globals().get("discord_panel_msg_id")),
+            "boot_done": globals().get("BOOT_DONE", False),
+            "panel_loop": globals().get("PANEL_LOOP_RUNNING", False)
+        }
+
+    except Exception as e:
+        print(f"[HEALTH ERROR] {e}")
+        return {
+            "panel_ok": False,
+            "boot_done": False,
+            "panel_loop": False
+        }
+
+# =========================
 # 1 BOT WOOTTEO
 # =========================
 
