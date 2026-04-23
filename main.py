@@ -2412,6 +2412,7 @@ async def update_panel():
 # =========================
 # DISCORD READY (CORRIGIDO DUPLO EVENTO)
 # =========================
+
 @bot_discord.event
 async def on_ready():
 
@@ -2431,6 +2432,12 @@ async def on_ready():
         )
     except Exception as e:
         print(f"[STATUS ERROR] {e}")
+
+    # 🔧 garante inicialização do painel antes do watchdog estabilizar
+    try:
+        await update_panel()
+    except Exception as e:
+        print(f"[PANEL INIT ERROR] {e}")
 
 # =========================
 # 18.1 CHECK FUNCTIONS (VERSÃO REAL + SEGURA - BLINDADA)
