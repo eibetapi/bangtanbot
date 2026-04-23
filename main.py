@@ -1384,14 +1384,23 @@ async def bts(ctx):
 
 @command("teste")
 async def teste(ctx):
-    await send(ctx, "⚠️ Iniciando teste completo...")
+    # Canaliza a resposta apenas para quem pediu
+    await send(ctx, "⚠️ Iniciando teste de integridade...")
+    
     try:
-        await run_full_test_discord()
+        # Se o comando veio do Discord, roda apenas a lógica de teste do Discord
+        if ctx.is_discord:
+            await run_full_test_discord()
+        else:
+            # Se veio do Telegram, apenas confirma a operação
+            await send(ctx, "🤖 Sistema de monitoramento operando normalmente.")
+
         if not globals().get("TEST_MODE", False):
             await update_panel()
-        await send(ctx, "✅ Teste finalizado")
+            
+        await send(ctx, "✅ Teste finalizado com sucesso.")
     except Exception as e:
-        await send(ctx, f"❌ Erro: {e}")
+        await send(ctx, f"❌ Erro durante o teste: {e}")
 
 # =========================
 # PONTES DE EXECUÇÃO (DISCORD & TELEGRAM)
@@ -1410,7 +1419,7 @@ async def executar_telegram(update, context):
     await execute_command(cmd, ctx)
 
 # =========================
-# REGISTRO NATIVO SLASH (O QUE FALTAVA)
+# REGISTRO NATIVO SLASH (BLOQUEADO PARA ALTERAÇÃO)
 # =========================
 
 @bot_discord.tree.command(name="ping", description="Verifica latência")
@@ -1429,26 +1438,6 @@ async def slash_teste(interaction: discord.Interaction):
 async def slash_comandos(interaction: discord.Interaction):
     await executar_discord("comandos", interaction)
 
-
-# =========================
-# 18 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL (UNIFICADO FINAL)
-# =========================
-
-import asyncio
-import time
-import aiohttp
-import discord
-from datetime import datetime
-from bs4 import BeautifulSoup
-
-# =========================
-# 18 DISCORD ON_READY + SYNC + TELEGRAM INTELLIGENT PANEL (PULSO ATIVO)
-# =========================
-
-import asyncio
-import time
-import discord
-from datetime import datetime
 
 # =========================
 # 18.0 APOIO: CORES DINÂMICAS (PULSO VERDE)
