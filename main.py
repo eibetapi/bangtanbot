@@ -1146,6 +1146,9 @@ async def ensure_single_panel():
 
         print("[12.1] iniciando recovery blindado...")
 
+        telegram_ok = False
+        discord_ok = False
+
         # =========================
         # TELEGRAM RECOVERY
         # =========================
@@ -1154,10 +1157,12 @@ async def ensure_single_panel():
 
             if saved_id:
                 panel_message_id = saved_id
+                telegram_ok = True
             else:
                 panel_message_id = None
 
-        except Exception:
+        except Exception as e:
+            print(f"[TELEGRAM RECOVERY ERROR] {e}")
             panel_message_id = None
 
 
@@ -1166,32 +1171,44 @@ async def ensure_single_panel():
         # =========================
         try:
 
-            channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
+            if bot_discord is None:
+                print("[RECOVERY] bot discord ainda não pronto")
+                discord_panel_msg_id = None
+            else:
 
-            if channel is None:
-                channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
+                channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
-            if channel:
+                if channel is None:
+                    channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
 
-                async for msg in channel.history(limit=50):
+                if channel:
 
-                    # 🔥 validação REAL do painel
-                    if (
-                        msg.author == bot_discord.user
-                        and msg.embeds
-                        and "ARIRANG TOUR" in msg.embeds[0].description
-                    ):
-                        discord_panel_msg_id = msg.id
-                        break
+                    async for msg in channel.history(limit=50):
+
+                        if (
+                            msg.author == bot_discord.user
+                            and msg.embeds
+                            and msg.embeds[0].description
+                            and "ARIRANG TOUR" in msg.embeds[0].description
+                        ):
+                            discord_panel_msg_id = msg.id
+                            discord_ok = True
+                            break
 
         except Exception as e:
             print(f"[12.1 DISCORD RECOVERY ERROR] {e}")
             discord_panel_msg_id = None
 
 
-        PANEL_BOOT_DONE = True
-
-        print("[12.1] painel único garantido com validação real")
+        # =========================
+        # SÓ FINALIZA SE PELO MENOS 1 OK
+        # =========================
+        if telegram_ok or discord_ok:
+            PANEL_BOOT_DONE = True
+            print("[12.1] painel único garantido com validação real")
+        else:
+            print("[12.1] recovery falhou - tentando novamente no próximo boot")
+            PANEL_BOOT_DONE = False
 
 
 # =========================
@@ -1208,18 +1225,25 @@ async def safe_boot():
 
         await asyncio.sleep(2)
 
-        print("[BOOT] sistema estabilizado com painel único")
+        if PANEL_BOOT_DONE:
+            print("[BOOT] sistema estabilizado com painel único")
+        else:
+            print("[BOOT] sistema ainda em recuperação")
 
 # =========================
 # 13 WEVERSE ALERTS (PRODUÇÃO SEGURA)
 # =========================
 
 import hashlib
+import asyncio
 
 # =========================
 # CACHE GLOBAL POR TIPO + CONTEÚDO
 # =========================
 WEVERSE_CACHE = {}
+
+# 🔒 lock para evitar race condition em concorrência
+WEVERSE_LOCK = asyncio.Lock()
 
 
 def is_new_weverse_event(event_type, url, content=""):
@@ -1246,17 +1270,19 @@ def is_new_weverse_event(event_type, url, content=""):
 # =========================
 async def weverse_post(url, member_name, title, message_translated, found):
 
-    if not is_new_weverse_event("post", url, title + message_translated):
-        return
+    async with WEVERSE_LOCK:
 
-    global total_weverse, last_weverse_check
+        if not is_new_weverse_event("post", url, title + message_translated):
+            return
 
-    total_weverse += 1
-    last_weverse_check = time.time()
+        global total_weverse, last_weverse_check
 
-    emoji = get_member_emoji(member_name)
+        total_weverse += 1
+        last_weverse_check = time.time()
 
-    msg = f"""
+        emoji = get_member_emoji(member_name)
+
+        msg = f"""
 🩷 WEVERSE POST 🩷
 {emoji} {member_name.upper()} fez uma publicação 
 📌 {title}
@@ -1264,8 +1290,8 @@ async def weverse_post(url, member_name, title, message_translated, found):
 🔗 {url}
 """
 
-    await send_alert("weverse_post", msg)
-    await update_panel()
+        await send_alert("weverse_post", msg)
+        await update_panel()
 
 
 # =========================
@@ -1273,24 +1299,26 @@ async def weverse_post(url, member_name, title, message_translated, found):
 # =========================
 async def weverse_live(url, member_name, found):
 
-    if not is_new_weverse_event("live", url):
-        return
+    async with WEVERSE_LOCK:
 
-    global total_weverse, last_weverse_check
+        if not is_new_weverse_event("live", url):
+            return
 
-    total_weverse += 1
-    last_weverse_check = time.time()
+        global total_weverse, last_weverse_check
 
-    emoji = get_member_emoji(member_name)
+        total_weverse += 1
+        last_weverse_check = time.time()
 
-    msg = f"""
+        emoji = get_member_emoji(member_name)
+
+        msg = f"""
 📹 WEVERSE LIVE 📹
 {emoji} {member_name.upper()} está ao vivo
 🔗 {url}
 """
 
-    await send_alert("weverse_live", msg)
-    await update_panel()
+        await send_alert("weverse_live", msg)
+        await update_panel()
 
 
 # =========================
@@ -1298,25 +1326,27 @@ async def weverse_live(url, member_name, found):
 # =========================
 async def weverse_news(url, member_name, message_translated, found):
 
-    if not is_new_weverse_event("news", url, message_translated):
-        return
+    async with WEVERSE_LOCK:
 
-    global total_weverse, last_weverse_check
+        if not is_new_weverse_event("news", url, message_translated):
+            return
 
-    total_weverse += 1
-    last_weverse_check = time.time()
+        global total_weverse, last_weverse_check
 
-    emoji = get_member_emoji(member_name)
+        total_weverse += 1
+        last_weverse_check = time.time()
 
-    msg = f"""
+        emoji = get_member_emoji(member_name)
+
+        msg = f"""
 🚨 WEVERSE NEWS 🚨
 {emoji} {member_name.upper()} fez uma publicação 
 📝 {message_translated}
 🔗 {url}
 """
 
-    await send_alert("weverse_news", msg)
-    await update_panel()
+        await send_alert("weverse_news", msg)
+        await update_panel()
 
 
 # =========================
@@ -1324,17 +1354,19 @@ async def weverse_news(url, member_name, message_translated, found):
 # =========================
 async def weverse_media(url, member_name, title, message_translated, found):
 
-    if not is_new_weverse_event("media", url, title + message_translated):
-        return
+    async with WEVERSE_LOCK:
 
-    global total_weverse, last_weverse_check
+        if not is_new_weverse_event("media", url, title + message_translated):
+            return
 
-    total_weverse += 1
-    last_weverse_check = time.time()
+        global total_weverse, last_weverse_check
 
-    emoji = get_member_emoji(member_name)
+        total_weverse += 1
+        last_weverse_check = time.time()
 
-    msg = f"""
+        emoji = get_member_emoji(member_name)
+
+        msg = f"""
 📀 WEVERSE MEDIA 📀
 {emoji} {member_name.upper()} fez uma publicação 
 ⭐ {title}
@@ -1342,21 +1374,28 @@ async def weverse_media(url, member_name, title, message_translated, found):
 🔗 {url}
 """
 
-    await send_alert("weverse_media", msg)
-    await update_panel()
+        await send_alert("weverse_media", msg)
+        await update_panel()
 
 # =========================
 # 14 INSTAGRAM ALERTS (PRODUÇÃO SEGURA)
 # =========================
 
 import hashlib
+import asyncio
 
+# =========================
+# CACHE GLOBAL POR EVENTO
+# =========================
 INSTAGRAM_CACHE = {
     "post": None,
     "reel": None,
     "story": None,
     "live": None
 }
+
+# 🔒 lock global para evitar race condition
+INSTAGRAM_LOCK = asyncio.Lock()
 
 
 def is_new_instagram(event_type, url, extra=""):
@@ -1376,24 +1415,26 @@ def is_new_instagram(event_type, url, extra=""):
 # =========================
 async def instagram_post(url, member_name, title, found):
 
-    if not is_new_instagram("post", url, title):
-        return
+    async with INSTAGRAM_LOCK:
 
-    global total_social, last_social_check
+        if not is_new_instagram("post", url, title):
+            return
 
-    total_social += 1
-    last_social_check = time.time()
+        global total_social, last_social_check
 
-    emoji, name = format_member(member_name)
+        total_social += 1
+        last_social_check = time.time()
 
-    msg = f"""
+        emoji, name = format_member(member_name)
+
+        msg = f"""
 🌟 INSTAGRAM POST 🌟
 {emoji} {name} fez uma publicação 
 🔗 {url}
 """
 
-    await send_alert("instagram_post", msg)
-    await update_panel()
+        await send_alert("instagram_post", msg)
+        await update_panel()
 
 
 # =========================
@@ -1401,24 +1442,26 @@ async def instagram_post(url, member_name, title, found):
 # =========================
 async def instagram_reel(url, member_name, title, found):
 
-    if not is_new_instagram("reel", url, title):
-        return
+    async with INSTAGRAM_LOCK:
 
-    global total_social, last_social_check
+        if not is_new_instagram("reel", url, title):
+            return
 
-    total_social += 1
-    last_social_check = time.time()
+        global total_social, last_social_check
 
-    emoji, name = format_member(member_name)
+        total_social += 1
+        last_social_check = time.time()
 
-    msg = f"""
+        emoji, name = format_member(member_name)
+
+        msg = f"""
 🎬 INSTAGRAM REELS 🎬
 {emoji} {name} publicou um reels 
 🔗 {url}
 """
 
-    await send_alert("instagram_reels", msg)
-    await update_panel()
+        await send_alert("instagram_reels", msg)
+        await update_panel()
 
 
 # =========================
@@ -1426,59 +1469,69 @@ async def instagram_reel(url, member_name, title, found):
 # =========================
 async def instagram_story(url, member_name, title, found):
 
-    if not is_new_instagram("story", url, title):
-        return
+    async with INSTAGRAM_LOCK:
 
-    global total_social, last_social_check
+        if not is_new_instagram("story", url, title):
+            return
 
-    total_social += 1
-    last_social_check = time.time()
+        global total_social, last_social_check
 
-    emoji, name = format_member(member_name)
+        total_social += 1
+        last_social_check = time.time()
 
-    msg = f"""
+        emoji, name = format_member(member_name)
+
+        msg = f"""
 🫧 INSTAGRAM STORY 🫧
 {emoji} {name} publicou stories
 🔗 {url}
 """
 
-    await send_alert("instagram_stories", msg)
-    await update_panel()
+        await send_alert("instagram_stories", msg)
+        await update_panel()
 
 
 # =========================
-# LIVE (CORRIGIDO — AGORA TEM CACHE)
+# LIVE (CACHE CORRIGIDO)
 # =========================
 async def instagram_live(url, member_name, title, found):
 
-    if not is_new_instagram("live", url):
-        return
+    async with INSTAGRAM_LOCK:
 
-    global total_social, last_social_check
+        if not is_new_instagram("live", url):
+            return
 
-    total_social += 1
-    last_social_check = time.time()
+        global total_social, last_social_check
 
-    emoji, name = format_member(member_name)
+        total_social += 1
+        last_social_check = time.time()
 
-    msg = f"""
+        emoji, name = format_member(member_name)
+
+        msg = f"""
 🎥 INSTAGRAM LIVE 🎥
 {emoji} {name} está ao vivo
 🔗 {url}
 """
 
-    await send_alert("instagram_live", msg)
-    await update_panel()
+        await send_alert("instagram_live", msg)
+        await update_panel()
 
 # =========================
-# 15 ALERTAS TIKTOK E YOUTUBE (PADRÃO UNIFICADO)
+# 15 ALERTAS TIKTOK E YOUTUBE (PRODUÇÃO SEGURA)
 # =========================
+
+import asyncio
+import hashlib
 
 # =========================
 # CACHE GLOBAL
 # =========================
 LAST_TIKTOK = {}
 LAST_YOUTUBE = {}
+
+# 🔒 lock global para evitar concorrência
+SOCIAL_LOCK = asyncio.Lock()
 
 
 def is_new_social(cache, key):
@@ -1493,13 +1546,15 @@ def is_new_social(cache, key):
 # =========================
 async def tiktok_post(url, member_name, title, found):
 
-    key = f"post:{member_name}:{url}"
-    if not is_new_social(LAST_TIKTOK, key):
-        return
+    async with SOCIAL_LOCK:
 
-    emoji = get_member_emoji(member_name)
+        key = f"post:{member_name}:{url}"
+        if not is_new_social(LAST_TIKTOK, key):
+            return
 
-    msg = f"""
+        emoji = get_member_emoji(member_name)
+
+        msg = f"""
 
 🎵 TIKTOK POST 🎵
 {emoji} {member_name.upper()} publicou um vídeo
@@ -1507,8 +1562,8 @@ async def tiktok_post(url, member_name, title, found):
 
 """
 
-    await send_alert("tiktok_post", msg)
-    await update_panel()
+        await send_alert("tiktok_post", msg)
+        await update_panel()
 
 
 # =========================
@@ -1516,13 +1571,15 @@ async def tiktok_post(url, member_name, title, found):
 # =========================
 async def tiktok_live(url, member_name, title, found):
 
-    key = f"live:{member_name}:{url}"
-    if not is_new_social(LAST_TIKTOK, key):
-        return
+    async with SOCIAL_LOCK:
 
-    emoji = get_member_emoji(member_name)
+        key = f"live:{member_name}:{url}"
+        if not is_new_social(LAST_TIKTOK, key):
+            return
 
-    msg = f"""
+        emoji = get_member_emoji(member_name)
+
+        msg = f"""
 
 🎥 TIKTOK LIVE 🎥
 {emoji} {member_name.upper()} está ao vivo
@@ -1530,8 +1587,8 @@ async def tiktok_live(url, member_name, title, found):
 
 """
 
-    await send_alert("tiktok_live", msg)
-    await update_panel()
+        await send_alert("tiktok_live", msg)
+        await update_panel()
 
 
 # =========================
@@ -1539,13 +1596,15 @@ async def tiktok_live(url, member_name, title, found):
 # =========================
 async def youtube_post(url, final_url=None):
 
-    key = f"post:{url}"
-    if not is_new_social(LAST_YOUTUBE, key):
-        return
+    async with SOCIAL_LOCK:
 
-    link = final_url or "https://www.youtube.com/@BTS"
+        key = f"post:{url}"
+        if not is_new_social(LAST_YOUTUBE, key):
+            return
 
-    msg = f"""
+        link = final_url or "https://www.youtube.com/@BTS"
+
+        msg = f"""
 
 🎞️ YOUTUBE POST 🎞️
 💜 BTS publicou vídeo novo
@@ -1553,8 +1612,8 @@ async def youtube_post(url, final_url=None):
 
 """
 
-    await send_alert("youtube_post", msg)
-    await update_panel()
+        await send_alert("youtube_post", msg)
+        await update_panel()
 
 
 # =========================
@@ -1562,13 +1621,15 @@ async def youtube_post(url, final_url=None):
 # =========================
 async def youtube_live(url=None):
 
-    key = "live:youtube"
-    if not is_new_social(LAST_YOUTUBE, key):
-        return
+    async with SOCIAL_LOCK:
 
-    live_url = "https://www.youtube.com/@BTS/live"
+        key = "live:youtube"
+        if not is_new_social(LAST_YOUTUBE, key):
+            return
 
-    msg = f"""
+        live_url = "https://www.youtube.com/@BTS/live"
+
+        msg = f"""
 
 📹 YOUTUBE LIVE 📹
 🚨 BTS está ao vivo agora
@@ -1576,8 +1637,8 @@ async def youtube_live(url=None):
 
 """
 
-    await send_alert("youtube_live", msg)
-    await update_panel()
+        await send_alert("youtube_live", msg)
+        await update_panel()
 
 # =========================
 # 15.1 TICKETMASTER & BUYTICKET (PRODUÇÃO SEGURA)
