@@ -2907,7 +2907,7 @@ async def trigger_alert(alert_type, url, message):
     await smart_alert(alert_type, url, message)
 
 # =========================
-# 21 STARTUP FINAL (PRODUÇÃO SEGURA)
+# 21 STARTUP FINAL (CORRIGIDO E COMPATÍVEL)
 # =========================
 
 async def main():
@@ -2917,22 +2917,23 @@ async def main():
     try:
 
         # =========================
-        # 1. WEB SERVER (THREAD)
+        # WEB SERVER
         # =========================
         keep_alive()
 
         # =========================
-        # 2. TELEGRAM BOT
+        # TELEGRAM (FIX CRÍTICO)
         # =========================
-        start_telegram()
+        # garante execução async segura
+        asyncio.create_task(start_telegram())
 
         # =========================
-        # 3. ENGINE PRINCIPAL (MONITOR + ALERTAS)
+        # ENGINE PRINCIPAL
         # =========================
         asyncio.create_task(start_engine())
 
         # =========================
-        # 4. DISCORD BOT (ENTRYPOINT ÚNICO)
+        # DISCORD BOT (ENTRYPOINT)
         # =========================
         await bot_discord.start(DISCORD_TOKEN)
 
@@ -2941,7 +2942,7 @@ async def main():
 
 
 # =========================
-# ENTRYPOINT (SAFE RUN)
+# ENTRYPOINT
 # =========================
 
 if __name__ == "__main__":
