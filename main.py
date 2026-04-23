@@ -1,5 +1,5 @@
 # =========================
-# HEALTH CHECK (MUST BE FIRST LEVEL)
+# 0 HEALTH CHECK (MUST BE FIRST LEVEL)
 # =========================
 
 def system_health():
@@ -188,6 +188,8 @@ total_social = 0
 last_ticket_check = time.time()
 last_weverse_check = time.time()
 last_social_check = time.time()
+last_buy_check = time.time()
+total_buy = 0
 
 SEEN_TICKET = set()
 SEEN_WEVERSE = set()
