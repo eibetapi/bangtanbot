@@ -3153,15 +3153,12 @@ BOOT_FINGERPRINT_LOCK = asyncio.Lock()
 
 
 # =========================
-# FINGERPRINT DO ESTADO (ANTI RELOAD DUPLO)
+# FINGERPRINT DO ESTADO (ANTI MULTI INSTANCE)
 # =========================
 
 def get_boot_fingerprint():
 
-    # base simples de identidade do processo
-    # evita re-run de boot em reconnect/restart parcial
     raw = f"{DISCORD_PANEL_CHANNEL_ID}:{PANEL_CHAT_ID}"
-
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
@@ -3177,11 +3174,8 @@ async def recover_panels():
         channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
 
         if channel:
-
             async for msg in channel.history(limit=30):
-
                 if msg.author == bot_discord.user:
-
                     discord_panel_msg_id = msg.id
                     break
 
@@ -3200,7 +3194,7 @@ async def recover_panels():
 
 
 # =========================
-# SINGLE PANEL GUARD (IDEMPOTENTE REAL)
+# SINGLE PANEL GUARD (IDEMPOTENTE)
 # =========================
 
 async def ensure_single_panel():
@@ -3232,7 +3226,6 @@ async def safe_boot():
         if BOOT_DONE:
             return
 
-        # fingerprint check (anti multi-instance lógico)
         current_fp = get_boot_fingerprint()
 
         async with BOOT_FINGERPRINT_LOCK:
@@ -3254,7 +3247,7 @@ async def safe_boot():
 
 
 # =========================
-# DISCORD READY SAFE HOOK (ROBUSTO)
+# DISCORD READY SAFE HOOK
 # =========================
 
 @bot_discord.event
@@ -3264,7 +3257,6 @@ async def on_ready():
 
     try:
         await safe_boot()
-
         await bot_discord.tree.sync()
 
         await bot_discord.change_presence(
@@ -3285,20 +3277,23 @@ async def on_ready():
 @bot_discord.event
 async def on_connect():
 
-    # NÃO inicia nada pesado aqui (somente log)
     print("[DISCORD] connect event (safe)")
 
+
 # =========================
-# HEALTH CHECK (FINAL DO SISTEMA)
+# HEALTH CHECK (SAFE + RAILWAY FRIENDLY)
 # =========================
 
 def system_health():
 
     try:
         return {
-            "panel_ok": bool(panel_message_id or discord_panel_msg_id),
-            "boot_done": BOOT_DONE,
-            "panel_loop": PANEL_LOOP_RUNNING
+            "panel_ok": bool(
+                globals().get("panel_message_id") or
+                globals().get("discord_panel_msg_id")
+            ),
+            "boot_done": globals().get("BOOT_DONE", False),
+            "panel_loop": globals().get("PANEL_LOOP_RUNNING", False)
         }
 
     except Exception as e:
@@ -3309,3 +3304,168 @@ def system_health():
             "boot_done": False,
             "panel_loop": False
         }
+
+# =========================
+# 23 BOOT SEQUENCE MAP (ORDER CONTROL + ANTI LOOP + RAILWAY SAFE)
+# =========================
+
+import asyncio
+import time
+
+BOOT_SEQUENCE_READY = False
+
+
+# =========================
+# ESTADO GLOBAL DE EXECUÇÃO
+# =========================
+
+ENGINE_STARTED = False
+WATCHDOG_STARTED = False
+HEALTH_STARTED = False
+
+
+# =========================
+# VERIFICAÇÃO DE CONSISTÊNCIA DO SISTEMA
+# =========================
+
+def system_integrity_check():
+
+    try:
+        return {
+            "boot_done": globals().get("BOOT_DONE", False),
+            "panel_ok": bool(
+                globals().get("panel_message_id") or
+                globals().get("discord_panel_msg_id")
+            ),
+            "engine": globals().get("ENGINE_STARTED", False),
+            "watchdog": globals().get("WATCHDOG_STARTED", False),
+            "health": globals().get("HEALTH_STARTED", False)
+        }
+
+    except Exception as e:
+        print(f"[INTEGRITY ERROR] {e}")
+
+        return {
+            "boot_done": False,
+            "panel_ok": False,
+            "engine": False,
+            "watchdog": False,
+            "health": False
+        }
+
+
+# =========================
+# GATE DE SEGURANÇA (BLOQUEIA EXECUÇÃO PRECOCE)
+# =========================
+
+async def wait_system_ready():
+
+    global BOOT_SEQUENCE_READY
+
+    timeout = 60
+    start = time.time()
+
+    while True:
+
+        status = system_integrity_check()
+
+        # sistema pronto
+        if status["boot_done"] and status["panel_ok"]:
+            BOOT_SEQUENCE_READY = True
+            print("[BOOT MAP] sistema pronto para engine")
+            return True
+
+        # timeout de segurança (evita travar infinito no Railway)
+        if time.time() - start > timeout:
+            print("[BOOT MAP] timeout de boot, liberando com fallback")
+            BOOT_SEQUENCE_READY = True
+            return False
+
+        await asyncio.sleep(2)
+
+
+# =========================
+# ENGINE GUARD (ANTI DUPLICAÇÃO)
+# =========================
+
+async def start_engine_guard():
+
+    global ENGINE_STARTED
+
+    if ENGINE_STARTED:
+        return
+
+    ENGINE_STARTED = True
+
+    print("[BOOT MAP] engine liberado")
+
+
+# =========================
+# WATCHDOG GUARD (ANTI LOOP DUPLO)
+# =========================
+
+async def start_watchdog_guard():
+
+    global WATCHDOG_STARTED
+
+    if WATCHDOG_STARTED:
+        return
+
+    WATCHDOG_STARTED = True
+
+    print("[BOOT MAP] watchdog liberado")
+
+
+# =========================
+# HEALTH GUARD (ANTI REPAIR LOOP)
+# =========================
+
+async def start_health_guard():
+
+    global HEALTH_STARTED
+
+    if HEALTH_STARTED:
+        return
+
+    HEALTH_STARTED = True
+
+    print("[BOOT MAP] health monitor liberado")
+
+
+# =========================
+# BOOT MAP ORQUESTRADOR
+# =========================
+
+async def boot_sequence_map():
+
+    print("[BOOT MAP] iniciando controle de sequência...")
+
+    # 1. espera sistema estabilizar (boot + panel)
+    await wait_system_ready()
+
+    # 2. libera camadas em ordem segura
+    await start_engine_guard()
+    await start_watchdog_guard()
+    await start_health_guard()
+
+    print("[BOOT MAP] todas as camadas liberadas com segurança")
+
+# =========================
+# ANTI REPAIR LOOP COOLDOWN (EVITA WATCHDOG SPAM)
+# =========================
+
+LAST_REPAIR_TIME = 0
+REPAIR_COOLDOWN = 60  # segundos
+
+
+def can_run_repair():
+
+    global LAST_REPAIR_TIME
+
+    now = time.time()
+
+    if now - LAST_REPAIR_TIME < REPAIR_COOLDOWN:
+        return False
+
+    LAST_REPAIR_TIME = now
+    return True
