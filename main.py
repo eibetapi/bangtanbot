@@ -65,7 +65,6 @@ stored_panel = load_storage(PANEL_DATA_FILE, {"tg_msg_id": None, "dc_msg_id": No
 total_tickets = stored_counters["tickets"]
 total_weverse = stored_counters["weverse"]
 total_social = stored_counters["social"]
-total_buy = stored_counters["buy"]
 panel_message_id = stored_panel["tg_msg_id"] # ID do Telegram
 discord_panel_msg_id = stored_panel["dc_msg_id"] # ID do Discord
 
@@ -96,7 +95,7 @@ async def start_telegram():
 COUNTER_LOCK = asyncio.Lock()
 
 async def save_counters():
-    data = {"tickets": total_tickets, "weverse": total_weverse, "social": total_social, "buy": total_buy}
+    data = {"tickets": total_tickets, "weverse": total_weverse, "social": total_social,
     save_storage(COUNTERS_FILE, data)
 
 async def increment_ticket():
