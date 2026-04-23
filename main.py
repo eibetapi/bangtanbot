@@ -3146,7 +3146,7 @@ async def on_connect():
     print("[DISCORD] connect event")
 
 # =========================
-# 24 TELEGRAM START (PRODUÇÃO SEGURA)
+# 24 TELEGRAM START (PRODUÇÃO - FIX DEFINITIVO)
 # =========================
 
 async def start_telegram():
@@ -3155,20 +3155,25 @@ async def start_telegram():
 
     try:
 
-        # python-telegram-bot (Application)
-        if "telegram_app" in globals():
+        # =========================
+        # MODO LEGACY (SEU CASO ATUAL)
+        # =========================
+        if bot_ticket is not None:
+            print("[TELEGRAM] pronto (modo Bot básico)")
+            return
+
+        # =========================
+        # MODO APPLICATION (FUTURO)
+        # =========================
+        if telegram_app is not None:
             await telegram_app.initialize()
             await telegram_app.start()
             print("[TELEGRAM] online (Application)")
             return
 
-        # fallback genérico
-        if "telegram_bot" in globals():
-            if hasattr(telegram_bot, "start"):
-                await telegram_bot.start()
-                print("[TELEGRAM] online (Bot)")
-                return
-
+        # =========================
+        # NÃO CONFIGURADO
+        # =========================
         print("[TELEGRAM] não configurado — ignorado")
 
     except Exception as e:
