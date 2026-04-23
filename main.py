@@ -803,6 +803,16 @@ async def sync_panel_counters():
     await update_panel_blindado()
 
 # =========================
+# AUTO-START HOOK (BLINDAGEM FINAL)
+# =========================
+
+async def ensure_panel_recovery():
+    try:
+        await recover_panel_state()
+    except Exception as e:
+        print(f"[AUTO RECOVERY ERROR] {e}")
+
+# =========================
 # 13 ALERTAS WEVERSE (CORRIGIDO)
 # =========================
 
