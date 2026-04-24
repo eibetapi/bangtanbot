@@ -1621,7 +1621,7 @@ async def monitor_loop():
     async with aiohttp.ClientSession() as session:
         while True:
             await safe_monitor_cycle(session)
-            await asyncio.sleep(20)
+            await asyncio.sleep(60)
 
 # --- WATCHDOG (VIGIA DO PAINEL) ---
 async def watchdog():
