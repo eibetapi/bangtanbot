@@ -1133,8 +1133,6 @@ async def executar_telegram(update, context):
 async def slash_ping(i: discord.Interaction): await executar_discord("ping", i)
 @bot_discord.tree.command(name="bts")
 async def slash_bts(i: discord.Interaction): await executar_discord("bts", i)
-@bot_discord.tree.command(name="teste")
-async def slash_teste(i: discord.Interaction): await executar_discord("teste", i)
 @bot_discord.tree.command(name="comandos")
 async def slash_comandos(i: discord.Interaction): await executar_discord("comandos", i)
 
