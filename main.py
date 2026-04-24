@@ -1138,9 +1138,9 @@ async def slash_teste(i: discord.Interaction): await executar_discord("teste", i
 @bot_discord.tree.command(name="comandos")
 async def slash_comandos(i: discord.Interaction): await executar_discord("comandos", i)
 
-# =========================================================
+# ============================================
 # 18 SISTEMA INTEGRADO: ESTADO, PERSISTÊNCIA E MONITORAMENTO
-# =========================================================
+# ============================================
 
 COUNTER_DATA_FILE = "counters.json"
 PANEL_DATA_FILE = "panel_ids.json"
@@ -1276,7 +1276,7 @@ async def update_panel():
                     try: 
                         await bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=tg_id, text=texto)
                     except Exception: 
-                        globals()["panel_message_id"] = None # Se falhou editar, reseta para criar um novo id válido
+                        globals()["panel_message_id"] = None
                 
                 if not globals().get("panel_message_id"):
                     m = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto)
@@ -1303,7 +1303,6 @@ async def update_panel():
                         try: await m.pin()
                         except: pass
             
-            # Salva tudo após a atualização bem sucedida
             await save_counters()
         except Exception as e: 
             print(f"[PANEL ERR] {e}")
@@ -1318,7 +1317,6 @@ async def on_ready():
     if globals().get("PANEL_BOOT_DONE", False): return
     print(f"SISTEMA ONLINE: {bot_discord.user}")
     
-    # ORDEM CRÍTICA: Carregar primeiro, atualizar depois
     await load_counters()
     await update_panel()
     globals()["PANEL_BOOT_DONE"] = True
@@ -1328,52 +1326,69 @@ async def on_ready():
 async def check_ticketmaster(session):
     try:
         globals()["is_checking_ticket"] = True
-        await update_panel()
+        # Usa o lock do bloco 19 para sincronizar a bolinha verde
+        if 'locked_update_panel' in globals(): await locked_update_panel()
+        else: await update_panel()
+
         for url in TICKET_LINKS:
             await asyncio.sleep(1)
             html = await fetch_html(session, url)
-            if html:
-                globals()["total_tickets"] += 1
-                globals()["last_ticket_check"] = time.time()
-                await save_counters()
+            # Incremento INDEPENDENTE de mudança (registra o acesso ao link)
+            globals()["total_tickets"] = globals().get("total_tickets", 0) + 1
+            globals()["last_ticket_check"] = time.time()
+            
+            # Se houver mudança real, o trigger_alert do bloco 19 decide se manda alerta
+            if html and 'trigger_alert' in globals():
+                if is_real_change(f"tm:{url}", html):
+                    await trigger_alert("reposicao", url, f"🎟️ Mudança detectada em: {url}")
+
         globals()["is_checking_ticket"] = False
-        await update_panel()
-        await asyncio.sleep(60)
-    except: 
+        await save_counters()
+    except Exception as e:
+        print(f"[TM ERR] {e}")
         globals()["is_checking_ticket"] = False
-        await asyncio.sleep(10)
 
 async def check_weverse(session):
     try:
         globals()["is_checking_weverse"] = True
-        await update_panel()
+        if 'locked_update_panel' in globals(): await locked_update_panel()
+        else: await update_panel()
+
         for url in WEVERSE_LINKS:
             html = await fetch_html(session, url)
-            if html:
-                globals()["total_weverse"] += 1
-                globals()["last_weverse_check"] = time.time()
-                await save_counters()
+            globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
+            globals()["last_weverse_check"] = time.time()
+
+            if html and 'trigger_alert' in globals():
+                if is_real_change(f"wv:{url}", html):
+                    await trigger_alert("weverse_post", url, f"🩷 Nova atualização Weverse: {url}")
+
         globals()["is_checking_weverse"] = False
-        await update_panel()
-        await asyncio.sleep(60)
-    except: globals()["is_checking_weverse"] = False
+        await save_counters()
+    except:
+        globals()["is_checking_weverse"] = False
 
 async def check_social(session):
     try:
         globals()["is_checking_social"] = True
-        await update_panel()
+        if 'locked_update_panel' in globals(): await locked_update_panel()
+        else: await update_panel()
+
         all_links = list(INSTAGRAM_LINKS.values()) + YOUTUBE_LINKS
         for url in all_links:
             html = await fetch_html(session, url)
-            if html:
-                globals()["total_social"] += 1
-                globals()["last_social_check"] = time.time()
-                await save_counters()
+            globals()["total_social"] = globals().get("total_social", 0) + 1
+            globals()["last_social_check"] = time.time()
+
+            if html and 'trigger_alert' in globals():
+                if is_real_change(f"soc:{url}", html):
+                    await trigger_alert("social", url, f"📱 Atividade social: {url}")
+
         globals()["is_checking_social"] = False
-        await update_panel()
-        await asyncio.sleep(60)
-    except: globals()["is_checking_social"] = False
-        
+        await save_counters()
+    except:
+        globals()["is_checking_social"] = False
+  
 # =========================
 # 19 FINAL CORE UNIFICADO (PRODUÇÃO ESTÁVEL - BLINDADO)
 # =========================
