@@ -1169,15 +1169,14 @@ async def safe_monitor_cycle(session):
     
     try:
         # 1. TICKETMASTER (1 MINUTO)
-        # Registramos ANTES para garantir que você veja a atividade
         stats['total_tickets'] += 1
         globals()['total_tickets'] = stats['total_tickets']
         
         globals()["is_checking_ticket"] = True
         if 'check_ticketmaster' in globals():
             try:
-                # Timeout de 15s para o site não travar o bot
                 await asyncio.wait_for(check_ticketmaster(session), timeout=15.0)
+                if 'update_panel' in globals(): await update_panel() # <--- Ativa a bolinha na tela
             except Exception: pass 
         globals()["is_checking_ticket"] = False
 
@@ -1191,6 +1190,7 @@ async def safe_monitor_cycle(session):
             if 'check_weverse' in globals():
                 try:
                     await asyncio.wait_for(check_weverse(session), timeout=15.0)
+                    if 'update_panel' in globals(): await update_panel() # <--- Ativa a bolinha na tela
                 except Exception: pass
             globals()["is_checking_weverse"] = False
 
@@ -1204,6 +1204,7 @@ async def safe_monitor_cycle(session):
             if 'check_social' in globals():
                 try:
                     await asyncio.wait_for(check_social(session), timeout=15.0)
+                    if 'update_panel' in globals(): await update_panel() # <--- Ativa a bolinha na tela
                 except Exception: pass
             globals()["is_checking_social"] = False
         
@@ -1213,7 +1214,7 @@ async def safe_monitor_cycle(session):
             if _WARMUP_STEPS >= 2: _INITIAL_WARMUP_DONE = True
             print(f"⚙️ [WARMUP] Passo {_WARMUP_STEPS}/2 concluído.")
 
-        # ATUALIZAÇÃO MANDATÓRIA DO PAINEL
+        # ATUALIZAÇÃO FINAL (Retorno ao estado de descanso)
         if 'update_panel' in globals():
             await update_panel()
 
@@ -1233,6 +1234,7 @@ async def start_engine():
     asyncio.create_task(monitor_loop())
     if 'watchdog' in globals():
         asyncio.create_task(watchdog())
+
 
 # =========================
 # 20 STARTUP FINAL (RAILWAY SAFE)
