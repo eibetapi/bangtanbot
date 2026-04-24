@@ -44,7 +44,7 @@ from telegram import Bot
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-PANEL_CHAT_ID = -1003920883053
+PANEL_CHAT_ID = -1003972186058
 DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
 
 # IDs específicos para roteamento de alertas
@@ -1058,7 +1058,7 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 🎯 Acessos realizados: {tt}
 🎟️ Ingressos rastreados: {ttf}
 
-•°•👾 Wootteo em rota há: {uptime} ✨
+👾 Wootteo em rota há: {uptime} ✨
 
 🛰️ Status: 
 🟢 Verificando
@@ -1146,12 +1146,20 @@ async def on_ready():
     
     globals()["PANEL_BOOT_DONE"] = True
     
-# =========================
-# 19 MOTOR UNIFICADO (CORREÇÃO DE CONTADORES)
-# =========================
+# =========================================================
+# 19 MONITOR ENGINE (CONTROLE OBRIGATÓRIO DE CONTADORES)
+# =========================================================
 import asyncio
 import time
 import aiohttp
+
+# --- INICIALIZAÇÃO DE SEGURANÇA ---
+_LAST_SOCIAL_RUN = 0
+_INITIAL_WARMUP_DONE = False
+_WARMUP_STEPS = 0
+is_checking_ticket = False
+is_checking_weverse = False
+is_checking_social = False
 
 # GLOBAL LOCKS
 MONITOR_LOCK = asyncio.Lock()
@@ -1161,37 +1169,37 @@ async def safe_monitor_cycle(session):
     global is_checking_ticket, is_checking_weverse, is_checking_social
     
     try:
-        # 1. TICKETMASTER
+        # 1. TICKETMASTER (REGISTRO OBRIGATÓRIO)
         globals()["is_checking_ticket"] = True
         if 'check_ticketmaster' in globals():
             await check_ticketmaster(session)
-            # FIX: Incrementa o contador global após a execução
+            # Força o incremento garantindo que a variável exista
             globals()["total_tickets"] = globals().get("total_tickets", 0) + 1
             globals()["last_ticket_check"] = time.time()
         globals()["is_checking_ticket"] = False
 
-        # 2. WEVERSE
+        # 2. WEVERSE (REGISTRO OBRIGATÓRIO)
         globals()["is_checking_weverse"] = True
         if 'check_weverse' in globals():
             await check_weverse(session)
-            # FIX: Incrementa o contador global após a execução
+            # Força o incremento garantindo que a variável exista
             globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
             globals()["last_weverse_check"] = time.time()
         globals()["is_checking_weverse"] = False
 
-        # 3. SOCIAIS (Intervalo de 120s)
+        # 3. SOCIAIS (REGISTRO OBRIGATÓRIO A CADA 120S)
         now = time.time()
         if now - _LAST_SOCIAL_RUN >= 120:
             globals()["is_checking_social"] = True
             if 'check_social' in globals():
                 await check_social(session)
-                # FIX: Incrementa o contador global após a execução
+                # Força o incremento garantindo que a variável exista
                 globals()["total_social"] = globals().get("total_social", 0) + 1
                 globals()["last_social_check"] = time.time()
                 _LAST_SOCIAL_RUN = now
             globals()["is_checking_social"] = False
         
-        # LÓGICA DE WARMUP
+        # 4. GESTÃO DE WARMUP
         if not _INITIAL_WARMUP_DONE:
             if _WARMUP_STEPS < 2:
                 _WARMUP_STEPS += 1
@@ -1200,38 +1208,40 @@ async def safe_monitor_cycle(session):
                 _INITIAL_WARMUP_DONE = True
                 print("✅ [ENGINE] Monitoramento Ativo!")
 
-        # 4. ATUALIZAÇÃO DO PAINEL
-        # Força a atualização visual para refletir os novos números imediatamente
+        # 5. ATUALIZAÇÃO OBRIGATÓRIA DO PAINEL
+        # Executa o update para que o contador mude visualmente na hora
         if 'update_panel' in globals():
             await update_panel()
 
     except Exception as e:
+        # Reset de segurança para evitar bolinhas verdes travadas em erro
         globals()["is_checking_ticket"] = False
         globals()["is_checking_weverse"] = False
         globals()["is_checking_social"] = False
-        print(f"⚠️ [MONITOR ERROR] {e}")
+        print(f"⚠️ [MONITOR ERROR] Falha no Ciclo: {e}")
 
 async def monitor_loop():
-    """Loop principal de checagem."""
+    """Mantém a engine em execução constante."""
     await bot_discord.wait_until_ready()
-    print("🚀 [MONITOR] Motor Unificado Iniciado.")
+    print("🚀 [MONITOR] Motor Unificado Iniciado com Registro Obrigatório.")
     
     async with aiohttp.ClientSession() as session:
         while True:
             async with MONITOR_LOCK:
                 await safe_monitor_cycle(session)
+            # Ciclo de 60 segundos entre checagens
             await asyncio.sleep(60)
 
 async def start_engine():
-    """Inicia as tarefas em paralelo."""
+    """Dispara os processos de monitoramento e vigilância."""
     if globals().get("_ENGINE_TASKS_STARTED", False): 
         return
     globals()["_ENGINE_TASKS_STARTED"] = True
     
-    # Inicia o loop de monitoramento
+    # Task 1: Checagem de Conteúdo
     asyncio.create_task(monitor_loop())
     
-    # Inicia o watchdog se ele estiver definido no código
+    # Task 2: Vigilância do Painel (se definido no Bloco 22/23)
     if 'watchdog' in globals():
         asyncio.create_task(watchdog())
         
