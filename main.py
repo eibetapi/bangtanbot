@@ -1316,26 +1316,26 @@ async def throttle(key, delay=2):
             await asyncio.sleep(delay - (now - last))
         LAST_REQUEST_TIME[key] = time.time()
 
-# --- GERENCIAMENTO DE PAINEL (REGRA DE EDIÇÃO PRIORITÁRIA) ---
+# --- GERENCIAMENTO DE PAINEL (EDITA SE EXISTE, CRIA SE TG/DC = NONE) ---
 async def locked_update_panel():
     global _last_panel_sync
     async with _PANEL_SYNC_LOCK:
         now = time.time()
-        # Respeita o throttle de 10s apenas se os IDs já existirem na memória
-        has_ids = globals().get("tg_panel_msg_id") and globals().get("discord_panel_msg_id")
-        if now - _last_panel_sync < 10 and has_ids: 
+        # Se os IDs forem None (como no seu log), força a criação sem esperar 10s
+        tg_id = globals().get("tg_panel_msg_id")
+        dc_id = globals().get("discord_panel_msg_id")
+        
+        if (now - _last_panel_sync < 10) and (tg_id and dc_id): 
             return
             
         _last_panel_sync = now
         if 'update_panel' in globals():
-            # A função update_panel (Bloco 18) deve tentar EDITAR antes de criar
             await update_panel()
 
 async def trigger_alert(alert_type, url, message):
     key = f"{alert_type}:{url}"
     await priority_send(alert_type, message, key=key)
 
-# --- ROUTER DE ALERTAS ---
 async def priority_send(alert_type, message, key=None):
     global _INITIAL_WARMUP_DONE
     if not _INITIAL_WARMUP_DONE: return
@@ -1351,7 +1351,7 @@ async def priority_send(alert_type, message, key=None):
     except Exception as e:
         print(f"[ALERT ERR] {e}")
 
-# --- MONITOR CYCLE (CONTADORES E STATUS) ---
+# --- MONITOR CYCLE (CONTADORES REATIVADOS) ---
 async def safe_monitor_cycle(session):
     global _INITIAL_WARMUP_DONE, _LAST_SOCIAL_RUN, _WARMUP_STEPS
     global last_ticket_check, last_weverse_check, last_social_check
@@ -1394,15 +1394,11 @@ async def safe_monitor_cycle(session):
 
 # --- MOTORES E VIGIA ---
 async def watchdog():
-    """Vigia os IDs. Só chama o update se o ID for nulo (deletado ou novo canal)."""
     await bot_discord.wait_until_ready()
     while True:
-        tg_id = globals().get("tg_panel_msg_id")
-        dc_id = globals().get("discord_panel_msg_id")
-        
-        if not tg_id or not dc_id:
+        # Se os IDs no RECOVERY forem None, o watchdog chama a criação
+        if not globals().get("tg_panel_msg_id") or not globals().get("discord_panel_msg_id"):
             await locked_update_panel()
-            
         await asyncio.sleep(30)
 
 async def monitor_loop():
@@ -1430,7 +1426,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(start_engine())
     except KeyboardInterrupt:
-        pass 
+        pass
         
 # =========================
 # 20 STARTUP FINAL (RAILWAY SAFE / SINGLE INSTANCE)
