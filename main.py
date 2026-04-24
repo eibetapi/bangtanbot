@@ -1318,7 +1318,6 @@ async def throttle(key, delay=2):
 
 # --- GERENCIAMENTO DE PAINEL ---
 async def locked_update_panel():
-    """Sincroniza o painel respeitando o bloqueio de edição de 10s"""
     global _last_panel_sync
     async with _PANEL_SYNC_LOCK:
         now = time.time()
@@ -1331,7 +1330,7 @@ async def trigger_alert(alert_type, url, message):
     key = f"{alert_type}:{url}"
     await priority_send(alert_type, message, key=key)
 
-# --- ROUTER DE ALERTAS (TRAVA DE RETROATIVO) ---
+# --- ROUTER DE ALERTAS ---
 async def priority_send(alert_type, message, key=None):
     global _INITIAL_WARMUP_DONE
     if not _INITIAL_WARMUP_DONE: return
@@ -1349,10 +1348,16 @@ async def priority_send(alert_type, message, key=None):
     except Exception as e:
         print(f"[ALERT ERR] {e}")
 
-# --- MONITOR CYCLE ---
+# --- MONITOR CYCLE (VERIFICAÇÃO DE SEGURANÇA ADICIONADA) ---
 async def safe_monitor_cycle(session):
     global _INITIAL_WARMUP_DONE, _LAST_SOCIAL_RUN, _WARMUP_STEPS
     now = time.time()
+    
+    # CRÍTICO: Garante que as funções de outros blocos já existem
+    funcs = ['check_ticketmaster', 'check_weverse', 'check_social']
+    if not all(k in globals() for k in funcs):
+        return # Pula o ciclo se as funções ainda não carregaram
+
     try:
         # 1. Críticos (1 min)
         await throttle("ticket", 3)
@@ -1381,7 +1386,6 @@ async def safe_monitor_cycle(session):
 
 # --- MOTORES E VIGIA ---
 async def watchdog():
-    """Garante que o painel exista no canal"""
     await bot_discord.wait_until_ready()
     while True:
         await asyncio.sleep(60)
@@ -1392,7 +1396,7 @@ async def monitor_loop():
     global _ENGINE_STARTED
     await bot_discord.wait_until_ready()
     
-    # --- PAUSA DE SEGURANÇA PARA CARREGAR OUTROS BLOCOS ---
+    # Pausa inicial para estabilização global
     await asyncio.sleep(5) 
     
     if _ENGINE_STARTED: return
