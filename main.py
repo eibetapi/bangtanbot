@@ -1196,7 +1196,7 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 
 •°•👾 Wootteo em rota há: {uptime} ✨
 
-Status: 
+🛰️ Status: 
 🟢 Verificando agora
 🟣 Online e Ativo
 🟡 Instabilidade/Lento
