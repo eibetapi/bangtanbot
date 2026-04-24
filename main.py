@@ -1316,14 +1316,19 @@ async def throttle(key, delay=2):
             await asyncio.sleep(delay - (now - last))
         LAST_REQUEST_TIME[key] = time.time()
 
-# --- GERENCIAMENTO DE PAINEL ---
+# --- GERENCIAMENTO DE PAINEL (REGRA DE EDIÇÃO PRIORITÁRIA) ---
 async def locked_update_panel():
     global _last_panel_sync
     async with _PANEL_SYNC_LOCK:
         now = time.time()
-        if now - _last_panel_sync < 10: return
+        # Respeita o throttle de 10s apenas se os IDs já existirem na memória
+        has_ids = globals().get("tg_panel_msg_id") and globals().get("discord_panel_msg_id")
+        if now - _last_panel_sync < 10 and has_ids: 
+            return
+            
         _last_panel_sync = now
         if 'update_panel' in globals():
+            # A função update_panel (Bloco 18) deve tentar EDITAR antes de criar
             await update_panel()
 
 async def trigger_alert(alert_type, url, message):
@@ -1334,10 +1339,8 @@ async def trigger_alert(alert_type, url, message):
 async def priority_send(alert_type, message, key=None):
     global _INITIAL_WARMUP_DONE
     if not _INITIAL_WARMUP_DONE: return
-
     level = PRIORITY.get(alert_type, 1)
     if is_duplicate_alert(alert_type, message): return
-
     try:
         if level == 3:
             await send_alert(alert_type, message)
@@ -1348,19 +1351,19 @@ async def priority_send(alert_type, message, key=None):
     except Exception as e:
         print(f"[ALERT ERR] {e}")
 
-# --- MONITOR CYCLE ---
+# --- MONITOR CYCLE (CONTADORES E STATUS) ---
 async def safe_monitor_cycle(session):
     global _INITIAL_WARMUP_DONE, _LAST_SOCIAL_RUN, _WARMUP_STEPS
     global last_ticket_check, last_weverse_check, last_social_check
+    global total_weverse, total_social, total_tickets, total_tickets_found 
     
     now = time.time()
-    
     funcs = ['check_ticketmaster', 'check_weverse', 'check_social']
     if not all(k in globals() for k in funcs):
         return 
 
     try:
-        # 1. Críticos (1 min)
+        # 1. Críticos
         await throttle("ticket", 3)
         await check_ticketmaster(session)
         globals()["last_ticket_check"] = time.time()
@@ -1369,18 +1372,18 @@ async def safe_monitor_cycle(session):
         await check_weverse(session)
         globals()["last_weverse_check"] = time.time()
 
-        # 2. Sociais (2 min)
+        # 2. Sociais
         if now - _LAST_SOCIAL_RUN >= 120:
             await throttle("social", 10) 
             await check_social(session)
             globals()["last_social_check"] = time.time()
             _LAST_SOCIAL_RUN = now
         
-        # 3. Warmup Logic
+        # 3. Warmup
         if not _INITIAL_WARMUP_DONE:
             if _WARMUP_STEPS < 2:
                 _WARMUP_STEPS += 1
-                print(f"[WARMUP] Passo {_WARMUP_STEPS}/2: Mapeando em silêncio...")
+                print(f"[WARMUP] Passo {_WARMUP_STEPS}/2: Mapeando...")
             else:
                 _INITIAL_WARMUP_DONE = True
                 print("✅ [ENGINE] Sistema Blindado. Alertas liberados!")
@@ -1391,17 +1394,21 @@ async def safe_monitor_cycle(session):
 
 # --- MOTORES E VIGIA ---
 async def watchdog():
+    """Vigia os IDs. Só chama o update se o ID for nulo (deletado ou novo canal)."""
     await bot_discord.wait_until_ready()
     while True:
-        await asyncio.sleep(60)
-        if not globals().get("discord_panel_msg_id"):
+        tg_id = globals().get("tg_panel_msg_id")
+        dc_id = globals().get("discord_panel_msg_id")
+        
+        if not tg_id or not dc_id:
             await locked_update_panel()
+            
+        await asyncio.sleep(30)
 
 async def monitor_loop():
     global _ENGINE_STARTED
     await bot_discord.wait_until_ready()
     await asyncio.sleep(5) 
-    
     if _ENGINE_STARTED: return
     _ENGINE_STARTED = True
     print("[MONITOR] Motor Unificado Iniciado.")
@@ -1419,7 +1426,6 @@ async def start_engine():
     ]
     await asyncio.gather(*tasks, return_exceptions=True)
 
-# Chamada final (Certifique-se de que esta seja a última linha do arquivo)
 if __name__ == "__main__":
     try:
         asyncio.run(start_engine())
