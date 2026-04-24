@@ -985,60 +985,37 @@ async def ticket_agenda(url, data, cidade, pais):
     await send_alert("agenda", msg)
     await update_panel()
 
-# ===========================================
-# 16 SISTEMA DE TESTE (DIRETO E CONSOLIDADO)
-# ===========================================
-
-import os
-import asyncio
-import discord
-
-async def run_full_test_discord(interaction: discord.Interaction):
-    """
-    Executa um teste de integridade e responde diretamente 
-    no canal onde o comando foi invocado.
-    """
-    await interaction.response.defer(ephemeral=True) # Evita timeout e mantém privado se quiser
+# --- 16: TESTE DE SISTEMA ---
+@bot_discord.tree.command(name="teste", description="Valida o funcionamento do bot")
+async def teste(interaction: discord.Interaction):
+    """Diagnóstico consolidado enviado diretamente ao canal do usuário."""
+    await interaction.response.defer(thinking=True)
     
-    print(f"[TESTE] Executado por {interaction.user} no canal {interaction.channel}")
-
-    # Coleta de dados para o relatório de teste
+    # Extração de dados (Fallback para 0 se não existir)
     uptime = get_uptime() if 'get_uptime' in globals() else "N/A"
-    lwc = globals().get("last_weverse_check", 0)
-    lsc = globals().get("last_social_check", 0)
-    ltc = globals().get("last_ticket_check", 0)
+    
+    # Status e Contadores
+    stats = {
+        "Weverse": (globals().get("last_weverse_check", 0), "weverse", "total_weverse"),
+        "Social": (globals().get("last_social_check", 0), "social", "total_social"),
+        "Tickets": (globals().get("last_ticket_check", 0), "ticket", "total_tickets")
+    }
 
-    # Formatação do Relatório de Diagnóstico
-    report = (
-        "## 🛠️ Relatório de Teste Wootteo\n"
-        f"✅ **Status do Bot:** Online\n"
-        f"⏳ **Uptime:** {uptime}\n\n"
-        "### 📡 Últimas Varreduras:\n"
-        f"🟣 **Weverse:** {status_color(lwc, 'weverse') if 'status_color' in globals() else 'Check'}\n"
-        f"🟠 **Social:** {status_color(lsc, 'social') if 'status_color' in globals() else 'Check'}\n"
-        f"💷 **Ticketmaster:** {status_color(ltc, 'ticket') if 'status_color' in globals() else 'Check'}\n\n"
-        "### 📊 Contadores Atuais:\n"
-        f"🎯 Acessos TM: `{globals().get('total_tickets', 0)}` \n"
-        f"🎯 Acessos WV: `{globals().get('total_weverse', 0)}` \n"
-        f"🎯 Acessos Sociais: `{globals().get('total_social', 0)}` \n\n"
-        "--- \n"
-        "*Teste finalizado. Se os contadores estiverem subindo, o motor está operando corretamente.*"
-    )
+    report = "## 🛠️ Relatório Wootteo\n"
+    report += f"✅ **Status:** Online | ⏳ **Uptime:** {uptime}\n\n"
+
+    for label, (t_last, t_key, count_key) in stats.items():
+        color = status_color(t_last, t_key) if 'status_color' in globals() else "⚪"
+        count = globals().get(count_key, 0)
+        report += f"{color} **{label}:** `{count}` acessos\n"
+
+    report += "\n---\n*Monitoramento ativo e operando em ciclos de 1min.*"
 
     try:
-        # Envia a resposta diretamente no canal do comando
         await interaction.followup.send(content=report)
     except Exception as e:
-        print(f"[TEST ERR] Erro ao responder no canal: {e}")
+        print(f"[TEST ERR] {e}")
 
-# ===================================
-# EXEMPLO DE CHAMADA NO COMANDO SLASH
-# ====================================
-
- @bot_discord.tree.command(name="teste", description="Valida o funcionamento do bot")
-# async def teste(interaction: discord.Interaction):
-     await run_full_test_discord(interaction)
- 
 # ==========================================
 # 17 COMMAND ENGINE FRAMEWORK - FINAL (COM FORÇA BRUTA)
 # ==========================================
