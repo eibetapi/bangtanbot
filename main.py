@@ -1391,6 +1391,10 @@ async def watchdog():
 async def monitor_loop():
     global _ENGINE_STARTED
     await bot_discord.wait_until_ready()
+    
+    # --- PAUSA DE SEGURANÇA PARA CARREGAR OUTROS BLOCOS ---
+    await asyncio.sleep(5) 
+    
     if _ENGINE_STARTED: return
     _ENGINE_STARTED = True
     print("[MONITOR] Motor Unificado Iniciado.")
