@@ -36,10 +36,18 @@ from telegram import Bot
 # =========================
 # 2 CONFIGURAÇÃO E PERSISTÊNCIA
 # =========================
+import os
+import json
+import discord
+from discord.ext import commands
+from telegram import Bot
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 PANEL_CHAT_ID = -1003920883053
 DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
+
+# IDs específicos para roteamento de alertas
 DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
 DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
 DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
@@ -49,27 +57,41 @@ COUNTERS_FILE = "counters.json"
 PANEL_DATA_FILE = "panel_data.json"
 PANEL_BOOT_DONE = False
 
-
 def load_storage(file, default):
+    """Carrega o JSON de forma segura"""
     if os.path.exists(file):
-        with open(file, "r") as f: return json.load(f)
+        try:
+            with open(file, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[MEMÓRIA] Erro ao ler {file}: {e}")
+            return default
     return default
 
 def save_storage(file, data):
-    with open(file, "w") as f: json.dump(data, f)
+    with open(file, "w") as f:
+        json.dump(data, f)
 
-# Carregar dados salvos
-stored_counters = load_storage(COUNTERS_FILE, {"tickets": 0, "weverse": 0, "social": 0, "buy": 0})
+# --- CARREGAMENTO BLINDADO ---
+# Usamos chaves que batem com o que o Bloco 18 salva
+default_counters = {
+    "total_tickets": 0, 
+    "total_weverse": 0, 
+    "total_social": 0, 
+    "total_buy": 0
+}
+stored_counters = load_storage(COUNTERS_FILE, default_counters)
 stored_panel = load_storage(PANEL_DATA_FILE, {"tg_msg_id": None, "dc_msg_id": None})
 
-# Variáveis globais sincronizadas
+# Variáveis globais sincronizadas (Usando .get para evitar KeyError)
 total_tickets = stored_counters.get("total_tickets", 0)
-total_weverse = stored_counters["weverse"]
-total_social = stored_counters["social"]
-panel_message_id = stored_panel["tg_msg_id"] # ID do Telegram
-discord_panel_msg_id = stored_panel["dc_msg_id"] # ID do Discord
+total_weverse = stored_counters.get("total_weverse", 0)
+total_social = stored_counters.get("total_social", 0)
 
-# Bot Discord
+panel_message_id = stored_panel.get("tg_msg_id")
+discord_panel_msg_id = stored_panel.get("dc_msg_id")
+
+# --- CONFIGURAÇÃO DO BOT ---
 intents = discord.Intents.default()
 intents.message_content = True
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
@@ -79,7 +101,8 @@ async def setup_hook():
     try:
         await bot_discord.tree.sync()
         print("[SYNC] Slash commands sincronizados")
-    except Exception as e: print(f"[SYNC ERROR] {e}")
+    except Exception as e: 
+        print(f"[SYNC ERROR] {e}")
 
 # 2.1 TELEGRAM START #
 bot_ticket = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
@@ -87,7 +110,6 @@ bot_ticket = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
 async def start_telegram():
     if bot_ticket:
         print("[TELEGRAM] pronto (Modo Legacy)")
-
 # =========================
 # 3 CONTROLE DE CONTADORES (FIX SINCRONIA)
 # =========================
@@ -1057,27 +1079,52 @@ async def slash_bts(i: discord.Interaction): await executar_discord("bts", i)
 @bot_discord.tree.command(name="comandos")
 async def slash_comandos(i: discord.Interaction): await executar_discord("comandos", i)
 
-# 17.1 UTILS: MOTOR DE REQUISIÇÃO ASSÍNCRONA #
+# =========================================================
+# 17.1 UTILS: MOTOR DE REQUISIÇÃO ASSÍNCRONA (ANTI-BLOCK)
+# =========================================================
+import asyncio
+import random
+
 async def fetch_html(session, url):
-    """Realiza a busca segura do HTML para os motores do Bloco 18"""
+    """Realiza a busca segura do HTML com disfarce dinâmico"""
+    
+    # Headers simulando um navegador moderno e real
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.google.com/",
+        "Sec-Ch-Ua": '"Not-A.Brand";v="99", "Chromium";v="124", "Google Chrome";v="124"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Upgrade-Insecure-Requests": "1"
     }
+
     try:
-        # Timeout de 15 segundos para evitar que o bot trave em links lentos
-        async with session.get(url, headers=headers, timeout=15) as response:
+        # Delay aleatório (1.5 a 4.5s) para evitar detecção de padrão robótico
+        # Isso ajuda MUITO contra o erro 429 do Instagram
+        await asyncio.sleep(random.uniform(1.5, 4.5))
+
+        async with session.get(url, headers=headers, timeout=20) as response:
             if response.status == 200:
                 return await response.text()
+            
+            # Se cair no 429 (Too Many Requests), avisa no console
+            if response.status == 429:
+                print(f"[LIMIT] Instagram/Site limitou o IP (429): {url}")
+            elif response.status == 403:
+                print(f"[BLOCK] Ticketmaster barrou o acesso (403): {url}")
             else:
                 print(f"[FETCH] Status {response.status} para: {url}")
-                return None
-    except Exception as e:
-        # O erro 'name fetch_html is not defined' morre aqui
-        print(f"[FETCH ERR] Falha ao acessar {url}: {e}")
-        return None
+            
+            return None
 
+    except asyncio.TimeoutError:
+        print(f"[TIMEOUT] Link muito lento: {url}")
+        return None
+    except Exception as e:
+        print(f"[FETCH ERR] Falha crítica em {url}: {e}")
+        return None
 # =====================
 # 18 SISTEMA INTEGRADO: ESTADO, PERSISTÊNCIA E MONITORAMENTO
 # =====================
