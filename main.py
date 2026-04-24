@@ -985,7 +985,7 @@ async def ticket_agenda(url, data, cidade, pais):
     await send_alert("agenda", msg)
     await update_panel()
 
-# --- 16: TESTE DE SISTEMA ---
+# ======= 16 TESTE DE SISTEMA =======
 @bot_discord.tree.command(name="teste", description="Valida o funcionamento do bot")
 async def teste(interaction: discord.Interaction):
     """Diagnóstico consolidado enviado diretamente ao canal do usuário."""
@@ -1050,9 +1050,9 @@ async def send(ctx, text):
         try: await bot_ticket.send_message(chat_id=ctx.chat_id, text=text)
         except: pass
 
-# =========================================================
+# ========================================
 # COMANDOS BLOQUEADOS (LAYOUT ORIGINAL)
-# =========================================================
+# ========================================
 
 @command("ping")
 async def ping(ctx):
@@ -1135,6 +1135,31 @@ async def slash_ping(i: discord.Interaction): await executar_discord("ping", i)
 async def slash_bts(i: discord.Interaction): await executar_discord("bts", i)
 @bot_discord.tree.command(name="comandos")
 async def slash_comandos(i: discord.Interaction): await executar_discord("comandos", i)
+
+# ============================================
+# 17.1 UTILS: MOTOR DE REQUISIÇÃO ASSÍNCRONA
+# =============================================
+
+async def fetch_html(session, url):
+    """Realiza a busca segura do HTML para os motores do Bloco 18"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    try:
+        # Timeout de 15 segundos para evitar que o bot trave em links lentos
+        async with session.get(url, headers=headers, timeout=15) as response:
+            if response.status == 200:
+                return await response.text()
+            else:
+                print(f"[FETCH] Status {response.status} para: {url}")
+                return None
+    except Exception as e:
+        # O erro 'name fetch_html is not defined' morre aqui
+        print(f"[FETCH ERR] Falha ao acessar {url}: {e}")
+        return None
+
 
 # ============================================
 # 18 SISTEMA INTEGRADO: ESTADO, PERSISTÊNCIA E MONITORAMENTO
