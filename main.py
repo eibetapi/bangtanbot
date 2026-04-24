@@ -1426,7 +1426,7 @@ if "panel_message_id" not in globals(): globals()["panel_message_id"] = None
 if "discord_panel_msg_id" not in globals(): globals()["discord_panel_msg_id"] = None
 
 async def save_counters():
-    """Salva contadores e IDs das mensagens"""
+    """Salva contadores e IDs das mensagens de forma persistente"""
     data_counters = {
         "total_weverse": globals().get("total_weverse", 0),
         "total_social": globals().get("total_social", 0),
@@ -1437,11 +1437,18 @@ async def save_counters():
         "last_ticket_check": globals().get("last_ticket_check", 0)
     }
     save_storage(COUNTER_DATA_FILE, data_counters)
-    save_storage(PANEL_DATA_FILE, {"tg_msg_id": globals().get("panel_message_id"), "dc_msg_id": globals().get("discord_panel_msg_id")})
+    
+    # Salva os IDs atuais para garantir que na próxima volta ele edite estes
+    data_panel = {
+        "tg_msg_id": globals().get("panel_message_id"),
+        "dc_msg_id": globals().get("discord_panel_msg_id")
+    }
+    save_storage(PANEL_DATA_FILE, data_panel)
 
 async def load_counters():
-    """Carrega os dados e IDs salvos no boot"""
+    """Carrega os dados e resgata os IDs das mensagens do disco"""
     try:
+        # Recupera Contadores
         c_data = load_storage(COUNTER_DATA_FILE)
         if c_data:
             globals()["total_weverse"] = c_data.get("total_weverse", 0)
@@ -1451,11 +1458,17 @@ async def load_counters():
             globals()["last_weverse_check"] = c_data.get("last_weverse_check", 0)
             globals()["last_social_check"] = c_data.get("last_social_check", 0)
             globals()["last_ticket_check"] = c_data.get("last_ticket_check", 0)
+
+        # Recupera IDs das Mensagens (Crucial para EDITAR em vez de CRIAR)
         p_data = load_storage(PANEL_DATA_FILE)
         if p_data:
             globals()["panel_message_id"] = p_data.get("tg_msg_id")
             globals()["discord_panel_msg_id"] = p_data.get("dc_msg_id")
-    except: pass
+            print(f"[MEMÓRIA] IDs Recuperados -> TG: {globals()['panel_message_id']} | DC: {globals()['discord_panel_msg_id']}")
+        else:
+            print("[MEMÓRIA] Nenhum ID de painel encontrado no arquivo.")
+    except Exception as e:
+        print(f"[MEMÓRIA ERR] Falha ao carregar IDs: {e}")
 
 def status_color(last_check_time, tipo):
     if globals().get(f"is_checking_{tipo}", False): return "🟢"
@@ -1527,35 +1540,45 @@ async def update_panel():
             last_panel_update = now
             d_show, city, d_prox, d_br = get_countdown_data()
             texto = gerar_texto_painel(d_show, city, d_prox, d_br)
+            
+            # TELEGRAM
             tg_id = globals().get("panel_message_id")
-            dc_id = globals().get("discord_panel_msg_id")
-
             if bot_ticket and PANEL_CHAT_ID:
                 if tg_id:
-                    try: await bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=tg_id, text=texto)
-                    except: globals()["panel_message_id"] = None
+                    try: 
+                        await bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=tg_id, text=texto)
+                    except Exception: 
+                        globals()["panel_message_id"] = None # Se falhou editar, reseta para criar um novo id válido
+                
                 if not globals().get("panel_message_id"):
                     m = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto)
                     globals()["panel_message_id"] = m.message_id
                     try: await bot_ticket.pin_chat_message(PANEL_CHAT_ID, m.message_id)
                     except: pass
 
+            # DISCORD
+            dc_id = globals().get("discord_panel_msg_id")
             if DISCORD_PANEL_CHANNEL_ID:
                 chan = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID) or await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
                 if chan:
                     emb = discord.Embed(description=texto, color=0x8A2BE2)
                     if dc_id:
                         try:
-                            m = await chan.fetch_message(dc_id)
-                            await m.edit(embed=emb)
-                        except: globals()["discord_panel_msg_id"] = None
+                            msg = await chan.fetch_message(dc_id)
+                            await msg.edit(embed=emb)
+                        except Exception: 
+                            globals()["discord_panel_msg_id"] = None
+                    
                     if not globals().get("discord_panel_msg_id"):
                         m = await chan.send(embed=emb)
                         globals()["discord_panel_msg_id"] = m.id
                         try: await m.pin()
                         except: pass
+            
+            # Salva tudo após a atualização bem sucedida
             await save_counters()
-        except Exception as e: print(f"[PANEL ERR] {e}")
+        except Exception as e: 
+            print(f"[PANEL ERR] {e}")
 
 @bot_discord.event
 async def on_ready():
@@ -1563,15 +1586,16 @@ async def on_ready():
     await bot_discord.change_presence(status=discord.Status.online, activity=act)
     try: await bot_discord.tree.sync()
     except: pass
+    
     if globals().get("PANEL_BOOT_DONE", False): return
-    print(f"DISCORD CONECTADO: {bot_discord.user}")
-    try:
-        await load_counters()
-        await update_panel()
-        globals()["PANEL_BOOT_DONE"] = True
-    except: pass
+    print(f"SISTEMA ONLINE: {bot_discord.user}")
+    
+    # ORDEM CRÍTICA: Carregar primeiro, atualizar depois
+    await load_counters()
+    await update_panel()
+    globals()["PANEL_BOOT_DONE"] = True
 
-# --- CORREÇÃO DOS MOTORES (INCREMENTO GARANTIDO) ---
+# --- MOTORES DE MONITORAMENTO (CONTADORES E INTERVALO) ---
 
 async def check_ticketmaster(session):
     try:
@@ -1581,7 +1605,6 @@ async def check_ticketmaster(session):
             await asyncio.sleep(1)
             html = await fetch_html(session, url)
             if html:
-                # Incremento direto no dicionário global para não haver erro de escopo
                 globals()["total_tickets"] += 1
                 globals()["last_ticket_check"] = time.time()
                 await save_counters()
@@ -1621,7 +1644,8 @@ async def check_social(session):
         globals()["is_checking_social"] = False
         await update_panel()
         await asyncio.sleep(60)
-    except: globals()["is_checking_social"] = False    
+    except: globals()["is_checking_social"] = False
+        
 # =========================
 # 19 FINAL CORE UNIFICADO (PRODUÇÃO ESTÁVEL - BLINDADO)
 # =========================
