@@ -1274,16 +1274,18 @@ CONTENT_CACHE = {}
 ALERT_CACHE = {}
 LAST_REQUEST_TIME = {}
 _INITIAL_WARMUP_DONE = False 
-_LAST_SOCIAL_RUN = 0         
-_WARMUP_STEPS = 0  # <--- NOVA VARIÁVEL DE CONTROLE
+_LAST_SOCIAL_RUN = 0          
+_WARMUP_STEPS = 0  
+_ENGINE_STARTED = False
+_PANEL_STARTED = False
+_ENGINE_TASKS_STARTED = False
 
-# PRIORIDADE DE ALERTAS (Não altere os níveis)
+# PRIORIDADE DE ALERTAS 
 PRIORITY = {
     "ticket": 3, "reposicao": 3, "weverse_live": 3, "youtube_live": 3,
     "agenda": 2, "weverse_post": 2, "youtube_post": 2,
     "instagram_post": 1, "instagram_reels": 1, "tiktok_post": 1, "social": 1
 }
-
 # --- FUNÇÕES DE APOIO (Mantenha como estão) ---
 def extract_core_signatures(html):
     soup = BeautifulSoup(html or "", "html.parser")
