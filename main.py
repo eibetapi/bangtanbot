@@ -995,15 +995,28 @@ async def load_counters():
     except Exception as e:
         print(f"[MEMÓRIA ERR] {e}")
 
-# --- LÓGICA DO PAINEL (MANTIDO SEU PADRÃO VISUAL) ---
 def status_color(last_check_time, tipo):
-    # Regra: Se estiver checando agora, fica verde. Senão, calcula por tempo.
-    if globals().get(f"is_checking_{tipo}", False): return "🟢"
-    if not last_check_time or last_check_time == 0: return "🔴"
+    # 1. ATIVIDADE EM TEMPO REAL
+    # Se o motor do Bloco 19 estiver acessando o site agora, fica Verde
+    if globals().get(f"is_checking_{tipo}", False): 
+        return "🟢" 
+    
+    # 2. VERIFICAÇÃO DE HISTÓRICO
+    if not last_check_time or last_check_time == 0: 
+        return "🔴" 
+        
     elapsed = time.time() - last_check_time
-    if elapsed < 600: return "🟣" # Online e Ativo
-    elif elapsed < 1800: return "🟡" # Lento
-    else: return "🔴" # Offline
+    
+    # 3. ESTADOS DE OPERAÇÃO
+    # Se o último acesso foi há menos de 10 min, mantém Roxo (Ativo)
+    if elapsed < 600: 
+        return "🟣" 
+    # Se passar de 10 min, entra em atenção (Amarelo)
+    elif elapsed < 1800: 
+        return "🟡" 
+    # Somente após 30 min sem registros ele fica Vermelho (Offline)
+    else: 
+        return "🔴"
 
 def get_countdown_data():
     now_dt = datetime.now()
