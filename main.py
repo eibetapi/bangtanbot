@@ -1181,22 +1181,28 @@ async def safe_monitor_cycle(session):
     stats = globals()['contadores_globais']
     
     try:
-        # 1. TICKETMASTER (1 MINUTO)
+                # 1. TICKETMASTER (1 MINUTO)
         stats['total_tickets'] += 1
         globals()['total_tickets'] = stats['total_tickets']
         
+        # --- A LINHA QUE CURA A BOLINHA VERMELHA ---
+        globals()['last_check_ticket'] = time.time() 
+        # ------------------------------------------
+
         globals()["is_checking_ticket"] = True
         if 'check_ticketmaster' in globals():
             try:
                 await asyncio.wait_for(check_ticketmaster(session), timeout=15.0)
-                if 'update_panel' in globals(): await update_panel() # <--- Ativa a bolinha na tela
+                if 'update_panel' in globals(): await update_panel()
             except Exception: pass 
         globals()["is_checking_ticket"] = False
+
 
         # 2. WEVERSE (2 MINUTOS)
         if now - _LAST_WEVERSE_RUN >= 120:
             stats['total_weverse'] += 1
             globals()['total_weverse'] = stats['total_weverse']
+globals()['last_check_weverse'] = time.time() 
             _LAST_WEVERSE_RUN = now
             
             globals()["is_checking_weverse"] = True
@@ -1211,6 +1217,7 @@ async def safe_monitor_cycle(session):
         if now - _LAST_SOCIAL_RUN >= 120:
             stats['total_social'] += 1
             globals()['total_social'] = stats['total_social']
+globals()['last_check_social'] = time.time() 
             _LAST_SOCIAL_RUN = now
             
             globals()["is_checking_social"] = True
