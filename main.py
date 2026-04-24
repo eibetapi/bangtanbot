@@ -1284,7 +1284,7 @@ Status:
 🟣 Online e Ativo
 🟡 Instabilidade/Lento
 🔴 Offline/Erro
-
+"""
 
 panel_lock = asyncio.Lock()
 last_panel_update = 0
