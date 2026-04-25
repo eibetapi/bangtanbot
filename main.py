@@ -1160,7 +1160,7 @@ async def on_ready():
     globals()["PANEL_BOOT_DONE"] = True
     
 # =========================================================
-# 19 MOTOR UNIFICADO (ANTI-TRAVAMENTO & REGISTRO IMEDIATO)
+# 19 MOTOR UNIFICADO (FIX: SINCRONIA DE CORES DAS BOLINHAS)
 # =========================================================
 import asyncio
 import time
@@ -1184,7 +1184,10 @@ async def safe_monitor_cycle(session):
         # 1. TICKETMASTER (1 MINUTO)
         stats['total_tickets'] += 1
         globals()['total_tickets'] = stats['total_tickets']
-        globals()['last_check_ticket'] = time.time() 
+        
+        # AJUSTE DE CORES: Salva nos dois formatos para o Bloco 18 encontrar
+        globals()['last_check_ticket'] = now
+        globals()['last_ticket_check'] = now 
 
         globals()["is_checking_ticket"] = True
         if 'check_ticketmaster' in globals():
@@ -1199,7 +1202,10 @@ async def safe_monitor_cycle(session):
         if now - _LAST_WEVERSE_RUN >= 120:
             stats['total_weverse'] += 1
             globals()['total_weverse'] = stats['total_weverse']
-            globals()['last_check_weverse'] = time.time() 
+            
+            # AJUSTE DE CORES: Salva nos dois formatos
+            globals()['last_check_weverse'] = now
+            globals()['last_weverse_check'] = now 
             _LAST_WEVERSE_RUN = now
             
             globals()["is_checking_weverse"] = True
@@ -1214,7 +1220,10 @@ async def safe_monitor_cycle(session):
         if now - _LAST_SOCIAL_RUN >= 120:
             stats['total_social'] += 1
             globals()['total_social'] = stats['total_social']
-            globals()['last_check_social'] = time.time() 
+            
+            # AJUSTE DE CORES: Salva nos dois formatos
+            globals()['last_check_social'] = now
+            globals()['last_social_check'] = now 
             _LAST_SOCIAL_RUN = now
             
             globals()["is_checking_social"] = True
@@ -1251,7 +1260,6 @@ async def start_engine():
     asyncio.create_task(monitor_loop())
     if 'watchdog' in globals():
         asyncio.create_task(watchdog())
-
 # =========================
 # 20 STARTUP FINAL (RAILWAY SAFE)
 # =========================
