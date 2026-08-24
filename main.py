@@ -76,17 +76,12 @@ def save_storage(file, data):
 # Usamos chaves que batem com o que o Bloco 18 salva
 default_counters = {
     "total_tickets": 0, 
-    "total_weverse": 0, 
-    "total_social": 0, 
-    "total_buy": 0
 }
 stored_counters = load_storage(COUNTERS_FILE, default_counters)
 stored_panel = load_storage(PANEL_DATA_FILE, {"tg_msg_id": None, "dc_msg_id": None})
 
 # Variáveis globais sincronizadas (Usando .get para evitar KeyError)
 total_tickets = stored_counters.get("total_tickets", 0)
-total_weverse = stored_counters.get("total_weverse", 0)
-total_social = stored_counters.get("total_social", 0)
 
 panel_message_id = stored_panel.get("tg_msg_id")
 discord_panel_msg_id = stored_panel.get("dc_msg_id")
@@ -245,8 +240,6 @@ AGENDA = [
 import time
 
 # Variáveis de controle de estado para as bolinhas do painel
-is_checking_weverse = False
-is_checking_social = False
 is_checking_ticket = False
 
 def status_color(last_check_time, tipo):
@@ -304,41 +297,9 @@ async def fetch(url, retries=2):
                 if resp.status == 200: return await resp.text()
         except: await asyncio.sleep(1)
     return None
-
-# =========================
-# 10 EMOJIS & FORMATTER (ATUALIZADO)
-# =========================
-import re
-
-MEMBER_EMOJI = {
-    "rm": "🐨", "jin": "🐹", "suga": "🐱", 
-    "jhope": "🐿️", "jimin": "🐥", "v": "🐻", 
-    "jungkook": "🐰", "bts": "💜", "wootteo": "🛸"
-}
-
-def get_member_emoji(name):
-    """Retorna o emoji do membro com fallback para 💜"""
-    if not name: 
-        return "💜"
-    # Limpa caracteres especiais e espaços para bater com as chaves do dicionário
-    clean_name = re.sub(r"[^a-z0-9]", "", str(name).lower())
-    return MEMBER_EMOJI.get(clean_name, "💜")
-
-def format_member(name):
-    """Retorna dicionário formatado para uso nos alertas do Instagram/Weverse"""
-    if not name:
-        return {"emoji": "💜", "name": "BTS", "display": "💜 BTS"}
-    
-    emoji = get_member_emoji(name)
-    u_name = str(name).upper()
-    return {
-        "emoji": emoji, 
-        "name": u_name, 
-        "display": f"{emoji} {u_name}"
-    }
     
 # =========================
-# 11 ALERT DISPATCHER (ESTABILIZADO)
+# 10 ALERT DISPATCHER (ESTABILIZADO)
 # =========================
 import asyncio
 
@@ -364,12 +325,8 @@ async def send_alert(alert_type, message, increment=False):
         
         # 3. Incremento Controlado (Só roda se explicitamente pedido)
         if increment:
-            if "weverse" in alert_type:
-                globals()["total_weverse"] += 1
-            elif "ticket" in alert_type or "reposicao" in alert_type:
+            if "ticket" in alert_type or "reposicao" in alert_type:
                 globals()["total_tickets"] += 1
-            elif "instagram" in alert_type or "tiktok" in alert_type or "social" in alert_type:
-                globals()["total_social"] += 1
             
             # Salva após o incremento para manter o painel fiel
             if 'save_counters' in globals():
@@ -380,18 +337,14 @@ async def send_alert(alert_type, message, increment=False):
 
 async def increment_only(alert_type):
     """Apenas incrementa o contador sem enviar mensagem (Útil para logs silenciosos)"""
-    if "weverse" in alert_type:
-        globals()["total_weverse"] += 1
-    elif "ticket" in alert_type:
+    if "ticket" in alert_type:
         globals()["total_tickets"] += 1
-    elif "social" in alert_type:
-        globals()["total_social"] += 1
     
     if 'save_counters' in globals():
         await save_counters()
 
 # =========================
-# 12 PERSISTÊNCIA & STORAGE (CORRIGIDO)
+# 11 PERSISTÊNCIA & STORAGE (CORRIGIDO)
 # =========================
 import json
 import os
@@ -428,7 +381,7 @@ async def save_panel_ids():
     save_storage(PANEL_DATA_FILE, data)
 
 # =========================
-# 13 SISTEMA DE PERSISTÊNCIA & WEVERSE ALERTS (COMPLETO)
+# 12 SISTEMA DE PERSISTÊNCIA (COMPLETO)
 # =========================
 import hashlib
 import asyncio
@@ -439,19 +392,14 @@ import time
 # INICIALIZAÇÃO DE GLOBAIS (ANTI-ERROR) # 
 PANEL_BOOT_DONE = globals().get("PANEL_BOOT_DONE", False)
 COUNTERS_FILE = "counters.json" 
-WEVERSE_CACHE = {}
-WEVERSE_LOCK = asyncio.Lock()
 
 # SISTEMA DE DISCO (RAILWAY SAFE) #
 async def save_counters():
     """Salva totais e IDs das mensagens para evitar 'amnésia' e duplicatas."""
     try:
         data = {
-            "total_weverse": globals().get("total_weverse", 0),
             "total_social": globals().get("total_social", 0),
-            "total_tickets": globals().get("total_tickets", 0),
-            "last_weverse_check": globals().get("last_weverse_check", 0),
-            "last_social_check": globals().get("last_social_check", 0),
+            "total_tickets": globals().get("total_tickets", 0)
             "last_ticket_check": globals().get("last_ticket_check", 0),
             # [FIX] Garante que o ID do painel seja persistido
             "tg_msg_id": globals().get("panel_message_id"),
@@ -469,11 +417,7 @@ async def load_counters():
             with open(COUNTERS_FILE, 'r') as f:
                 data = json.load(f)
             
-            globals()["total_weverse"] = data.get("total_weverse", 0)
-            globals()["total_social"] = data.get("total_social", 0)
             globals()["total_tickets"] = data.get("total_tickets", 0)
-            globals()["last_weverse_check"] = data.get("last_weverse_check", 0)
-            globals()["last_social_check"] = data.get("last_social_check", 0)
             globals()["last_ticket_check"] = data.get("last_ticket_check", 0)
             # [FIX] Recupera IDs para que o Motor edite em vez de criar novo
             globals()["panel_message_id"] = data.get("tg_msg_id")
@@ -483,195 +427,10 @@ async def load_counters():
         except Exception as e:
             print(f"❌ [LOAD ERROR] Falha ao carregar estado: {e}")
 
-# LÓGICA DE DUPLICAÇÃO # 
-def is_new_weverse_event(event_type, url, content=""):
-    """Evita duplicação usando hash do conteúdo."""
-    raw = f"{event_type}:{url}:{content}"
-    new_hash = hashlib.md5(raw.encode("utf-8")).hexdigest()
 
-    if WEVERSE_CACHE.get(event_type) == new_hash:
-        return False
-
-    WEVERSE_CACHE[event_type] = new_hash
-    return True
-
-# FUNÇÕES DE ALERTA (WEVERSE) # 
-
-async def weverse_post(url, member_name, title, message_translated, found):
-    async with WEVERSE_LOCK:
-        if not is_new_weverse_event("post", url, title + message_translated):
-            return
-
-        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
-        globals()["last_weverse_check"] = time.time()
-        await save_counters() 
-
-        emoji = get_member_emoji(member_name)
-        msg = f"🩷 WEVERSE POST 🩷\n{emoji} {member_name.upper()} fez uma publicação\n📌 {title}\n📝 {message_translated}\n🔗 {url}"
-
-        # [FIX] increment=False para não duplicar contagem no Bloco 11
-        await send_alert("weverse_post", msg, increment=False)
-        await update_panel()
-
-async def weverse_live(url, member_name, found):
-    async with WEVERSE_LOCK:
-        if not is_new_weverse_event("live", url):
-            return
-
-        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
-        globals()["last_weverse_check"] = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-        msg = f"📹 WEVERSE LIVE 📹\n{emoji} {member_name.upper()} está ao vivo\n🔗 {url}"
-
-        await send_alert("weverse_live", msg, increment=False)
-        await update_panel()
-
-async def weverse_news(url, member_name, message_translated, found):
-    async with WEVERSE_LOCK:
-        if not is_new_weverse_event("news", url, message_translated):
-            return
-
-        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
-        globals()["last_weverse_check"] = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-        msg = f"🚨 WEVERSE NEWS 🚨\n{emoji} {member_name.upper()} fez uma publicação\n📝 {message_translated}\n🔗 {url}"
-
-        await send_alert("weverse_news", msg, increment=False)
-        await update_panel()
-
-async def weverse_media(url, member_name, title, message_translated, found):
-    async with WEVERSE_LOCK:
-        if not is_new_weverse_event("media", url, title + message_translated):
-            return
-
-        globals()["total_weverse"] = globals().get("total_weverse", 0) + 1
-        globals()["last_weverse_check"] = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-        msg = f"📀 WEVERSE MEDIA 📀\n{emoji} {member_name.upper()} fez uma publicação\n⭐ {title}\n📝 {message_translated}\n🔗 {url}"
-
-        await send_alert("weverse_media", msg, increment=False)
-        await update_panel()
-
-# =========================
-# 14 INSTAGRAM ALERTS (PRODUÇÃO SEGURA)
-# ========================= 
-import hashlib
-import asyncio
-import time
-
-INSTAGRAM_CACHE = {"post": None, "reel": None, "story": None, "live": None}
-INSTAGRAM_LOCK = asyncio.Lock()
-
-def is_new_instagram(event_type, url, extra=""):
-    raw = f"{event_type}:{url}:{extra}"
-    new_hash = hashlib.md5(raw.encode("utf-8")).hexdigest()
-    if INSTAGRAM_CACHE.get(event_type) == new_hash:
-        return False
-    INSTAGRAM_CACHE[event_type] = new_hash
-    return True
-
-async def instagram_post(url, member_name, title, found):
-    async with INSTAGRAM_LOCK:
-        if not is_new_instagram("post", url, title): return
-        
-        global total_social, last_social_check
-        total_social += 1
-        last_social_check = time.time()
-        await save_counters()
-
-        m_data = format_member(member_name)
-        msg = f"🌟 **INSTAGRAM POST** 🌟\n{m_data['emoji']} **{m_data['name']}** fez uma publicação\n🔗 {url}"
-
-        # FIX: increment=False para evitar contagem dupla no B11
-        await send_alert("instagram_post", msg, increment=False)
-        await update_panel()
-
-async def instagram_reel(url, member_name, title, found):
-    async with INSTAGRAM_LOCK:
-        if not is_new_instagram("reel", url, title): return
-        
-        global total_social, last_social_check
-        total_social += 1
-        last_social_check = time.time()
-        await save_counters()
-
-        m_data = format_member(member_name)
-        msg = f"🎬 **INSTAGRAM REELS** 🎬\n{m_data['emoji']} **{m_data['name']}** publicou um reels\n🔗 {url}"
-        
-        await send_alert("instagram_reels", msg, increment=False)
-        await update_panel()
-
-async def instagram_story(url, member_name, title, found):
-    async with INSTAGRAM_LOCK:
-        if not is_new_instagram("story", url, title): return
-        
-        global total_social, last_social_check
-        total_social += 1
-        last_social_check = time.time()
-        await save_counters()
-
-        m_data = format_member(member_name)
-        msg = f"🫧 **INSTAGRAM STORY** 🫧\n{m_data['emoji']} **{m_data['name']}** publicou stories\n🔗 {url}"
-        
-        await send_alert("instagram_stories", msg, increment=False)
-        await update_panel()
-
-async def instagram_live(url, member_name, title, found):
-    async with INSTAGRAM_LOCK:
-        if not is_new_instagram("live", url): return
-        
-        global total_social, last_social_check
-        total_social += 1
-        last_social_check = time.time()
-        await save_counters()
-
-        m_data = format_member(member_name)
-        msg = f"🎥 **INSTAGRAM LIVE** 🎥\n{m_data['emoji']} **{m_data['name']}** está ao vivo\n🔗 {url}"
-        
-        await send_alert("instagram_live", msg, increment=False)
-        await update_panel()
-        
 # =========================================================
-# 15 ALERTAS TIKTOK, YOUTUBE E TICKETMASTER
+# 13 ALERTAS TICKETMASTER
 # =========================================================
-
-async def tiktok_post(url, member_name, title, found):
-    async with SOCIAL_LOCK:
-        key = f"post:{member_name}:{url}"
-        if not is_new_social(LAST_TIKTOK, key): return
-
-        global total_social, last_social_check
-        total_social += 1
-        last_social_check = time.time()
-        await save_counters()
-
-        emoji = get_member_emoji(member_name)
-        msg = f"🎵 **TIKTOK POST** 🎵\n{emoji} **{member_name.upper()}** publicou um vídeo\n🔗 {url}"
-        
-        await send_alert("tiktok_post", msg, increment=False)
-        await update_panel()
-
-async def youtube_post(url, final_url=None):
-    async with SOCIAL_LOCK:
-        key = f"post:{url}"
-        if not is_new_social(LAST_YOUTUBE, key): return
-
-        global total_social, last_social_check
-        total_social += 1
-        last_social_check = time.time()
-        await save_counters()
-
-        link = final_url or "https://www.youtube.com/@BTS"
-        msg = f"🎞️ **YOUTUBE POST** 🎞️\n💜 **BTS** publicou vídeo novo\n🔗 {link}"
-        
-        await send_alert("youtube_post", msg, increment=False)
-        await update_panel()
 
 async def ticket_reposicao(url, data, setor, categoria):
     global total_tickets, last_ticket_check
@@ -688,7 +447,7 @@ async def ticket_reposicao(url, data, setor, categoria):
     await update_panel()
     
 # =========================
-# 16 TESTE DE SISTEMA (CORRIGIDO)
+# 14 TESTE DE SISTEMA (CORRIGIDO)
 # =========================
 @bot_discord.tree.command(name="teste", description="Valida o funcionamento do bot")
 async def teste(interaction: discord.Interaction):
@@ -701,8 +460,6 @@ async def teste(interaction: discord.Interaction):
     
     # Estrutura de dados para o relatório
     stats = {
-        "Weverse": (globals().get("last_weverse_check", 0), "weverse", "total_weverse"),
-        "Social": (globals().get("last_social_check", 0), "social", "total_social"),
         "Tickets": (globals().get("last_ticket_check", 0), "ticket", "total_tickets")
     }
 
@@ -727,7 +484,7 @@ async def teste(interaction: discord.Interaction):
         print(f"❌ [TEST ERR] {e}")
 
 # =============================
-# 17 COMMAND ENGINE FRAMEWORK - FINAL (COM FORÇA BRUTA)
+# 15 COMMAND ENGINE FRAMEWORK - FINAL (COM FORÇA BRUTA)
 # ============================
 COMMANDS = {}
 
@@ -839,7 +596,7 @@ async def slash_bts(i: discord.Interaction): await executar_discord("bts", i)
 async def slash_comandos(i: discord.Interaction): await executar_discord("comandos", i)
 
 # =========================================================
-# 17.1 UTILS: MOTOR DE REQUISIÇÃO ASSÍNCRONA (ANTI-BLOCK)
+# 16 UTILS: MOTOR DE REQUISIÇÃO ASSÍNCRONA (ANTI-BLOCK)
 # =========================================================
 import asyncio
 import random
@@ -886,7 +643,7 @@ async def fetch_html(session, url):
         return None
         
 # =========================================================
-# 18 SISTEMA INTEGRADO: ESTADO, PERSISTÊNCIA E FAXINA (COMPLETO)
+# 17 SISTEMA INTEGRADO: ESTADO, PERSISTÊNCIA E FAXINA (COMPLETO)
 # =========================================================
 import asyncio
 import time
@@ -895,20 +652,14 @@ from datetime import datetime
 
 # --- VARIÁVEIS GLOBAIS DE ESTADO (PAINEL 🟢) ---
 # Mantém os indicadores de checagem para as bolinhas funcionarem
-is_checking_weverse = False
-is_checking_social = False
 is_checking_ticket = False
 
 # --- PERSISTÊNCIA (NOMES UNIFICADOS COM BLOCO 13) ---
 async def save_counters():
     """Salva estado garantindo que os IDs batam com o Recovery do Bloco 13"""
     data_counters = {
-        "total_weverse": globals().get("total_weverse", 0),
-        "total_social": globals().get("total_social", 0),
         "total_tickets": globals().get("total_tickets", 0),
         "total_tickets_found": globals().get("total_tickets_found", 0),
-        "last_weverse_check": globals().get("last_weverse_check", 0),
-        "last_social_check": globals().get("last_social_check", 0),
         "last_ticket_check": globals().get("last_ticket_check", 0),
         # [PONTE FIXA] Salva com os nomes que o seu Bloco 13 busca no reboot
         "tg_msg_id": globals().get("panel_message_id"),
@@ -979,10 +730,8 @@ def get_countdown_data():
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
     # SEU DESIGN VISUAL FOI 100% PRESERVADO AQUI
-    lwc = globals().get("last_weverse_check", 0)
-    lsc = globals().get("last_social_check", 0)
     ltc = globals().get("last_ticket_check", 0)
-    tw, ts, tt, ttf = globals().get("total_weverse", 0), globals().get("total_social", 0), globals().get("total_tickets", 0), globals().get("total_tickets_found", 0)
+    tw, ts, tt, ttf = globals().get("total_tickets", 0), globals().get("total_tickets_found", 0)
     uptime = get_uptime() if 'get_uptime' in globals() else "Calculando..."
 
     return f"""🪭⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜🪭
@@ -994,12 +743,6 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 🩷 Faltam {d_br} dias para o BTS no Brasil!
 
 •°•🌙.•°ATUALIZAÇÕES •°.💫
-
-🟣 Weverse {status_color(lwc, "weverse")}
-🎯 Acessos realizados: {tw}
-
-🟠 Redes sociais {status_color(lsc, "social")}
-🎯 Acessos realizados: {ts}
 
 💷 Ticketmaster {status_color(ltc, "ticket")}
 🎯 Acessos realizados: {tt}
@@ -1094,7 +837,7 @@ async def on_ready():
     globals()["PANEL_BOOT_DONE"] = True
     
 # =========================================================
-# 19 MOTOR UNIFICADO (FIX: SINCRONIA DE CORES DAS BOLINHAS)
+# 18 MOTOR UNIFICADO (FIX: SINCRONIA DE CORES DAS BOLINHAS)
 # =========================================================
 import asyncio
 import time
@@ -1102,15 +845,13 @@ import aiohttp
 
 # --- REFERÊNCIA DE MEMÓRIA ---
 if 'contadores_globais' not in globals():
-    globals()['contadores_globais'] = {'total_tickets': 0, 'total_weverse': 0, 'total_social': 0}
+    globals()['contadores_globais'] = {'total_tickets': 0}
 
-_LAST_SOCIAL_RUN = 0
-_LAST_WEVERSE_RUN = 0 
 _INITIAL_WARMUP_DONE = False
 _WARMUP_STEPS = 0
 
 async def safe_monitor_cycle(session):
-    global _INITIAL_WARMUP_DONE, _LAST_SOCIAL_RUN, _LAST_WEVERSE_RUN, _WARMUP_STEPS
+    global _INITIAL_WARMUP_DONE, _WARMUP_STEPS
     now = time.time()
     stats = globals()['contadores_globais']
     
@@ -1131,43 +872,6 @@ async def safe_monitor_cycle(session):
             except Exception: pass 
         globals()["is_checking_ticket"] = False
 
-
-        # 2. WEVERSE (2 MINUTOS)
-        if now - _LAST_WEVERSE_RUN >= 120:
-            stats['total_weverse'] += 1
-            globals()['total_weverse'] = stats['total_weverse']
-            
-            # AJUSTE DE CORES: Salva nos dois formatos
-            globals()['last_check_weverse'] = now
-            globals()['last_weverse_check'] = now 
-            _LAST_WEVERSE_RUN = now
-            
-            globals()["is_checking_weverse"] = True
-            if 'check_weverse' in globals():
-                try:
-                    await asyncio.wait_for(check_weverse(session), timeout=15.0)
-                    if 'update_panel' in globals(): await update_panel() 
-                except Exception: pass
-            globals()["is_checking_weverse"] = False
-
-        # 3. SOCIAIS (2 MINUTOS)
-        if now - _LAST_SOCIAL_RUN >= 120:
-            stats['total_social'] += 1
-            globals()['total_social'] = stats['total_social']
-            
-            # AJUSTE DE CORES: Salva nos dois formatos
-            globals()['last_check_social'] = now
-            globals()['last_social_check'] = now 
-            _LAST_SOCIAL_RUN = now
-            
-            globals()["is_checking_social"] = True
-            if 'check_social' in globals():
-                try:
-                    await asyncio.wait_for(check_social(session), timeout=15.0)
-                    if 'update_panel' in globals(): await update_panel() 
-                except Exception: pass
-            globals()["is_checking_social"] = False
-        
         # LOGS DE CONTROLE
         if not _INITIAL_WARMUP_DONE:
             _WARMUP_STEPS += 1
@@ -1194,8 +898,9 @@ async def start_engine():
     asyncio.create_task(monitor_loop())
     if 'watchdog' in globals():
         asyncio.create_task(watchdog())
+
 # =========================
-# 20 STARTUP FINAL (RAILWAY SAFE)
+# 19 STARTUP FINAL (RAILWAY SAFE)
 # =========================
 import asyncio
 
@@ -1257,7 +962,7 @@ if __name__ == "__main__":
         print(f"💀 [SYSTEM CRASH] {e}")
 
 # =========================
-# 21 PANEL LOOP (ANTI-SPAM)
+# 20 PANEL LOOP (ANTI-SPAM)
 # =========================
 import asyncio
 
@@ -1300,7 +1005,7 @@ async def start_background_tasks():
         PANEL_LOOP_TASK = asyncio.create_task(panel_loop())
         
 # =========================
-# 22 BOOT MASTER SAFE (ABSOLUTE MODE)
+# 21 BOOT MASTER SAFE (ABSOLUTE MODE)
 # =========================
 import asyncio
 import hashlib
@@ -1363,7 +1068,7 @@ async def safe_boot():
         print("🏁 [BOOT] Sistema liberado com segurança total!")
 
 # =========================================================
-# 23 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
+# 22 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
 # =========================================================
 import asyncio
 import time
