@@ -49,8 +49,6 @@ DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
 
 # IDs específicos para roteamento de alertas
 DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
-DISCORD_WEVERSE_CHANNEL_ID = 1494680233025208461
-DISCORD_SOCIAL_CHANNEL_ID = 1494682078950981864
 
 # Arquivos de persistência
 COUNTERS_FILE = "counters.json"
@@ -398,7 +396,6 @@ async def save_counters():
     """Salva totais e IDs das mensagens para evitar 'amnésia' e duplicatas."""
     try:
         data = {
-            "total_social": globals().get("total_social", 0),
             "total_tickets": globals().get("total_tickets", 0),
             "last_ticket_check": globals().get("last_ticket_check", 0),
             # [FIX] Garante que o ID do painel seja persistido
@@ -1126,3 +1123,4 @@ def can_run_repair():
         return False
     LAST_REPAIR_TIME = now
     return True
+
