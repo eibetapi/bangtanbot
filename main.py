@@ -708,16 +708,19 @@ def get_countdown_data():
     next_show, next_local = "Continua…", "---"
     d_prox, d_br = 0, 0
     agenda_data = globals().get("AGENDA", [])
-    
+
     for item in agenda_data:
         try:
+            # Garante a leitura no formato Dia/Mês/Ano Hora:Minuto
             show_dt = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
             if show_dt > now_dt:
                 next_show, next_local = item[0], f"{item[1]}, {item[2]}"
                 d_prox = (show_dt.date() - now_dt.date()).days
                 break
-        except: continue
-    
+        except Exception as err:
+            print(f"⚠️ [AGENDA ERR] Data inválida ignorada ({item[0]} - {item[1]}): {err}")
+            continue
+
     for item in agenda_data:
         try:
             if "Brasil" in item[2]:
@@ -726,6 +729,7 @@ def get_countdown_data():
                     d_br = (br_date - now_dt.date()).days
                     break
         except: continue
+
     return next_show, next_local, d_prox, d_br
 
 def gerar_texto_painel(data_show, city, d_prox, d_br):
