@@ -399,7 +399,7 @@ async def save_counters():
     try:
         data = {
             "total_social": globals().get("total_social", 0),
-            "total_tickets": globals().get("total_tickets", 0)
+            "total_tickets": globals().get("total_tickets", 0),
             "last_ticket_check": globals().get("last_ticket_check", 0),
             # [FIX] Garante que o ID do painel seja persistido
             "tg_msg_id": globals().get("panel_message_id"),
