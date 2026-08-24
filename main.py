@@ -819,22 +819,16 @@ async def update_panel():
 
 @bot_discord.event
 async def on_ready():
-    """Configura o status visual e restaura o painel no boot."""
-    
-    # [ESTRITAMENTE COMO SOLICITADO] - Define a atividade "Ouvindo"
+    """Configura o status visual e força a atualização do painel no boot."""
     act = discord.Activity(
         type=discord.ActivityType.listening, 
         name="🪭Em tournê - Ouvindo: Arirang"
     )
     await bot_discord.change_presence(status=discord.Status.online, activity=act)
-    
-    # Evita que o boot rode duas vezes se o bot reconectar
-    if globals().get("PANEL_BOOT_DONE", False): 
-        return
-        
+
     print(f"✅ BOT ONLINE: {bot_discord.user}")
-    
-    # Restaura memória e sincroniza painel inicial
+
+    # Carrega dados e força a edição do painel imediatamente ao ligar
     await load_counters()
     await update_panel()
     
@@ -920,37 +914,29 @@ async def main():
     print("🚀 [SYSTEM] Inicializando sistema completo...")
 
     async with _BOOT_LOCK:
-        # 🔒 Proteção contra double boot no Railway/Render
         if _BOOT_STARTED:
             print("⚠️ [SYSTEM] Boot já executado (ignorado)")
             return
         _BOOT_STARTED = True
 
         try:
-            # 1. Carrega memória (Contadores e IDs) antes de tudo
             await load_counters()
-            
-            # 2. Garante que o painel antigo seja limpo ou recuperado
-            # se 'ensure_single_panel' existir no seu Bloco 18/22
-            if 'ensure_single_panel' in globals():
-                await ensure_single_panel()
 
-            # 3. WEB SERVER (Monitoramento de Saúde)
             if 'keep_alive' in globals():
                 keep_alive()
 
-            # 4. TELEGRAM (Inicia como Task Independente)
+            # Ativa a atualização contínua em segundo plano
+            if 'start_background_tasks' in globals():
+                await start_background_tasks()
+
             if _TELEGRAM_TASK is None and 'start_telegram' in globals():
                 print("📨 [BOOT] Iniciando Telegram...")
                 _TELEGRAM_TASK = asyncio.create_task(start_telegram())
 
-            # 5. ENGINE PRINCIPAL (Monitoramento)
             if _ENGINE_TASK is None and 'start_engine' in globals():
                 print("⚙️ [BOOT] Iniciando Motor de Monitoramento...")
                 _ENGINE_TASK = asyncio.create_task(start_engine())
 
-            # 6. DISCORD BOT (Entrypoint bloqueante)
-            # Deve ser o último pois o .start() trava o loop
             print("👾 [BOOT] Conectando ao Discord...")
             await bot_discord.start(DISCORD_TOKEN)
 
