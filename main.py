@@ -42,7 +42,7 @@ import discord
 from discord.ext import commands
 from telegram import Bot
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_TOKEN = 8627731148:AAGIiG3SYsCjk1LufUhgDRqzqSX2nS2MmoM
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 PANEL_CHAT_ID = -1003972186058
 DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
