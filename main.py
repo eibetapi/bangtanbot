@@ -120,9 +120,7 @@ async def save_counters():
     try:
         # [FIX] Adicionado o fechamento do dicionário } e do parênteses
         data = {
-            "tickets": total_tickets, 
-            "weverse": total_weverse, 
-            "social": total_social
+            "tickets": total_tickets
         }
         save_storage(COUNTERS_FILE, data)
     except Exception as e:
@@ -134,20 +132,6 @@ async def increment_ticket():
         total_tickets += 1
         await save_counters()
         return total_tickets
-
-async def increment_weverse():
-    global total_weverse
-    async with COUNTER_LOCK:
-        total_weverse += 1
-        await save_counters()
-        return total_weverse
-
-async def increment_social():
-    global total_social
-    async with COUNTER_LOCK:
-        total_social += 1
-        await save_counters()
-        return total_social
 
 # =========================
 # 4 WEB SERVER (KEEP ALIVE)
@@ -196,36 +180,6 @@ TICKET_LINKS = [
     "https://www.ticketmaster.com.br/event/venda-geral-bts-world-tour-arirang-31-10"
 ]
 
-WEVERSE_LINKS = [
-    "https://weverse.io/bts/artist",
-    "https://weverse.io/bts/live",
-    "https://weverse.io/bts/notice",
-    "https://weverse.io/bts/media"
-]
-
-INSTAGRAM_LINKS = {
-    "rm": "https://www.instagram.com/rkive/",
-    "jin": "https://www.instagram.com/jin/",
-    "suga": "https://www.instagram.com/agustd/",
-    "jhope": "https://www.instagram.com/uarmyhope/",
-    "jimin": "https://www.instagram.com/j.m/",
-    "v": "https://www.instagram.com/thv/",
-    "jungkook": "https://www.instagram.com/mnijungkook/",
-    "bts": "https://www.instagram.com/bts.bighitofficial/",
-    "wootteo": "https://www.instagram.com/wootteo/"
-}
-
-TIKTOK_LINKS = {
-    "jungkook": "https://www.tiktok.com/@mnijungkook",
-    "jhope": "https://www.tiktok.com/@iamurhope",
-    "v": "https://www.tiktok.com/@tete",
-    "bts": "https://www.tiktok.com/@bts_official_bighit"
-}
-
-YOUTUBE_LINKS = [
-    "https://www.youtube.com/@BTS"
-]
-
 def get_next_show():
     """Calcula dias para 28/10/2026"""
     data_alvo = datetime(2026, 10, 28)
@@ -237,35 +191,12 @@ def get_next_show():
 # 7 AGENDA FIXA
 # =========================
 AGENDA = [
-    ("25/04/2026", "Tampa", "EUA", "20:00"),
-    ("26/04/2026", "Tampa", "EUA", "20:00"),
-    ("28/04/2026", "Tampa", "EUA", "20:00"),
-    ("02/05/2026", "El Paso", "EUA", "20:00"),
-    ("03/05/2026", "El Paso", "EUA", "20:00"),
-    ("07/05/2026", "Cidade do México", "México", "20:00"),
-    ("09/05/2026", "Cidade do México", "México", "20:00"),
-    ("10/05/2026", "Cidade do México", "México", "20:00"),
-    ("16/05/2026", "Stanford", "EUA", "20:00"),
-    ("17/05/2026", "Stanford", "EUA", "20:00"),
-    ("19/05/2026", "Stanford", "EUA", "20:00"),
-    ("23/05/2026", "Las Vegas", "EUA", "20:00"),
-    ("24/05/2026", "Las Vegas", "EUA", "20:00"),
-    ("27/05/2026", "Las Vegas", "EUA", "20:00"),
-    ("28/05/2026", "Las Vegas", "EUA", "20:00"),
-    ("12/06/2026", "Busan", "Coreia do Sul", "20:00"),
-    ("13/06/2026", "Busan", "Coreia do Sul", "20:00"),
-    ("26/06/2026", "Madri", "Espanha", "20:00"),
-    ("27/06/2026", "Madri", "Espanha", "20:00"),
-    ("01/07/2026", "Bruxelas", "Bélgica", "20:00"),
-    ("02/07/2026", "Bruxelas", "Bélgica", "20:00"),
-    ("06/07/2026", "Londres", "Reino Unido", "20:00"),
-    ("07/07/2026", "Londres", "Reino Unido", "20:00"),
-    ("11/07/2026", "Munique", "Alemanha", "20:00"),
-    ("12/07/2026", "Munique", "Alemanha", "20:00"),
-    ("17/07/2026", "Saint-Denis", "França", "20:00"),
-    ("18/07/2026", "Saint-Denis", "França", "20:00"),
-    ("01/08/2026", "East Rutherford", "EUA", "20:00"),
-    ("02/08/2026", "East Rutherford", "EUA", "20:00"),
+    ("27/08/2026", "Chicago", "Estados Unidos", "20:00"),
+    ("28/08/2026", "Chicago", "Estados Unidos", "20:00"),
+    ("01/09/2026", "Los Angeles", "Estados Unidos", "20:00"),
+    ("02/09/2026", "Los Angeles", "Estados Unidos", "20:00"),
+    ("05/09/2026", "Los Angeles", "Estados Unidos", "20:00"),
+    ("06/09/2026", "Los Angeles", "Estados Unidos", "20:00"),
     ("02/10/2026", "Bogotá", "Colômbia", "20:00"),
     ("03/10/2026", "Bogotá", "Colômbia", "20:00"),
     ("07/10/2026", "Lima", "Peru", "20:00"),
@@ -274,7 +205,6 @@ AGENDA = [
     ("14/10/2026", "Santiago", "Chile", "20:00"),
     ("16/10/2026", "Santiago", "Chile", "20:00"),
     ("17/10/2026", "Santiago", "Chile", "20:00"),
-    ("21/10/2026", "Buenos Aires", "Argentina", "20:00"),
     ("23/10/2026", "Buenos Aires", "Argentina", "20:00"),
     ("24/10/2026", "Buenos Aires", "Argentina", "20:00"),
     ("28/10/2026", "São Paulo", "Brasil", "20:00"),
@@ -283,9 +213,9 @@ AGENDA = [
     ("19/11/2026", "Kaohsiung", "Taiwan", "20:00"),
     ("21/11/2026", "Kaohsiung", "Taiwan", "20:00"),
     ("22/11/2026", "Kaohsiung", "Taiwan", "20:00"),
-    ("03/12/2026", "Banguecoque", "Tailândia", "20:00"),
-    ("05/12/2026", "Banguecoque", "Tailândia", "20:00"),
-    ("06/12/2026", "Banguecoque", "Tailândia", "20:00"),
+    ("03/12/2026", "Bangkok", "Tailândia", "20:00"),
+    ("05/12/2026", "Bangkok", "Tailândia", "20:00"),
+    ("06/12/2026", "Bangkok", "Tailândia", "20:00"),
     ("12/12/2026", "Kuala Lumpur", "Malásia", "20:00"),
     ("13/12/2026", "Kuala Lumpur", "Malásia", "20:00"),
     ("17/12/2026", "Singapura", "Singapura", "20:00"),
@@ -294,16 +224,20 @@ AGENDA = [
     ("22/12/2026", "Singapura", "Singapura", "20:00"),
     ("26/12/2026", "Jacarta", "Indonésia", "20:00"),
     ("27/12/2026", "Jacarta", "Indonésia", "20:00"),
+    ("29/12/2026", "Jacarta", "Indonésia", "20:00"),
+    ("10/02/2027", "Melbourne", "Austrália", "20:00"),
     ("12/02/2027", "Melbourne", "Austrália", "20:00"),
     ("13/02/2027", "Melbourne", "Austrália", "20:00"),
     ("20/02/2027", "Sydney", "Austrália", "20:00"),
     ("21/02/2027", "Sydney", "Austrália", "20:00"),
-    ("04/03/2027", "Hong Kong", "China", "20:00"),
-    ("06/03/2027", "Hong Kong", "China", "20:00"),
-    ("07/03/2027", "Hong Kong", "China", "20:00"),
-    ("13/03/2027", "Manila", "Filipinas", "20:00"),
-    ("14/03/2027", "Manila", "Filipinas", "20:00")
+    ("04/03/2027", "Hong Kong", "Hong Kong", "20:00"),
+    ("06/03/2027", "Hong Kong", "Hong Kong", "20:00"),
+    ("07/03/2027", "Hong Kong", "Hong Kong", "20:00"),
+    ("13/03/2027", "Bocaue", "Filipinas", "20:00"),
+    ("14/03/2027", "Bocaue", "Filipinas", "20:00"),
+    ("16/03/2027", "Bocaue", "Filipinas", "20:00")
 ]
+
 
 # =========================
 # 8 RESOLVE STATUS & GESTÃO DE ESTADO
