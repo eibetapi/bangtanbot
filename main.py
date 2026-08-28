@@ -11,18 +11,16 @@ def system_health():
     except Exception as e:
         print(f"[HEALTH ERROR] {e}")
         return {"panel_ok": False, "boot_done": False, "panel_loop": False}
-
 # AUTO REPAIR SAFE #
 async def auto_repair_panel():
     try:
         await update_panel()
     except Exception as e:
         print(f"[AUTO REPAIR ERROR] {e}")
-
 # =========================
 # 1 BOT WOOTTEO & IMPORTS
 # =========================
-import asyncio, time, hashlib, os, re, json
+import asyncio, time, hashlib, os, re, json, random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from threading import Thread, Lock
@@ -33,29 +31,20 @@ import aiohttp
 from bs4 import BeautifulSoup
 from flask import Flask
 from telegram import Bot
-
 # =========================
 # 2 CONFIGURAÇÃO E PERSISTÊNCIA
 # =========================
-import os
-import json
-import discord
-from discord.ext import commands
-from telegram import Bot
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 PANEL_CHAT_ID = -1003972186058
 DISCORD_PANEL_CHANNEL_ID = 1494667029150695625
-
 # IDs específicos para roteamento de alertas
 DISCORD_TICKETS_CHANNEL_ID = 1494670074374651985
-
+DISCORD_ALERTA_CHANNELS = [DISCORD_TICKETS_CHANNEL_ID]
 # Arquivos de persistência
 COUNTERS_FILE = "counters.json"
 PANEL_DATA_FILE = "panel_data.json"
 PANEL_BOOT_DONE = False
-
 def load_storage(file, default):
     """Carrega o JSON de forma segura"""
     if os.path.exists(file):
@@ -66,11 +55,9 @@ def load_storage(file, default):
             print(f"[MEMÓRIA] Erro ao ler {file}: {e}")
             return default
     return default
-
 def save_storage(file, data):
     with open(file, "w") as f:
         json.dump(data, f)
-
 # --- CARREGAMENTO BLINDADO ---
 # Usamos chaves que batem com o que o Bloco 18 salva
 default_counters = {
@@ -78,18 +65,14 @@ default_counters = {
 }
 stored_counters = load_storage(COUNTERS_FILE, default_counters)
 stored_panel = load_storage(PANEL_DATA_FILE, {"tg_msg_id": None, "dc_msg_id": None})
-
 # Variáveis globais sincronizadas (Usando .get para evitar KeyError)
 total_tickets = stored_counters.get("total_tickets", 0)
-
 panel_message_id = stored_panel.get("tg_msg_id")
 discord_panel_msg_id = stored_panel.get("dc_msg_id")
-
 # --- CONFIGURAÇÃO DO BOT ---
 intents = discord.Intents.default()
 intents.message_content = True
 bot_discord = commands.Bot(command_prefix="!", intents=intents)
-
 @bot_discord.event
 async def setup_hook():
     try:
@@ -97,10 +80,8 @@ async def setup_hook():
         print("[SYNC] Slash commands sincronizados")
     except Exception as e: 
         print(f"[SYNC ERROR] {e}")
-
 # 2.1 TELEGRAM START #
 bot_ticket = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
-
 async def start_telegram():
     if bot_ticket:
         print("[TELEGRAM] pronto (Modo Legacy)")
@@ -108,54 +89,47 @@ async def start_telegram():
 # 3 CONTROLE DE CONTADORES (FIX SINCRONIA)
 # =========================
 COUNTER_LOCK = asyncio.Lock()
-
 async def save_counters():
     """Salva os contadores no disco para evitar perda de dados."""
     try:
-        # [FIX] Adicionado o fechamento do dicionário } e do parênteses
         data = {
-            "tickets": total_tickets
+            "total_tickets": globals().get("total_tickets", 0),
+            "last_ticket_check": globals().get("last_ticket_check", 0),
+            "tg_msg_id": globals().get("panel_message_id"),
+            "dc_msg_id": globals().get("discord_panel_msg_id")
         }
         save_storage(COUNTERS_FILE, data)
     except Exception as e:
         print(f"[SAVE ERROR] {e}")
-
 async def increment_ticket():
     global total_tickets
     async with COUNTER_LOCK:
         total_tickets += 1
         await save_counters()
         return total_tickets
-
 # =========================
 # 4 WEB SERVER (KEEP ALIVE)
 # =========================
 app_web = Flask(__name__)
 start_time = time.time()
-
 @app_web.route("/")
 def home(): return {"status": "online", "uptime": int(time.time() - start_time)}
-
 _web_started = False
 def run_web():
     app_web.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=False, use_reloader=False)
-
 def keep_alive():
     global _web_started
     if not _web_started:
         _web_started = True
         Thread(target=run_web, daemon=True).start()
-
 # =========================
 # 5 ANTI-SPAM E HASH (PERSISTENTE)
 # =========================
 CONTENT_HASH = load_storage("content_hash_cache.json", {})
 CONTENT_LOCK = asyncio.Lock()
-
 def normalize_html(html):
     if not html: return ""
     return " ".join(BeautifulSoup(html, "html.parser").get_text(separator=" ", strip=True).split())
-
 async def is_new(url, html):
     global CONTENT_HASH
     new_hash = hashlib.md5(normalize_html(html).encode("utf-8")).hexdigest()
@@ -165,6 +139,12 @@ async def is_new(url, html):
             save_storage("content_hash_cache.json", CONTENT_HASH)
             return True
     return False
+# Auxiliar para estabilização de eventos do Bloco 13
+EVENT_CACHE_REP = {}
+def is_new_event(tipo, key):
+    if key in EVENT_CACHE_REP: return False
+    EVENT_CACHE_REP[key] = time.time()
+    return True
 # =========================
 # 6 LINKS (ÚNICO - NÃO DUPLICAR)
 # =========================
@@ -231,53 +211,34 @@ AGENDA = [
     ("16/03/2027", "Bocaue", "Filipinas", "20:00")
 ]
 
-# =========================
 # 8 RESOLVE STATUS & GESTÃO DE ESTADO
 # =========================
 import time
-
-# Variáveis de controle de estado para as bolinhas do painel
 is_checking_ticket = False
-
 def status_color(last_check_time, tipo):
-    """
-    Retorna o emoji de status baseado no tempo decorrido e estado atual.
-    Substitui a antiga 'resolve_status' para compatibilidade com o Bloco 16 e 18.
-    """
-    # 1. Prioridade: Se o motor estiver rodando a função agora, mostra VERDE
     if globals().get(f"is_checking_{tipo}", False):
         return "🟢"
-
-    # 2. Se nunca checou ou tempo zerado, mostra VERMELHO
     if not last_check_time or last_check_time == 0:
         return "🔴"
-
-    # 3. Cálculo de latência
     elapsed = time.time() - last_check_time
-
-    if elapsed < 600:    # Menos de 10 min: ATIVO (ROXO)
+    if elapsed < 600:    
         return "🟣"
-    elif elapsed < 1800: # Menos de 30 min: LENTO (AMARELO)
+    elif elapsed < 1800: 
         return "🟡"
-    else:                # Mais de 30 min: OFFLINE (VERMELHO)
+    else:                
         return "🔴"
-
 def get_uptime():
-    """Calcula o tempo de atividade do bot"""
     if 'start_time' not in globals():
         return "N/A"
-
     total_seconds = int(time.time() - globals()["start_time"])
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-
     return f"{hours}h {minutes}m {seconds}s"
 # =========================
 # 9 SESSION HTTP
 # =========================
 http_session = None
 _session_lock = asyncio.Lock()
-
 async def get_session():
     global http_session
     async with _session_lock:
@@ -285,7 +246,6 @@ async def get_session():
             http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30),
                 headers={"User-Agent": "Mozilla/5.0"})
     return http_session
-
 async def fetch(url, retries=2):
     for attempt in range(retries + 1):
         try:
@@ -299,46 +259,24 @@ async def fetch(url, retries=2):
 # 10 ALERT DISPATCHER (ESTABILIZADO)
 # =========================
 import asyncio
-
 async def send_alert(alert_type, message, increment=False):
-    """
-    Despachante central de alertas (Discord + Telegram).
-    increment=False: Evita somar o contador duas vezes (Erro do Bloco 14/15).
-    """
     try:
-        # 1. Envio para o Discord
-        if DISCORD_ALERTA_CHANNELS:
-            for channel_id in DISCORD_ALERTA_CHANNELS:
-                canal = bot_discord.get_channel(channel_id)
-                if canal:
-                    try:
-                        await canal.send(message)
-                    except Exception as e:
-                        print(f"❌ [DISCORD ERR] Erro no canal {channel_id}: {e}")
-
-        # 2. Envio para o Telegram (Usa a função estável do Bloco 10)
-        if 'send_alert_telegram' in globals():
-            await send_alert_telegram(message)
-
-        # 3. Incremento Controlado (Só roda se explicitamente pedido)
-        if increment:
-            if "ticket" in alert_type or "reposicao" in alert_type:
-                globals()["total_tickets"] += 1
-
-            # Salva após o incremento para manter o painel fiel
-            if 'save_counters' in globals():
-                await save_counters()
-
-    except Exception as e:
-        print(f"⚠️ [DISPATCH ERR] Falha crítica no envio: {e}")
-
+      if DISCORD_ALERTA_CHANNELS:
+for channel_id in DISCORD_ALERTA_CHANNELS:
+canal = bot_discord.get_channel(channel_id)
+if canal:
+try: await canal.send(message)
+except Exception as e: print(f"❌ [DISCORD ERR] {channel_id}: {e}")
+if increment:
+if "ticket" in alert_type or "reposicao" in alert_type:
+globals()["total_tickets"] += 1
+await save_counters()
+except Exception as e:
+print(f"⚠️ [DISPATCH ERR] {e}")
 async def increment_only(alert_type):
-    """Apenas incrementa o contador sem enviar mensagem (Útil para logs silenciosos)"""
-    if "ticket" in alert_type:
-        globals()["total_tickets"] += 1
-
-    if 'save_counters' in globals():
-        await save_counters()
+if "ticket" in alert_type:
+globals()["total_tickets"] += 1
+await save_counters()
 
 # =========================
 # 11 PERSISTÊNCIA & STORAGE (CORRIGIDO)
