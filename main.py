@@ -778,7 +778,8 @@ def get_countdown_data():
 def gerar_texto_painel(data_show, city, d_prox, d_br):
     # SEU DESIGN VISUAL FOI 100% PRESERVADO AQUI
     ltc = globals().get("last_ticket_check", 0)
-    tw, ts, tt, ttf = globals().get("total_tickets", 0), globals().get("total_tickets_found", 0)
+    tt = globals().get("total_tickets", 0)
+    ttf = globals().get("total_tickets_found", 0)
     uptime = get_uptime() if 'get_uptime' in globals() else "Calculando..."
 
     return f"""🪭⊙⊝⊜ ARIRANG TOUR ⊙⊝⊜🪭
