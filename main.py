@@ -1101,72 +1101,39 @@ async def safe_boot():
         BOOT_DONE = True
         print("🏁 [BOOT] Sistema liberado com segurança total!")
 
-# =========================================================
-# 22 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
-# =========================================================
-import asyncio
-import time
-
-# ESTADO GLOBAL DE EXECUÇÃO #
+=========================================================
+22 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
+=========================================================
 ENGINE_STARTED = False
-WATCHDOG_STARTED = False
-
+async def run_full_test_discord(): await asyncio.sleep(0.5)
 def system_integrity_check():
-    """Verifica se o boot foi concluído e os IDs existem."""
-    return {
-        "boot_done": globals().get("BOOT_DONE", False),
-        "panel_ok": bool(globals().get("panel_message_id") or globals().get("discord_panel_msg_id"))
-    }
-
+return {
+"boot_done": globals().get("BOOT_DONE", False),
+"panel_ok": bool(globals().get("panel_message_id") or globals().get("discord_panel_msg_id"))
+}
 async def wait_system_ready():
-    """Gate de segurança que aguarda o Bloco 22 terminar."""
-    timeout = 45 # Reduzido para ser mais ágil no Railway
-    start = time.time()
-
-    while True:
-        status = system_integrity_check()
-        # Se o boot terminou (Bloco 22) ou se o timeout bateu, liberamos a engine
-        if status["boot_done"]:
-            print("🚀 [BOOT MAP] Sistema pronto!")
-            return True
-
-        if time.time() - start > timeout:
-            print("⚠️ [BOOT MAP] Timeout atingido. Forçando liberação para evitar travamento.")
-            return False
-
-        await asyncio.sleep(2)
-
+timeout = 15
+start = time.time()
+while True:
+status = system_integrity_check()
+if status["boot_done"] or (time.time() - start > timeout): return True
+await asyncio.sleep(1)
 async def boot_sequence_map():
-    """Orquestrador final que amarra todos os blocos."""
-    global ENGINE_STARTED, WATCHDOG_STARTED
-
-    print("🛰️ [BOOT MAP] Sincronizando camadas...")
-
-    # 1. Espera o Bloco 22 (Recuperação de IDs e Arquivos)
-    await wait_system_ready()
-
-    # 2. Inicia o Motor de Monitoramento (Bloco 19)
-    if not ENGINE_STARTED:
-        if 'start_engine' in globals():
-            asyncio.create_task(start_engine())
-            ENGINE_STARTED = True
-            print("✅ [BOOT MAP] Engine monitor liberado.")
-
-    # 3. Inicia o Loop do Painel (Bloco 21)
-    if 'start_background_tasks' in globals():
-        await start_background_tasks()
-        print("✅ [BOOT MAP] Sync loop liberado.")
-
-    print("🌟 [BOOT MAP] Wootteo operando em 100%!")
-
-# Variáveis de Cooldown para o Watchdog do Bloco 19 não flodar as APIs
-LAST_REPAIR_TIME = 0
-REPAIR_COOLDOWN = 60 
-
-def can_run_repair():
-    global LAST_REPAIR_TIME
-    now = time.time()
-    if now - LAST_REPAIR_TIME < REPAIR_COOLDOWN:
-        return False
-    LAST_REPAIR_TIME = now
+global ENGINE_STARTED
+if ENGINE_STARTED: return
+ENGINE_STARTED = True
+print("🛰️ [BOOT MAP] Sincronizando camadas...")
+asyncio.create_task(safe_boot())
+await wait_system_ready()
+await start_background_tasks()
+await start_engine()
+asyncio.create_task(start_telegram())
+globals()["PANEL_BOOT_DONE"] = True
+print("🌟 [BOOT MAP] Wootteo operando em 100%!")
+if name == "main":
+try: asyncio.run(main())
+except KeyboardInterrupt: print("🛑 [SYSTEM] Encerrado")
+except Exception as e: print(f"💀 [SYSTEM CRASH] {e}")
+IME = now
     return True
+
