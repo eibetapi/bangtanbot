@@ -1039,39 +1039,48 @@ async def safe_boot():
         BOOT_DONE = True
         print("🏁 [BOOT] Sistema liberado com segurança total!")
 
-=========================================================
-22 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
-=========================================================
+# =========================================================
+# 22 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
+# =========================================================
 ENGINE_STARTED = False
-async def run_full_test_discord(): await asyncio.sleep(0.5)
-def system_integrity_check():
-return {
-"boot_done": globals().get("BOOT_DONE", False),
-"panel_ok": bool(globals().get("panel_message_id") or globals().get("discord_panel_msg_id"))
-}
-async def wait_system_ready():
-timeout = 15
-start = time.time()
-while True:
-status = system_integrity_check()
-if status["boot_done"] or (time.time() - start > timeout): return True
-await asyncio.sleep(1)
-async def boot_sequence_map():
-global ENGINE_STARTED
-if ENGINE_STARTED: return
-ENGINE_STARTED = True
-print("🛰️ [BOOT MAP] Sincronizando camadas...")
-asyncio.create_task(safe_boot())
-await wait_system_ready()
-await start_background_tasks()
-await start_engine()
-asyncio.create_task(start_telegram())
-globals()["PANEL_BOOT_DONE"] = True
-print("🌟 [BOOT MAP] Wootteo operando em 100%!")
-if name == "main":
-try: asyncio.run(main())
-except KeyboardInterrupt: print("🛑 [SYSTEM] Encerrado")
-except Exception as e: print(f"💀 [SYSTEM CRASH] {e}")
-IME = now
-    return True
+async def run_full_test_discord(): 
+    await asyncio.sleep(0.5)
 
+def system_integrity_check():
+    return {
+        "boot_done": globals().get("BOOT_DONE", False),
+        "panel_ok": bool(globals().get("panel_message_id") or globals().get("discord_panel_msg_id"))
+    }
+
+async def wait_system_ready():
+    timeout = 15
+    start = time.time()
+    while True:
+        status = system_integrity_check()
+        if status["boot_done"] or (time.time() - start > timeout): 
+            return True
+        await asyncio.sleep(1)
+
+async def boot_sequence_map():
+    global ENGINE_STARTED
+    if ENGINE_STARTED: 
+        return
+    ENGINE_STARTED = True
+    print("🛰️ [BOOT MAP] Sincronizando camadas...")
+    asyncio.create_task(safe_boot())
+    await wait_system_ready()
+    await start_background_tasks()
+    await start_engine()
+    asyncio.create_task(start_telegram())
+    globals()["PANEL_BOOT_DONE"] = True
+    print("🌟 [BOOT MAP] Wootteo operando em 100%!")
+
+LAST_REPAIR_TIME = 0
+REPAIR_COOLDOWN = 60 
+def can_run_repair():
+    global LAST_REPAIR_TIME
+    now = time.time()
+    if now - LAST_REPAIR_TIME < REPAIR_COOLDOWN:
+        return False
+    LAST_REPAIR_TIME = now
+    return True
