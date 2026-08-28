@@ -759,12 +759,14 @@ def gerar_texto_painel(data_show, city, d_prox, d_br):
 🔴 Offline
 """
 
-# --- MOTOR DE ATUALIZAÇÃO (ENGINE) ---
+# --- MOTOR DE ATUALIZAÇÃO (ENGINE CORRIGIDO) ---
 panel_lock = asyncio.Lock()
 last_panel_update = 0
 
 async def update_panel():
     global last_panel_update
+    if panel_lock.locked(): 
+        return
     async with panel_lock:
         try:
             now = time.time()
@@ -784,16 +786,23 @@ async def update_panel():
                     success_dc = False
                     if dc_id:
                         try:
-                            msg = await chan.fetch_message(dc_id)
-                            await msg.edit(embed=emb)
+                            # Adicionado limite de tempo para o Railway não travar se o Discord oscilar
+                            msg = await asyncio.wait_for(chan.fetch_message(dc_id), timeout=8.0)
+                            await asyncio.wait_for(msg.edit(embed=emb), timeout=8.0)
                             success_dc = True
-                        except: globals()["discord_panel_msg_id"] = None
+                        except discord.NotFound: 
+                            globals()["discord_panel_msg_id"] = None
+                        except Exception as e:
+                            print(f"❌ [PANEL DISCORD EDIT ERR] {e}")
+                            success_dc = True # Evita duplicar se for lentidão temporária
 
-                    if not success_dc:
-                        m = await chan.send(embed=emb)
-                        globals()["discord_panel_msg_id"] = m.id
-                        try: await m.pin()
-                        except: pass
+                    if not success_dc and globals().get("discord_panel_msg_id") is None:
+                        try:
+                            m = await asyncio.wait_for(chan.send(embed=emb), timeout=10.0)
+                            globals()["discord_panel_msg_id"] = m.id
+                            await asyncio.wait_for(m.pin(), timeout=4.0)
+                        except Exception as e:
+                            print(f"❌ [PANEL DISCORD SEND ERR] {e}")
 
             # --- TELEGRAM ---
             if bot_ticket and PANEL_CHAT_ID:
@@ -801,17 +810,29 @@ async def update_panel():
                 success_tg = False
                 if tg_id:
                     try:
-                        await bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=tg_id, text=texto)
+                        # [CORREÇÃO CRÍTICA]: Adicionado o await obrigatório nas APIs modernas do Telegram
+                        await asyncio.wait_for(bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=tg_id, text=texto), timeout=8.0)
                         success_tg = True
-                    except: globals()["panel_message_id"] = None
+                    except Exception as e:
+                        err = str(e).lower()
+                        if "message to edit not found" in err or "chat not found" in err: 
+                            globals()["panel_message_id"] = None
+                        else: 
+                            print(f"❌ [PANEL TELEGRAM EDIT ERR] {e}")
+                            success_tg = True # Evita criar duplicatas por instabilidade de rede
 
-                if not success_tg:
-                    m = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto)
-                    globals()["panel_message_id"] = m.message_id
+                if not success_tg and globals().get("panel_message_id") is None:
+                    try:
+                        # [CORREÇÃO CRÍTICA]: Adicionado o await obrigatório nas APIs modernas do Telegram
+                        m = await asyncio.wait_for(bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto), timeout=10.0)
+                        globals()["panel_message_id"] = m.message_id
+                    except Exception as e:
+                        print(f"❌ [PANEL TELEGRAM SEND ERR] {e}")
 
             await save_counters()
         except Exception as e:
-            print(f"[PANEL ENGINE ERR] {e}")
+            print(f"[PANEL ENGINE ERR COMPLETO] {e}")
+
 
 # --- EVENTOS DE STARTUP (RESTAURADO) ---
 
