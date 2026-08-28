@@ -260,23 +260,39 @@ async def fetch(url, retries=2):
 # =========================
 import asyncio
 async def send_alert(alert_type, message, increment=False):
+    """
+    Despachante central de alertas (Discord + Telegram).
+    increment=False: Evita somar o contador duas vezes (Erro do Bloco 14/15).
+    """
     try:
-      if DISCORD_ALERTA_CHANNELS:
-for channel_id in DISCORD_ALERTA_CHANNELS:
-canal = bot_discord.get_channel(channel_id)
-if canal:
-try: await canal.send(message)
-except Exception as e: print(f"❌ [DISCORD ERR] {channel_id}: {e}")
-if increment:
-if "ticket" in alert_type or "reposicao" in alert_type:
-globals()["total_tickets"] += 1
-await save_counters()
-except Exception as e:
-print(f"⚠️ [DISPATCH ERR] {e}")
+        # 1. Envio para o Discord
+        if DISCORD_ALERTA_CHANNELS:
+            for channel_id in DISCORD_ALERTA_CHANNELS:
+                canal = bot_discord.get_channel(channel_id)
+                if canal:
+                    try:
+                        await canal.send(message)
+                    except Exception as e:
+                        print(f"❌ [DISCORD ERR] Erro no canal {channel_id}: {e}")
+        # 2. Envio para o Telegram (Usa a função estável do Bloco 10)
+        if 'send_alert_telegram' in globals():
+            await send_alert_telegram(message)
+        # 3. Incremento Controlado (Só roda se explicitamente pedido)
+        if increment:
+            if "ticket" in alert_type or "reposicao" in alert_type:
+                globals()["total_tickets"] += 1
+            # Salva após o incremento para manter o painel fiel
+            if 'save_counters' in globals():
+                await save_counters()
+    except Exception as e:
+        print(f"⚠️ [DISPATCH ERR] Falha crítica no envio: {e}")
+
 async def increment_only(alert_type):
-if "ticket" in alert_type:
-globals()["total_tickets"] += 1
-await save_counters()
+    """Apenas incrementa o contador sem enviar mensagem (Útil para logs silenciosos)"""
+    if "ticket" in alert_type:
+        globals()["total_tickets"] += 1
+    if 'save_counters' in globals():
+        await save_counters()
 
 # =========================
 # 11 PERSISTÊNCIA & STORAGE (CORRIGIDO)
