@@ -184,7 +184,6 @@ def get_next_show():
 # 7 AGENDA FIXA
 # =========================
 AGENDA = [
-    ("27/08/2026", "Chicago", "Estados Unidos", "20:00"),
     ("28/08/2026", "Chicago", "Estados Unidos", "20:00"),
     ("01/09/2026", "Los Angeles", "Estados Unidos", "20:00"),
     ("02/09/2026", "Los Angeles", "Estados Unidos", "20:00"),
@@ -230,7 +229,6 @@ AGENDA = [
     ("14/03/2027", "Bocaue", "Filipinas", "20:00"),
     ("16/03/2027", "Bocaue", "Filipinas", "20:00")
 ]
-
 
 # =========================
 # 8 RESOLVE STATUS & GESTÃO DE ESTADO
@@ -1123,4 +1121,5 @@ def can_run_repair():
         return False
     LAST_REPAIR_TIME = now
     return True
+
 
