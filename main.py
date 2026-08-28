@@ -24,6 +24,7 @@ async def auto_repair_panel():
 # =========================
 import asyncio, time, hashlib, os, re, json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from threading import Thread, Lock
 import discord
 from discord.ext import commands
@@ -246,14 +247,14 @@ def status_color(last_check_time, tipo):
     # 1. Prioridade: Se o motor estiver rodando a função agora, mostra VERDE
     if globals().get(f"is_checking_{tipo}", False):
         return "🟢"
-    
+
     # 2. Se nunca checou ou tempo zerado, mostra VERMELHO
     if not last_check_time or last_check_time == 0:
         return "🔴"
-    
+
     # 3. Cálculo de latência
     elapsed = time.time() - last_check_time
-    
+
     if elapsed < 600:    # Menos de 10 min: ATIVO (ROXO)
         return "🟣"
     elif elapsed < 1800: # Menos de 30 min: LENTO (AMARELO)
@@ -265,11 +266,11 @@ def get_uptime():
     """Calcula o tempo de atividade do bot"""
     if 'start_time' not in globals():
         return "N/A"
-    
+
     total_seconds = int(time.time() - globals()["start_time"])
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    
+
     return f"{hours}h {minutes}m {seconds}s"
 # =========================
 # 9 SESSION HTTP
@@ -293,7 +294,7 @@ async def fetch(url, retries=2):
                 if resp.status == 200: return await resp.text()
         except: await asyncio.sleep(1)
     return None
-    
+
 # =========================
 # 10 ALERT DISPATCHER (ESTABILIZADO)
 # =========================
@@ -318,12 +319,12 @@ async def send_alert(alert_type, message, increment=False):
         # 2. Envio para o Telegram (Usa a função estável do Bloco 10)
         if 'send_alert_telegram' in globals():
             await send_alert_telegram(message)
-        
+
         # 3. Incremento Controlado (Só roda se explicitamente pedido)
         if increment:
             if "ticket" in alert_type or "reposicao" in alert_type:
                 globals()["total_tickets"] += 1
-            
+
             # Salva após o incremento para manter o painel fiel
             if 'save_counters' in globals():
                 await save_counters()
@@ -335,7 +336,7 @@ async def increment_only(alert_type):
     """Apenas incrementa o contador sem enviar mensagem (Útil para logs silenciosos)"""
     if "ticket" in alert_type:
         globals()["total_tickets"] += 1
-    
+
     if 'save_counters' in globals():
         await save_counters()
 
@@ -411,13 +412,13 @@ async def load_counters():
         try:
             with open(COUNTERS_FILE, 'r') as f:
                 data = json.load(f)
-            
+
             globals()["total_tickets"] = data.get("total_tickets", 0)
             globals()["last_ticket_check"] = data.get("last_ticket_check", 0)
             # [FIX] Recupera IDs para que o Motor edite em vez de criar novo
             globals()["panel_message_id"] = data.get("tg_msg_id")
             globals()["discord_panel_msg_id"] = data.get("dc_msg_id")
-            
+
             print("✅ [SYSTEM] Estado e IDs restaurados com sucesso.")
         except Exception as e:
             print(f"❌ [LOAD ERROR] Falha ao carregar estado: {e}")
@@ -437,10 +438,10 @@ async def ticket_reposicao(url, data, setor, categoria):
     await save_counters()
 
     msg = f"🔥 **ALERTA DE REPOSIÇÃO** 🔥\n📅 **Data:** {data}\n🎫 **Setor:** {setor}\n🏷️ **Cat:** {categoria}\n🔗 {url}"
-    
+
     await send_alert("reposicao", msg, increment=False)
     await update_panel()
-    
+
 # =========================
 # 14 TESTE DE SISTEMA (CORRIGIDO)
 # =========================
@@ -449,10 +450,10 @@ async def teste(interaction: discord.Interaction):
     """Diagnóstico consolidado enviado diretamente ao canal do usuário."""
     # Garante que o Discord não dê timeout enquanto o bot processa
     await interaction.response.defer(thinking=True)
-    
+
     # Extração de dados (Fallback para 0 se não existir)
     uptime = get_uptime() if 'get_uptime' in globals() else "N/A"
-    
+
     # Estrutura de dados para o relatório
     stats = {
         "Tickets": (globals().get("last_ticket_check", 0), "ticket", "total_tickets")
@@ -467,7 +468,7 @@ async def teste(interaction: discord.Interaction):
             color = status_color(t_last, t_key)
         else:
             color = "⚪"
-            
+
         count = globals().get(count_key, 0)
         report += f"{color} **{label}:** `{count}` acessos\n"
 
@@ -543,15 +544,15 @@ async def bts(ctx):
 async def teste(ctx):
     if ctx.is_discord:
         await send(ctx, "⚠️ [DISCORD] Forçando disparo de alertas nas salas de teste...")
-        
+
         # Silencia o Telegram para não vazar
         orig_tg = bot_ticket.send_message
         bot_ticket.send_message = lambda *a, **k: asyncio.sleep(0) 
-        
+
         try:
             # 1. Tenta a rotina do Bloco 16
             await run_full_test_discord()
-            
+
             # 2. FORÇA BRUTA: Se a rotina acima não mandou nada (porque não houve mudança real),
             # nós mandamos um alerta manual agora para confirmar a rota.
             alerta_canais = globals().get("DISCORD_ALERTA_CHANNELS", [])
@@ -598,7 +599,7 @@ import random
 
 async def fetch_html(session, url):
     """Realiza a busca segura do HTML com disfarce dinâmico"""
-    
+
     # Headers simulando um navegador moderno e real
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -619,7 +620,7 @@ async def fetch_html(session, url):
         async with session.get(url, headers=headers, timeout=20) as response:
             if response.status == 200:
                 return await response.text()
-            
+
             # Se cair no 429 (Too Many Requests), avisa no console
             if response.status == 429:
                 print(f"[LIMIT] Instagram/Site limitou o IP (429): {url}")
@@ -627,7 +628,7 @@ async def fetch_html(session, url):
                 print(f"[BLOCK] Ticketmaster barrou o acesso (403): {url}")
             else:
                 print(f"[FETCH] Status {response.status} para: {url}")
-            
+
             return None
 
     except asyncio.TimeoutError:
@@ -636,7 +637,7 @@ async def fetch_html(session, url):
     except Exception as e:
         print(f"[FETCH ERR] Falha crítica em {url}: {e}")
         return None
-        
+
 # =========================================================
 # 17 SISTEMA INTEGRADO: ESTADO, PERSISTÊNCIA E FAXINA (COMPLETO)
 # =========================================================
@@ -680,13 +681,13 @@ def status_color(last_check_time, tipo):
     # Se o motor do Bloco 19 estiver acessando o site agora, fica Verde
     if globals().get(f"is_checking_{tipo}", False): 
         return "🟢" 
-    
+
     # 2. VERIFICAÇÃO DE HISTÓRICO
     if not last_check_time or last_check_time == 0: 
         return "🔴" 
-        
+
     elapsed = time.time() - last_check_time
-    
+
     # 3. ESTADOS DE OPERAÇÃO
     # Se o último acesso foi há menos de 10 min, mantém Roxo (Ativo)
     if elapsed < 600: 
@@ -698,32 +699,79 @@ def status_color(last_check_time, tipo):
     else: 
         return "🔴"
 
+# Fusos horários oficiais das cidades da agenda.
+# A hora informada em AGENDA é a hora LOCAL do show.
+AGENDA_TIMEZONES = {
+    "Chicago": "America/Chicago",
+    "Los Angeles": "America/Los_Angeles",
+    "Bogotá": "America/Bogota",
+    "Lima": "America/Lima",
+    "Santiago": "America/Santiago",
+    "Buenos Aires": "America/Argentina/Buenos_Aires",
+    "São Paulo": "America/Sao_Paulo",
+    "Kaohsiung": "Asia/Taipei",
+    "Bangkok": "Asia/Bangkok",
+    "Kuala Lumpur": "Asia/Kuala_Lumpur",
+    "Singapura": "Asia/Singapore",
+    "Jacarta": "Asia/Jakarta",
+    "Melbourne": "Australia/Melbourne",
+    "Sydney": "Australia/Sydney",
+    "Hong Kong": "Asia/Hong_Kong",
+    "Bocaue": "Asia/Manila",
+}
+
 def get_countdown_data():
-    now_dt = datetime.now()
+    # IMPORTANTE:
+    # datetime.now() sozinho usa o fuso do servidor (Railway/UTC).
+    # Como cada show está marcado pela hora LOCAL da cidade, isso podia
+    # fazer o painel considerar um show como já encerrado antes da hora real.
+    now_utc = datetime.now(ZoneInfo("UTC"))
+
     next_show, next_local = "Continua…", "---"
     d_prox, d_br = 0, 0
     agenda_data = globals().get("AGENDA", [])
 
     for item in agenda_data:
         try:
-            # Garante a leitura no formato Dia/Mês/Ano Hora:Minuto
-            show_dt = datetime.strptime(f"{item[0]} {item[3]}", "%d/%m/%Y %H:%M")
-            if show_dt > now_dt:
-                next_show, next_local = item[0], f"{item[1]}, {item[2]}"
-                d_prox = (show_dt.date() - now_dt.date()).days
+            city = item[1]
+            timezone_name = AGENDA_TIMEZONES.get(city, "UTC")
+            local_tz = ZoneInfo(timezone_name)
+
+            # A data/hora da agenda representa a hora LOCAL do show.
+            show_naive = datetime.strptime(
+                f"{item[0]} {item[3]}",
+                "%d/%m/%Y %H:%M"
+            )
+            show_dt = show_naive.replace(tzinfo=local_tz)
+
+            # Compara corretamente, independentemente do fuso do servidor.
+            if show_dt.astimezone(ZoneInfo("UTC")) > now_utc:
+                now_local = now_utc.astimezone(local_tz)
+                next_show = item[0]
+                next_local = f"{item[1]}, {item[2]}"
+                d_prox = max(0, (show_dt.date() - now_local.date()).days)
                 break
+
         except Exception as err:
-            print(f"⚠️ [AGENDA ERR] Data inválida ignorada ({item[0]} - {item[1]}): {err}")
+            print(
+                f"⚠️ [AGENDA ERR] Data inválida ignorada "
+                f"({item[0]} - {item[1]}): {err}"
+            )
             continue
 
-    for item in agenda_data:
-        try:
+    # Contagem para o primeiro show no Brasil, usando a data de São Paulo.
+    try:
+        br_tz = ZoneInfo("America/Sao_Paulo")
+        br_today = now_utc.astimezone(br_tz).date()
+
+        for item in agenda_data:
             if "Brasil" in item[2]:
                 br_date = datetime.strptime(item[0], "%d/%m/%Y").date()
-                if br_date >= now_dt.date():
-                    d_br = (br_date - now_dt.date()).days
+                if br_date >= br_today:
+                    d_br = (br_date - br_today).days
                     break
-        except: continue
+    except Exception as err:
+        print(f"⚠️ [AGENDA BR ERR] {err}")
 
     return next_show, next_local, d_prox, d_br
 
@@ -767,7 +815,7 @@ async def update_panel():
             now = time.time()
             if (now - last_panel_update) < 5: return 
             last_panel_update = now
-            
+
             d_show, city, d_prox, d_br = get_countdown_data()
             texto = gerar_texto_painel(d_show, city, d_prox, d_br)
 
@@ -777,7 +825,7 @@ async def update_panel():
                 if chan:
                     dc_id = globals().get("discord_panel_msg_id")
                     emb = discord.Embed(description=texto, color=0x8A2BE2)
-                    
+
                     success_dc = False
                     if dc_id:
                         try:
@@ -805,7 +853,7 @@ async def update_panel():
                 if not success_tg:
                     m = await bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto)
                     globals()["panel_message_id"] = m.message_id
-            
+
             await save_counters()
         except Exception as e:
             print(f"[PANEL ENGINE ERR] {e}")
@@ -826,9 +874,9 @@ async def on_ready():
     # Carrega dados e força a edição do painel imediatamente ao ligar
     await load_counters()
     await update_panel()
-    
+
     globals()["PANEL_BOOT_DONE"] = True
-    
+
 # =========================================================
 # 18 MOTOR UNIFICADO (FIX: SINCRONIA DE CORES DAS BOLINHAS)
 # =========================================================
@@ -847,12 +895,12 @@ async def safe_monitor_cycle(session):
     global _INITIAL_WARMUP_DONE, _WARMUP_STEPS
     now = time.time()
     stats = globals()['contadores_globais']
-    
+
     try:
         # 1. TICKETMASTER (1 MINUTO)
         stats['total_tickets'] += 1
         globals()['total_tickets'] = stats['total_tickets']
-        
+
         # AJUSTE DE CORES: Salva nos dois formatos para o Bloco 18 encontrar
         globals()['last_check_ticket'] = now
         globals()['last_ticket_check'] = now 
@@ -988,7 +1036,7 @@ async def start_background_tasks():
         if PANEL_LOOP_TASK and not PANEL_LOOP_TASK.done():
             return
         PANEL_LOOP_TASK = asyncio.create_task(panel_loop())
-        
+
 # =========================
 # 21 BOOT MASTER SAFE (ABSOLUTE MODE)
 # =========================
@@ -1020,7 +1068,7 @@ async def recover_panels():
             channel = bot_discord.get_channel(DISCORD_PANEL_CHANNEL_ID)
             if not channel: 
                 channel = await bot_discord.fetch_channel(DISCORD_PANEL_CHANNEL_ID)
-            
+
             if channel:
                 async for msg in channel.history(limit=50):
                     # [CORREÇÃO CRÍTICA]: O painel é um Embed, então buscamos dentro da descrição do Embed
@@ -1090,7 +1138,7 @@ async def wait_system_ready():
 async def boot_sequence_map():
     """Orquestrador final que amarra todos os blocos."""
     global ENGINE_STARTED, WATCHDOG_STARTED
-    
+
     print("🛰️ [BOOT MAP] Sincronizando camadas...")
 
     # 1. Espera o Bloco 22 (Recuperação de IDs e Arquivos)
@@ -1121,5 +1169,3 @@ def can_run_repair():
         return False
     LAST_REPAIR_TIME = now
     return True
-
-
