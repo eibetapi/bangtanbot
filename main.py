@@ -80,11 +80,24 @@ async def setup_hook():
         print("[SYNC] Slash commands sincronizados")
     except Exception as e: 
         print(f"[SYNC ERROR] {e}")
-# 2.1 TELEGRAM START #
-bot_ticket = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
+# 2.1 TELEGRAM START (ATUALIZADO PARA V20+) #
+bot_ticket = None
+if TELEGRAM_TOKEN:
+    try:
+        from telegram.ext import ExtBot
+        # O ExtBot inicializa os canais de envio assíncrono sem quebrar o token
+        bot_ticket = ExtBot(token=TELEGRAM_TOKEN)
+    except ImportError:
+        bot_ticket = Bot(token=TELEGRAM_TOKEN)
+
 async def start_telegram():
     if bot_ticket:
-        print("[TELEGRAM] pronto (Modo Legacy)")
+        try:
+            # Acorda o robô validando a sessão de comunicação com o Telegram
+            await bot_ticket.initialize()
+            print("[TELEGRAM] pronto (Sessão Assíncrona Ativada)")
+        except Exception as e:
+            print(f"[TELEGRAM INIT ERR] Falha ao acordar o bot: {e}")
 # =========================
 # 3 CONTROLE DE CONTADORES (FIX SINCRONIA)
 # =========================
@@ -948,9 +961,10 @@ async def main():
             if 'start_background_tasks' in globals():
                 await start_background_tasks()
 
-            if _TELEGRAM_TASK is None and 'start_telegram' in globals():
+            # [FIX CRÍTICO]: Inicializa e valida a sessão assíncrona do Telegram antes do motor rodar
+            if 'start_telegram' in globals() and bot_ticket:
                 print("📨 [BOOT] Iniciando Telegram...")
-                _TELEGRAM_TASK = asyncio.create_task(start_telegram())
+                await start_telegram()
 
             if _ENGINE_TASK is None and 'start_engine' in globals():
                 print("⚙️ [BOOT] Iniciando Motor de Monitoramento...")
@@ -969,6 +983,7 @@ if __name__ == "__main__":
         print("🛑 [SYSTEM] Encerrado manualmente")
     except Exception as e:
         print(f"💀 [SYSTEM CRASH] {e}")
+
 
 # =========================
 # 20 PANEL LOOP (ANTI-SPAM)
