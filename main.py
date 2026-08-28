@@ -1095,6 +1095,7 @@ async def safe_boot():
 # 22 BOOT SEQUENCE MAP (ORDER CONTROL & RAILWAY SAFE)
 # =========================================================
 ENGINE_STARTED = False
+
 async def run_full_test_discord(): 
     await asyncio.sleep(0.5)
 
@@ -1129,6 +1130,7 @@ async def boot_sequence_map():
 
 LAST_REPAIR_TIME = 0
 REPAIR_COOLDOWN = 60 
+
 def can_run_repair():
     global LAST_REPAIR_TIME
     now = time.time()
@@ -1136,3 +1138,4 @@ def can_run_repair():
         return False
     LAST_REPAIR_TIME = now
     return True
+
