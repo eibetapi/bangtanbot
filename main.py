@@ -779,12 +779,13 @@ last_panel_update = 0
 
 async def update_panel():
     global last_panel_update
-    if panel_lock.locked(): 
+    if panel_lock.locked():
         return
     async with panel_lock:
         try:
             now = time.time()
-            if (now - last_panel_update) < 5: return 
+            if (now - last_panel_update) < 5:
+                return
             last_panel_update = now
 
             d_show, city, d_prox, d_br = get_countdown_data()
@@ -800,53 +801,127 @@ async def update_panel():
                     success_dc = False
                     if dc_id:
                         try:
-                            # Adicionado limite de tempo para o Railway não travar se o Discord oscilar
-                            msg = await asyncio.wait_for(chan.fetch_message(dc_id), timeout=8.0)
-                            await asyncio.wait_for(msg.edit(embed=emb), timeout=8.0)
+                            msg = await asyncio.wait_for(
+                                chan.fetch_message(dc_id),
+                                timeout=8.0
+                            )
+                            await asyncio.wait_for(
+                                msg.edit(embed=emb),
+                                timeout=8.0
+                            )
                             success_dc = True
-                        except discord.NotFound: 
+                        except discord.NotFound:
                             globals()["discord_panel_msg_id"] = None
                         except Exception as e:
                             print(f"❌ [PANEL DISCORD EDIT ERR] {e}")
-                            success_dc = True # Evita duplicar se for lentidão temporária
+                            success_dc = True
 
                     if not success_dc and globals().get("discord_panel_msg_id") is None:
                         try:
-                            m = await asyncio.wait_for(chan.send(embed=emb), timeout=10.0)
+                            m = await asyncio.wait_for(
+                                chan.send(embed=emb),
+                                timeout=10.0
+                            )
                             globals()["discord_panel_msg_id"] = m.id
-                            await asyncio.wait_for(m.pin(), timeout=4.0)
+                            await asyncio.wait_for(
+                                m.pin(),
+                                timeout=4.0
+                            )
                         except Exception as e:
                             print(f"❌ [PANEL DISCORD SEND ERR] {e}")
 
-            # --- TELEGRAM ---
+            # --- TELEGRAM CANAL 1 ---
             if bot_ticket and PANEL_CHAT_ID:
                 tg_id = globals().get("panel_message_id")
                 success_tg = False
+
                 if tg_id:
                     try:
-                        # [CORREÇÃO CRÍTICA]: Adicionado o await obrigatório nas APIs modernas do Telegram
-                        await asyncio.wait_for(bot_ticket.edit_message_text(chat_id=PANEL_CHAT_ID, message_id=tg_id, text=texto), timeout=8.0)
+                        await asyncio.wait_for(
+                            bot_ticket.edit_message_text(
+                                chat_id=PANEL_CHAT_ID,
+                                message_id=tg_id,
+                                text=texto
+                            ),
+                            timeout=8.0
+                        )
                         success_tg = True
                     except Exception as e:
                         err = str(e).lower()
-                        if "message to edit not found" in err or "chat not found" in err: 
-                            globals()["panel_message_id"] = None
-                        else: 
-                            print(f"❌ [PANEL TELEGRAM EDIT ERR] {e}")
-                            success_tg = True # Evita criar duplicatas por instabilidade de rede
 
-                if not success_tg and globals().get("panel_message_id") is None:
+                        if (
+                            "message to edit not found" in err
+                            or "chat not found" in err
+                        ):
+                            globals()["panel_message_id"] = None
+                        else:
+                            print(f"❌ [PANEL TELEGRAM EDIT ERR] {e}")
+                            success_tg = True
+
+                if (
+                    not success_tg
+                    and globals().get("panel_message_id") is None
+                ):
                     try:
-                        # [CORREÇÃO CRÍTICA]: Adicionado o await obrigatório nas APIs modernas do Telegram
-                        m = await asyncio.wait_for(bot_ticket.send_message(chat_id=PANEL_CHAT_ID, text=texto), timeout=10.0)
+                        m = await asyncio.wait_for(
+                            bot_ticket.send_message(
+                                chat_id=PANEL_CHAT_ID,
+                                text=texto
+                            ),
+                            timeout=10.0
+                        )
                         globals()["panel_message_id"] = m.message_id
                     except Exception as e:
                         print(f"❌ [PANEL TELEGRAM SEND ERR] {e}")
 
+            # --- TELEGRAM CANAL 2 ---
+            if bot_ticket and PANEL_CHAT_ID_2:
+                tg_id_2 = globals().get("panel_message_id_2")
+                success_tg_2 = False
+
+                if tg_id_2:
+                    try:
+                        await asyncio.wait_for(
+                            bot_ticket.edit_message_text(
+                                chat_id=PANEL_CHAT_ID_2,
+                                message_id=tg_id_2,
+                                text=texto
+                            ),
+                            timeout=8.0
+                        )
+                        success_tg_2 = True
+                    except Exception as e:
+                        err = str(e).lower()
+
+                        if (
+                            "message to edit not found" in err
+                            or "chat not found" in err
+                        ):
+                            globals()["panel_message_id_2"] = None
+                        else:
+                            print(f"❌ [PANEL TELEGRAM 2 EDIT ERR] {e}")
+                            success_tg_2 = True
+
+                if (
+                    not success_tg_2
+                    and globals().get("panel_message_id_2") is None
+                ):
+                    try:
+                        m = await asyncio.wait_for(
+                            bot_ticket.send_message(
+                                chat_id=PANEL_CHAT_ID_2,
+                                text=texto
+                            ),
+                            timeout=10.0
+                        )
+                        globals()["panel_message_id_2"] = m.message_id
+                    except Exception as e:
+                        print(f"❌ [PANEL TELEGRAM 2 SEND ERR] {e}")
+
             await save_counters()
+
         except Exception as e:
             print(f"[PANEL ENGINE ERR COMPLETO] {e}")
-
 
 # --- EVENTOS DE STARTUP (RESTAURADO) ---
 
